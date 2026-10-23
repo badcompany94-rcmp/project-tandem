@@ -1,4 +1,4 @@
-# Online play
+# Play Mario Kart: Double Dash!! online with Project Tandem
 
 Project Tandem supports rooms for **2–8 people**, with solo and shared karts in the same event. Online use needs an Internet connection. EOS provides device guest identities, lobby discovery, connection setup, and relay fallback; players do not need an Epic player account.
 
