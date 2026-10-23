@@ -1,0 +1,56 @@
+PROJECT TANDEM END-USER TERMS
+
+Project Tandem is an independent, experimental recompilation project. These
+terms describe the supplied project software and proprietary online-service
+components. They do not grant rights to any Nintendo game, disc image, game
+code, character, artwork, music, or trademark. Supply your own compatible game
+image and comply with the rights and laws that apply to it.
+
+OPEN-SOURCE COMPONENTS
+
+The original project source is provided under the accompanying MIT License.
+Other open-source components retain their own licenses and notices. Nothing
+in these terms restricts rights those licenses grant for those components.
+See LICENSE, CREDITS.md, THIRD-PARTY-NOTICES.md, and the notices supplied with
+the download. No game content is licensed under the project's MIT License.
+
+EPIC MATERIALS AND ONLINE SERVICES
+
+The Windows player package includes proprietary Epic Online Services runtime
+components supplied by Epic Games and its licensors ("Epic Materials"). The
+MIT License does not apply to the Epic Materials. Use of the bundled runtime
+is limited to its integration with Project Tandem; this download does not
+grant a license to redistribute or use the SDK as a standalone development
+product. Epic and its licensors retain their rights in the Epic Materials.
+
+TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, THE EPIC MATERIALS ARE
+PROVIDED "AS IS" AND "AS AVAILABLE." THE PROJECT CONTRIBUTORS, EPIC GAMES,
+AND THEIR RESPECTIVE AFFILIATES AND LICENSORS DISCLAIM ALL REPRESENTATIONS,
+WARRANTIES, AND CONDITIONS RELATED TO THE EPIC MATERIALS, WHETHER EXPRESS,
+IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. THEY DO NOT WARRANT THAT
+THE EPIC MATERIALS OR ONLINE SERVICES WILL BE AVAILABLE, UNINTERRUPTED,
+SECURE, OR ERROR-FREE.
+
+TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, THE PROJECT CONTRIBUTORS,
+EPIC GAMES, AND THEIR RESPECTIVE AFFILIATES AND LICENSORS DISCLAIM LIABILITY
+FOR CLAIMS, DAMAGES, LOSSES, COSTS, OR OTHER LIABILITIES ARISING OUT OF OR
+RELATING TO THE EPIC MATERIALS OR ONLINE SERVICES, INCLUDING DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, AND PUNITIVE DAMAGES, LOST
+DATA, LOST PROFITS, AND BUSINESS INTERRUPTION, REGARDLESS OF THE THEORY OF
+LIABILITY AND WHETHER ADVISED OF THE POSSIBILITY. THESE EXCLUSIONS DO NOT
+LIMIT RIGHTS OR LIABILITIES THAT APPLICABLE LAW DOES NOT ALLOW TO BE EXCLUDED.
+
+Project Tandem is a beta. Keep your own backups. Online availability and
+compatibility can change; there is no guarantee of continued online service.
+For data and connection information, read PRIVACY.md. Epic's own terms and
+privacy information are available at:
+https://onlineservices.epicgames.com/services/terms/agreements
+https://legal.epicgames.com/epicgames/privacy-policy
+
+TRADEMARKS AND AFFILIATION
+
+Mario Kart: Double Dash!!, GameCube, Nintendo characters, and related marks
+belong to their respective owners. Epic Online Services and related marks
+belong to Epic and its licensors. Project Tandem is not affiliated with or
+endorsed by Nintendo or Epic Games.

@@ -1,0 +1,15 @@
+{
+  "game_project": {
+    "url": "https://github.com/ethannicholas/mariokartdd-recomp",
+    "revision": "1f04b66df74c26ee6150869aa3b959006066c143",
+    "license": "MIT"
+  },
+  "runtime": {
+    "url": "https://github.com/ethannicholas/gcn-recomp",
+    "revision": "02d7135893c9961bd240d38e0450dc1c650e8418",
+    "license": "MIT",
+    "vendored": true
+  },
+  "includes_local_modifications": true,
+  "gameplay_compatibility": "69b8a88ef96a4c0b"
+}

@@ -1,0 +1,146 @@
+{
+  "format": 1,
+  "scope": "Distribution interface assets; excludes game data and documentation screenshots",
+  "assets": [
+    {
+      "path": "distribution/assets/classic/background.gctex",
+      "sha256": "5a658b59eae614bf94506db26532202c4960c54f74591a230a805314a3e2c88b",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/background.rgba",
+      "sha256": "4b70daacbcd663b483ac36cbc8ef2e2ec5a1fad07290e586278b819cb770a9c4",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/battle.gctex",
+      "sha256": "0c341856578f926f81ed6670bcd3c5e51a0766a8423d489f82f447791590d466",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/battle.rgba",
+      "sha256": "0dc5d06d8f0b4b714a669bd35be0340b39f1dcb1dd21cf11d7f8b72db2e76207",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/driver.gctex",
+      "sha256": "535cb609ed1468e7872d991fe681115eac37826913f75160edad6dc3db44fed4",
+      "bytes": 65568,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/driver.rgba",
+      "sha256": "25b6304447b465bcf6363e682755b4a0712a1e37695ec7ce021eaa163e680b3c",
+      "bytes": 4194316,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/engine.gctex",
+      "sha256": "5314fdc3a6ec7500ddf7ff04dabfa8bf1ff12d2c3ae0666ca2557ee383edeb7e",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/engine.rgba",
+      "sha256": "49c96d9ecbf9ec52f91d0804aa6cc0ab1640f726d7f7a79d7603faad3b83988f",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/hostjoin.gctex",
+      "sha256": "d9a3e5d208b5939ea9e554e479d1c4285f976698ca21ff30d94013fe2ac13466",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/hostjoin.rgba",
+      "sha256": "4c0c8065a2afdfe19fe2d18ab64ad10cea19697db37fceb68d498d4da990fac3",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/lobby.gctex",
+      "sha256": "f8148aeb642f66e22f508dcfd882223048fb7a06353a7d025aee9686fb4dbc23",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/lobby.rgba",
+      "sha256": "369005851ae640ea4ac21e35cd2e7485fe1a174a5032d0d0760c380345975c8c",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/mode.gctex",
+      "sha256": "9ce6acad390c23a61b4ad62ef404572aec238f404b2bf0a20bb3dc0a3be3c8d6",
+      "bytes": 2359328,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/mode.rgba",
+      "sha256": "fb6f155e96c90202d38b9ec368940a6a68739883dec103372e5da679a0536308",
+      "bytes": 33177612,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/classic/OFL.txt",
+      "sha256": "cdcc959c42ab255b4cea4bd82f2db5c24a2da7ecabe615d02d5a5dba3716e446",
+      "bytes": 4573,
+      "origin": "Font license notice",
+      "rights": "Notice retained unmodified"
+    },
+    {
+      "path": "distribution/assets/classic/racing-font-hd.bin",
+      "sha256": "be9f3cc53b946365984d6ecff38f0c517aec38b753736fd1fa90dbdb42809670",
+      "bytes": 17510796,
+      "origin": "Racing Sans One font or project-generated atlas derived from that font",
+      "rights": "SIL Open Font License 1.1; see classic/OFL.txt"
+    },
+    {
+      "path": "distribution/assets/classic/racing-font.bin",
+      "sha256": "950b0b46deca2d469d5ec28d2e667ead5b05c3526a23d6d07b88ca0cb5e03ab3",
+      "bytes": 1949040,
+      "origin": "Racing Sans One font or project-generated atlas derived from that font",
+      "rights": "SIL Open Font License 1.1; see classic/OFL.txt"
+    },
+    {
+      "path": "distribution/assets/classic/RacingSansOne-Regular.ttf",
+      "sha256": "8b5cada83e3e4692f624f1b583a069b34e457e07a4210ceddbb1133b3383673e",
+      "bytes": 145796,
+      "origin": "Racing Sans One font or project-generated atlas derived from that font",
+      "rights": "SIL Open Font License 1.1; see classic/OFL.txt"
+    },
+    {
+      "path": "distribution/assets/menu-cursor.png",
+      "sha256": "7ca5d4c356fe94349883b833efda7b483e1f6b484919fa81c1efde072138497e",
+      "bytes": 1298955,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/menu-kart.gctex",
+      "sha256": "7834acf740da5d9073c7946c033551547b7ade9b0809448821438b0b9b3e8497",
+      "bytes": 458784,
+      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    }
+  ]
+}

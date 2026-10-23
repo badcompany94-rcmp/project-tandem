@@ -1,0 +1,61 @@
+name: Bug report
+description: Report an installation, controls, gameplay, menu, or online problem.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach a disc image, generated game, your installed folder, local-data, EOS configuration, session tokens, or unreviewed logs. For sensitive security reports, read SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version and build ID
+      description: Find these in the lobby or F1 settings.
+      placeholder: Alpha25 / 69b8a88ef96a4c0b
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Setup or update
+        - Mouse and keyboard menus
+        - Mouse and keyboard racing
+        - Controller or local multiplayer
+        - Online lobby or selection
+        - Online racing or Battle
+        - Offline gameplay
+        - Display or sound
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps and result
+      description: What did you do, what happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Windows and hardware
+      placeholder: Windows version, CPU, GPU; controller model if relevant
+  - type: textarea
+    id: multiplayer
+    attributes:
+      label: Multiplayer details
+      description: Player count, approximate regions, mode, solo/shared kart arrangement, who hosted, and whether all PCs were affected. Do not post addresses or live room codes.
+  - type: textarea
+    id: counters
+    attributes:
+      label: FPS, RTT, and BUF
+      description: For stutter/delay, toggle F10 and provide readings from each PC. State whether this happened during racing, introductions, or results.
+  - type: textarea
+    id: excerpts
+    attributes:
+      label: Optional reviewed diagnostic excerpt
+      description: Remove private paths, names, identifiers, tokens, room codes, and configuration values before pasting. Whole-folder uploads are unnecessary.
+      render: text

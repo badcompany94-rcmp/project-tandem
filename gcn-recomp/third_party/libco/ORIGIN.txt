@@ -1,0 +1,5 @@
+Source: https://github.com/higan-emu/libco
+Revision: e18e09d634d612a01781168ad4d76be10a7e3bad
+Unmodified upstream amd64.c, libco.h, settings.h, LICENSE and valgrind.h.
+Only the Windows x64 backend is used, by runtime/rewind_stack.cpp.
+The wrapper owns stack storage, Windows stack bounds and floating-point controls.

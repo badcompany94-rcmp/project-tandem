@@ -1,0 +1,7 @@
+{
+  "product_id": "YOUR_PRODUCT_ID",
+  "sandbox_id": "YOUR_SANDBOX_ID",
+  "deployment_id": "YOUR_DEPLOYMENT_ID",
+  "client_id": "YOUR_GAME_CLIENT_ID",
+  "client_secret": "YOUR_GAME_CLIENT_SECRET"
+}

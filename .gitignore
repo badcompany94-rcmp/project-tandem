@@ -1,0 +1,27 @@
+# Each player supplies game data; never publish it or generated outputs.
+rom/*
+!rom/README.md
+*.iso
+*.ciso
+*.rvz
+*.gcz
+*.gcm
+*.dol
+*.raw
+build*/
+local-data/
+saves/
+disc/
+gen/
+eos-cache/
+eos.json
+config/eos.json
+eos-settings.json
+distribution/config/eos.json
+distribution/local-settings.json
+*.pem
+*.key
+__pycache__/
+*.pyc
+panic.txt
+.DS_Store

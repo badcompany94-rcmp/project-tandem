@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an improvement to Project Tandem.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help you do?
+      description: Describe the player problem or missing behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested behavior
+      description: Include the relevant menu, mode, or input device.
+    validations:
+      required: true
