@@ -43,6 +43,11 @@ void render_set_flat_overlay_hook(FlatOverlayHook hook,bool batch_only=false);
 void render_set_output_fbo(unsigned fbo);
 
 bool render_execute(Batch& b);
+// Flat desktop presentation only. Extra draws never advance the guest or GPU
+// checkpoint state. Discard history at correction/control boundaries.
+void render_interpolation_enable(bool enabled);
+void render_interpolation_reset();
+bool render_interpolated(float alpha);
 
 // Frames presented so far, for tracing what a display frame is actually showing.
 uint32_t present_count();

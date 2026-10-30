@@ -6,6 +6,8 @@
 #include "../runtime.h"
 #include "render.h"
 #include "render_gl.h"
+#include "interpolation.h"
+#include "scanout_overlay.h"
 #include "shadergen.h"
 #include "gl.h"
 #include <algorithm>
@@ -19,6 +21,9 @@
 bool write_png(const char* path, const uint8_t* rgba, int w, int h);
 
 namespace gx {
+
+static bool g_interpolating = false;
+static bool render_with_interpolation(Batch&);
 
 static const int EFB_W = 640, EFB_H = 528;
 
@@ -2213,7 +2218,7 @@ static void do_efb_copy(const EfbCopyCmd& c) {
         glUniform1i(g_copy_u_mode, (int)c.format | (c.depth ? 32 : 0));
         glBindVertexArray(g_copy_vao);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        if (c.writeback) copy_writeback(c);
+        if (c.writeback && !g_interpolating) copy_writeback(c);
         // GCN_COPYDUMP=<dir> with GCN_DRAWLOG=<frame>: every texture copy made in that
         // frame is written out as it was produced, twice -- its colour, and its alpha
         // as grey -- named by the frame, the copy's order in it and its texture id.
@@ -2417,7 +2422,7 @@ static void present(const EfbCopyCmd& c,bool publish=true) {
             if (!xfb) return;
         }
     }
-    if (!g_pair_second) g_present_count++;
+    if (!g_pair_second && !g_interpolating) g_present_count++;
     if (!publish) return; // Replay still assembles XFB strips and advances logical scanout.
     // GCN_DUMP_RANGE=a-b restricts dumping to a window of presented frames, so a short
     // stretch can be captured every single frame. Flicker is only visible frame by frame.
@@ -2434,11 +2439,11 @@ static void present(const EfbCopyCmd& c,bool publish=true) {
     const bool in_range = range_lo < 0 || ((int)g_present_count >= range_lo &&
                                            (int)g_present_count <= range_hi);
     if (xfb) {
-        if (g_dump_dir && g_dump_every && in_range && g_present_count % g_dump_every == 0) dump_xfb(*xfb, c.dst_w);
+        if (!g_interpolating && g_dump_dir && g_dump_every && in_range && g_present_count % g_dump_every == 0) dump_xfb(*xfb, c.dst_w);
         blit_rect_to_output(xfb->tex, c.dst_w, xfb->h, 0, 0, c.dst_w, xfb->h);
         return;
     }
-    if (g_dump_dir && g_dump_every && in_range && g_present_count % g_dump_every == 0) dump_efb(c);
+    if (!g_interpolating && g_dump_dir && g_dump_every && in_range && g_present_count % g_dump_every == 0) dump_efb(c);
     blit_to_output(c, g_efb_color);
 }
 
@@ -3414,19 +3419,8 @@ static void evict_textures(const Batch& b) {
 // happens, which is how the stereo path obtains the textures its eye passes sample.
 // `again` draws a batch this function has just drawn: the textures and vertices are
 // already up, and it is the same frame to the texture cache.
-static bool flat_fullscreen_overlay(const Batch& b, const Cmd& c) {
-    const auto& st = b.states[c.state];
-    if ((int)st.proj[6] == 0 || g_flat_overlay_scale == 1.0f) return false;
-    float x0 = 1e20f, x1 = -1e20f, y0 = 1e20f, y1 = -1e20f;
-    for (uint32_t i = 0; i < c.count; ++i) {
-        const auto& v = b.verts[b.indices[c.first + i]];
-        const float x = st.proj[0] * v.pos[0] + st.proj[1];
-        const float y = st.proj[2] * v.pos[1] + st.proj[3];
-        x0 = std::min(x0, x); x1 = std::max(x1, x);
-        y0 = std::min(y0, y); y1 = std::max(y1, y);
-    }
-    // Fades, clears, and copies of the complete rendered scene cover the full scanout.
-    return x0 <= -0.99f && x1 >= 0.99f && y0 <= -0.99f && y1 >= 0.99f;
+static bool flat_fullscreen_overlay(const Batch& b, const Cmd& c,const EfbCopyCmd& screen) {
+    return g_flat_overlay_scale!=1.f && covers_scanout(b,c,screen);
 }
 
 static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>* leave_out, bool again) {
@@ -3436,9 +3430,11 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
     // The displayed rect may use only part of the EFB. Anchor to its edges,
     // rather than to unused pixels outside the game's scanout.
     float overlay_center = 0.0f, overlay_halfwidth = 1.0f;
+    EfbCopyCmd overlay_screen{};overlay_screen.src_w=EFB_W;overlay_screen.src_h=EFB_H;
     for (const auto& cmd : b.cmds) {
         if ((cmd.type == CmdType::EfbCopy && cmd.copy.to_xfb) || cmd.type == CmdType::Present) {
             if (cmd.copy.src_w) {
+                overlay_screen=cmd.copy;
                 overlay_center = (2.0f * cmd.copy.src_x + cmd.copy.src_w) / EFB_W - 1.0f;
                 overlay_halfwidth = (float)cmd.copy.src_w / EFB_W;
             }
@@ -3447,8 +3443,7 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
     const auto t_start = std::chrono::steady_clock::now();
     double ms_tex = 0.0, ms_vbo = 0.0, ms_copy = 0.0;
     if (!again) {
-        g_render_frame++;
-        evict_textures(b);
+        if(!g_interpolating) {g_render_frame++;evict_textures(b);}
         for (auto& t : b.new_textures) upload_texture(*t);
         ms_tex = g_frametime ? ms_since(t_start) : 0.0;
         // A set the GPU has finished with; see g_vaos. The eye passes after this draw from
@@ -3723,7 +3718,7 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
             // culled or not: a game draws one it culls to set the plane.
             const bool zfreeze = (b.states[c.state].bp[0x00] >> 19) & 1;
             if (!zfreeze) zfreeze_plane(b, c, g_zplane);
-            const bool full_overlay = (!flat_offscreen.empty() && flat_offscreen[ci]) || flat_fullscreen_overlay(b, c);
+            const bool full_overlay = (!flat_offscreen.empty() && flat_offscreen[ci]) || flat_fullscreen_overlay(b, c,overlay_screen);
             const bool overlay = !g_vr_active && !full_overlay && (int)b.states[c.state].proj[6] != 0;
             const float scale = overlay ? g_flat_overlay_scale : 1.0f;
             const float anchor = overlay && scale != 1.0f && g_flat_overlay_hook ? g_flat_overlay_hook(b, c) : 0.0f;
@@ -3818,10 +3813,7 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
 }
 
 bool render_execute(Batch& b) {
-    frame_observe(b, nullptr);
-    g_hide.clear();   // the flat view shows everything, whatever the eyes leave out
-    const bool presented=execute_batch(b, !b.suppress_present);
-    return presented && !b.suppress_present;
+    return render_with_interpolation(b);
 }
 
 void render_set_panel_band(float band) { g_panel_band = band; }
@@ -3849,6 +3841,114 @@ bool render_execute_stereo_pair(Batch& b, unsigned fbo_l, unsigned fbo_r, float 
 }
 
 #include "render_checkpoint.inc"
+
+#ifndef GCN_GL_ES
+namespace {
+bool interpolation_enabled=false;
+std::unique_ptr<Batch> interpolation_native,interpolation_draw;
+std::unique_ptr<GpuRenderImage> interpolation_before;
+GLuint interpolation_fbo=0,interpolation_color=0,interpolation_depth=0;
+int interpolation_scale=0;
+Interpolation interpolation;
+}
+void render_interpolation_reset() {
+    interpolation.clear();interpolation_native.reset();interpolation_draw.reset();
+    interpolation_before.reset();
+    if(interpolation_fbo)glDeleteFramebuffers(1,&interpolation_fbo);
+    if(interpolation_color)glDeleteTextures(1,&interpolation_color);
+    if(interpolation_depth)glDeleteTextures(1,&interpolation_depth);
+    interpolation_fbo=interpolation_color=interpolation_depth=0;interpolation_scale=0;
+}
+void render_interpolation_enable(bool enabled) {
+    if(interpolation_enabled!=enabled)render_interpolation_reset();
+    interpolation_enabled=enabled;
+}
+static bool render_with_interpolation(Batch& b) {
+    frame_observe(b,nullptr);g_hide.clear();
+    // Both options off follows the original native renderer without snapshots,
+    // draw matching, extra frames or presentation waits.
+    if(!interpolation_enabled)return execute_batch(b,!b.suppress_present) && !b.suppress_present;
+    unsigned scanouts=0;
+    bool eligible=interpolation_enabled && !b.suppress_present && !g_vr_active && !g_fp_on && !g_eye_filter &&
+        (!g_frame_hook || g_frame_hook_batch_only) && (!g_flat_overlay_hook || g_flat_overlay_batch_only);
+    for(const auto& c:b.cmds) {
+        if(c.type==CmdType::Present) {++scanouts;if(c.copy.dst_h<b.display_height)eligible=false;}
+        if(c.type==CmdType::EfbCopy && c.copy.writeback)eligible=false;
+    }
+    eligible=eligible && scanouts==1;
+    if(!eligible)render_interpolation_reset();
+    // Keep an immutable input framebuffer. Previews draw into separate targets;
+    // the native output stays in place for the guest and rollback checkpoints.
+    auto before=eligible?std::make_unique<GpuRenderImage>(save_gpu_image()):nullptr;
+    const bool presented=execute_batch(b,!b.suppress_present) && !b.suppress_present;
+    if(eligible && presented) {
+        if(interpolation_native)interpolation.prepare(*interpolation_native,b);else interpolation.clear();
+        interpolation_native=std::make_unique<Batch>(b);
+        interpolation_draw=std::make_unique<Batch>(b);
+        interpolation_before=std::move(before);
+    }
+    return presented;
+}
+bool render_interpolated(float alpha) {
+    if(!interpolation_before || !interpolation.size())return false;
+    static unsigned verified=0;
+    const bool verify=getenv("GCN_INTERPOLATION_VERIFY") && verified<3 && g_present_count>120;
+    const auto oracle=verify?std::make_unique<RenderImage>(read_render_image()):nullptr;
+    const auto writebacks=g_copy_writebacks_done.load();
+    interpolation.apply(*interpolation_native,*interpolation_draw,alpha);
+    checkpoint_texture_access();
+    if(!interpolation_fbo || interpolation_scale!=g_scale) {
+        if(interpolation_fbo)glDeleteFramebuffers(1,&interpolation_fbo);
+        if(interpolation_color)glDeleteTextures(1,&interpolation_color);
+        if(interpolation_depth)glDeleteTextures(1,&interpolation_depth);
+        interpolation_color=clone_target(*interpolation_before->color);
+        interpolation_depth=clone_target(*interpolation_before->depth,true);
+        glGenFramebuffers(1,&interpolation_fbo);glBindFramebuffer(GL_FRAMEBUFFER,interpolation_fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,interpolation_color,0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,interpolation_depth,0);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw std::runtime_error("Interpolation framebuffer is incomplete");
+        interpolation_scale=g_scale;
+    } else {
+        copy_target(*interpolation_before->color,interpolation_color,false,false);
+        copy_target(*interpolation_before->depth,interpolation_depth,true,false);
+    }
+    const GLuint native_fbo=g_efb_fbo,native_color=g_efb_color,native_depth=g_efb_depth;
+    std::array<float,4> native_zplane;std::copy_n(g_zplane,4,native_zplane.begin());
+    auto native_textures=std::move(g_textures);
+    g_textures=interpolation_before->textures;
+    g_efb_fbo=interpolation_fbo;g_efb_color=interpolation_color;g_efb_depth=interpolation_depth;
+    auto restore_native=[&] {
+        g_interpolating=false;
+        g_efb_fbo=native_fbo;g_efb_color=native_color;g_efb_depth=native_depth;
+        g_textures=std::move(native_textures);std::copy(native_zplane.begin(),native_zplane.end(),g_zplane);
+        checkpoint_texture_access();glBindFramebuffer(GL_FRAMEBUFFER,g_efb_fbo);
+    };
+    g_interpolating=true;
+    try {
+        // Hooks use immutable batch metadata. Restart their per-frame HUD state.
+        frame_observe(*interpolation_draw,nullptr);g_hide.clear();
+        execute_batch(*interpolation_draw,true);
+        restore_native();
+    } catch(...) {
+        restore_native();throw;
+    }
+    if(verify) {
+        if(g_copy_writebacks_done.load()!=writebacks || !(read_render_image()==*oracle))
+            throw std::runtime_error("Interpolated preview changed native GPU state");
+        ++verified;
+        fprintf(stderr,"[interpolation-verify] PASS frame=%u vertices=%zu alpha=%.3f\n",g_present_count,interpolation.size(),alpha);
+    }
+    return true;
+}
+#else
+void render_interpolation_enable(bool) {}
+void render_interpolation_reset() {}
+bool render_interpolated(float) {return false;}
+static bool render_with_interpolation(Batch& b) {
+    frame_observe(b,nullptr);g_hide.clear();
+    return execute_batch(b,!b.suppress_present) && !b.suppress_present;
+}
+#endif
 }  // namespace gx
 
 DeviceFragment checkpoint_graphics_render(bool asynchronous) {

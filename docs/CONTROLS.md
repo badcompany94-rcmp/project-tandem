@@ -48,6 +48,7 @@ Xbox defaults: A=A, B=B, X=X, Y=Y, RB=Z, triggers=L/R, Menu=Start. Here **Menu**
 
 - F1 opens controller/port assignments, racing bindings, display, sound, and online settings.
 - Display settings offer common 16:9 resolutions and windowed, fullscreen, or borderless modes. Borderless uses the desktop resolution.
+- Display also includes independent experimental VSync and high-refresh interpolation options, both OFF by default and switchable back off. See [display options and limits](DISPLAY-REFRESH.md).
 - New installations start at 25% master volume; updates preserve existing volume.
 - F10 toggles the performance overlay.
 - Use F1 → Exit to desktop, Alt+F4, or the window close button. Select + Menu held together is the controller exit shortcut.

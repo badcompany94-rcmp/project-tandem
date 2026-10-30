@@ -1720,6 +1720,7 @@ static void draw_impl(const DrawCall& dc) {
             last.mtx == mtx && last.first + last.count == first && last.vfirst + last.vcount == base) {
             last.count += count;
             last.vcount += dc.count;
+            if(last.position_source!=g_state.cp[0xA0])last.position_source=0;
             pd.draws.back().cmd = (uint32_t)b.cmds.size() - 1;
             return;
         }
@@ -1733,6 +1734,7 @@ static void draw_impl(const DrawCall& dc) {
     c.mtx = mtx;
     c.vfirst = base;
     c.vcount = dc.count;
+    c.position_source = g_state.cp[0xA0];
     pd.draws.back().cmd = (uint32_t)b.cmds.size();
     b.cmds.push_back(c);
 }

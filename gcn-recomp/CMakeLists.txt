@@ -290,7 +290,7 @@ function(gcn_add_game)
   # front end, including the batch queue in gx/xf.cpp -- is free of both GL and SDL.
   set(CORE_SOURCES ${RUNTIME_SOURCES})
   list(REMOVE_ITEM CORE_SOURCES
-    ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
+    ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
     ${RT}/gx/render_gl.cpp ${RT}/gx/gl_load.cpp ${RT}/gx/shadergen.cpp)
   list(APPEND CORE_SOURCES ${RT}/audio_stub.cpp)
   # The benchmark compiles the game's SOURCES too (gcn_add_game), and a game's eye hook
@@ -494,7 +494,7 @@ function(gcn_add_game)
     target_include_directories(desktop_controls_test PRIVATE ${RT})
     target_link_libraries(desktop_controls_test PRIVATE ${GCN_SDL_TARGET})
     add_executable(desktop_settings_test ${GCN_RECOMP_DIR}/tests/desktop_settings.cpp
-      ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
+      ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
       ${RT}/gx/gl_load.cpp ${RT}/png.cpp ${GLAD_SOURCE})
     _gcn_set_standards(desktop_settings_test)
     target_include_directories(desktop_settings_test PRIVATE ${RT} ${GLAD_INCLUDE_DIR})
@@ -516,6 +516,15 @@ function(gcn_add_game)
     add_executable(presentation_stats_test ${GCN_RECOMP_DIR}/tests/presentation_stats.cpp)
     _gcn_set_standards(presentation_stats_test)
     target_include_directories(presentation_stats_test PRIVATE ${RT})
+    add_executable(presentation_test ${GCN_RECOMP_DIR}/tests/presentation.cpp ${RT}/desktop_presentation.cpp)
+    _gcn_set_standards(presentation_test)
+    target_include_directories(presentation_test PRIVATE ${RT} $<TARGET_PROPERTY:${GCN_SDL_TARGET},INTERFACE_INCLUDE_DIRECTORIES>)
+    add_executable(interpolation_test ${GCN_RECOMP_DIR}/tests/interpolation.cpp)
+    _gcn_set_standards(interpolation_test)
+    target_include_directories(interpolation_test PRIVATE ${RT})
+    add_executable(scanout_overlay_test ${GCN_RECOMP_DIR}/tests/scanout_overlay.cpp)
+    _gcn_set_standards(scanout_overlay_test)
+    target_include_directories(scanout_overlay_test PRIVATE ${RT})
   endif()
 
   # ---- Android headset app and harness ----

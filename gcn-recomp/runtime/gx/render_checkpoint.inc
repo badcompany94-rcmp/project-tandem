@@ -244,7 +244,7 @@ static RenderImage read_saved_gpu_image(const GpuRenderImage& saved) {
 static DeviceFragment render_checkpoint_on_thread() {
     if(getenv("GCN_RENDER_CPU_CHECKPOINT")) {
         auto image=std::make_shared<const RenderImage>(read_render_image());
-        return {"graphics CPU readback resources",[image]{write_render_image(*image);},[image]{return read_render_image()==*image;}};
+        return {"graphics CPU readback resources",[image]{render_interpolation_reset();write_render_image(*image);},[image]{return read_render_image()==*image;}};
     }
     auto image=std::make_shared<const GpuRenderImage>(save_gpu_image());
     // An independent readback oracle catches accidental writes through shared
@@ -252,6 +252,7 @@ static DeviceFragment render_checkpoint_on_thread() {
     // would otherwise falsely certify copy-on-write.
     auto oracle=getenv("GCN_RENDER_VERIFY")?std::make_shared<const RenderImage>(read_saved_gpu_image(*image)):nullptr;
     return {"graphics GPU resources",[image,oracle]{
+        render_interpolation_reset();
         if(oracle && !(read_saved_gpu_image(*image)==*oracle))throw std::runtime_error("Saved GPU texture was overwritten");
         restore_gpu_image(*image);
     },[image,oracle]{

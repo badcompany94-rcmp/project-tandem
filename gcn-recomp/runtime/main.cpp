@@ -13,6 +13,9 @@
 #include "desktop_stats.h"
 #include "presentation_stats.h"
 #include "display_config.h"
+#include "desktop_presentation.h"
+#include "refresh_clock.h"
+#include "presentation_wait.h"
 #include "gx/render_gl.h"
 #include "gx/gl.h"
 #include "hw/pad.h"
@@ -433,6 +436,23 @@ int main(int argc, char** argv) {
     uint64_t event_ns=0,wait_ns=0,render_ns=0,trace_ns=0;
     auto last_pace=clock_pace_profile();
     auto t0 = std::chrono::steady_clock::now();
+    RefreshClock refresh_clock;
+    PresentationWait refresh_wait;
+    uint64_t native_arrived=0;
+    int previous_refresh=0;
+    FILE* refresh_trace=[] {
+        const char* path=getenv("GCN_REFRESH_TRACE");if(!path)return (FILE*)nullptr;
+        FILE* file=fopen(path,"w");if(!file)fatal("Cannot open refresh trace");
+        fprintf(file,"native_frame,host_ns,alpha,interpolated,work_ns,swap_ns\n");return file;
+    }();
+    auto swap_refresh=[&](float alpha,bool interpolated,uint64_t began) {
+        glBindFramebuffer(GL_FRAMEBUFFER,0);
+        int w,h;SDL_GL_GetDrawableSize(win,&w,&h);
+        desktop_stats_present(w,h);desktop_settings_draw();
+        const auto swapping=host_ns();SDL_GL_SwapWindow(win);const auto done=host_ns();
+        if(refresh_trace)fprintf(refresh_trace,"%u,%llu,%.6f,%d,%llu,%llu\n",gx::present_count(),
+            (unsigned long long)done,alpha,interpolated,(unsigned long long)(swapping-began),(unsigned long long)(done-swapping));
+    };
     while (running) {
         uint64_t mark=profile_host?host_ns():0;
         running = pump_events(win);
@@ -440,16 +460,36 @@ int main(int argc, char** argv) {
         int dw, dh;
         SDL_GL_GetDrawableSize(win, &dw, &dh);
         gx::render_set_window_size(dw, dh);
+        const auto presentation=desktop_presentation::current();
+        // VR owns a separate presentation clock. Desktop interpolation never changes
+        // the virtual clock, PAD sampling, audio rate, or network input cadence.
+        const int refresh=(!g_eye_mode && theater_stereo_m<=0.0f)?presentation.refresh_hz:0;
+        if(refresh!=previous_refresh) {refresh_clock.reset();refresh_wait.reset();native_arrived=0;previous_refresh=refresh;}
+        gx::render_interpolation_enable(refresh>0);
         if(profile_host){const auto now=host_ns();event_ns+=now-mark;mark=now;}
-        auto b = gx::take_batch(4);
+        // Native mode keeps its original queue wait. High-refresh mode waits on
+        // a precise output timer below, while checking for native work each ms.
+        auto b = gx::take_batch(refresh?0:4);
         if(profile_host){const auto now=host_ns();wait_ns+=now-mark;mark=now;}
         if (!b) {
+            const auto now=host_ns();
+            if(refresh && native_arrived && now-native_arrived<=33333334ULL && refresh_clock.due(now,refresh)) {
+                const float alpha=std::min(1.f,float(now-native_arrived)/16666667.f);
+                if(gx::render_interpolated(alpha)) {swap_refresh(alpha,true,now);continue;}
+            }
             // Refresh the host UI even when the guest is waiting for network input.
             if(desktop_stats_idle(dw,dh,desktop_settings_open() || display_settings_hint())) {desktop_settings_draw();SDL_GL_SwapWindow(win);}
+            if(refresh) {
+                const auto after=host_ns(),deadline=refresh_clock.deadline();
+                refresh_wait.sleep(deadline>after?std::min<uint64_t>(1000000,deadline-after):1000000);
+            }
             if(profile_host)event_ns+=host_ns()-mark;
             continue;
         }
-        if (b->control) { b->control();if(profile_host)render_ns+=host_ns()-mark;continue; }
+        // Read-only checkpoint commands run frequently during ordinary online play.
+        // Actual renderer restores invalidate history inside their restore callback.
+        if (b->control) {b->control();if(profile_host)render_ns+=host_ns()-mark;continue; }
+        if(b->suppress_present){gx::render_interpolation_reset();native_arrived=0;}
         if(!g_eye_mode && theater_stereo_m<=0.0f) {
             const unsigned ui_width=display_ui_render_width();
             const int ui_scale=ui_width && dw>0 ? int((unsigned(dw)+ui_width-1)/ui_width) : scale;
@@ -497,10 +537,10 @@ int main(int argc, char** argv) {
         }
         if(profile_host){const auto now=host_ns();render_ns+=now-mark;mark=now;}
         if (presented) {
+            native_arrived=host_ns();
             // macOS (GL on Metal) only presents correctly with the window framebuffer bound.
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            desktop_stats_present(dw,dh);
-            desktop_settings_draw();
+            if(!refresh){desktop_stats_present(dw,dh);desktop_settings_draw();}
             if (dump_output && gx::g_dump_dir && gx::g_dump_every &&
                 gx::present_count() % gx::g_dump_every == 0) {
                 std::vector<uint8_t> pixels((size_t)dw * dh * 4), flipped(pixels.size());
@@ -519,7 +559,14 @@ int main(int argc, char** argv) {
                 record::frame(0, rw, rh);
             }
             const uint64_t swap_began=profile_host?host_ns():0;
-            SDL_GL_SwapWindow(win);
+            if(refresh) {
+                const auto began=host_ns();
+                if(refresh_clock.due(began,refresh)) {
+                    const float alpha=std::min(1.f,float(began-native_arrived)/16666667.f);
+                    const bool interpolated=gx::render_interpolated(alpha);
+                    swap_refresh(interpolated?alpha:1.f,interpolated,began);
+                }
+            } else SDL_GL_SwapWindow(win);
             // Optional timing evidence counts only newly rendered game frames,
             // never overlay refreshes or hidden corrective rendering.
             if(profile_host) {
@@ -556,6 +603,9 @@ int main(int argc, char** argv) {
             }
         }
     }
+    gx::render_interpolation_reset();
+    if(refresh_trace)fclose(refresh_trace);
+    if(present_trace)fclose(present_trace);
     desktop_settings_shutdown();
     desktop_stats_shutdown();
     record::finish();

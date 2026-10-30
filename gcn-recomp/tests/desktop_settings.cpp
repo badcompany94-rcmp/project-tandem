@@ -3,6 +3,7 @@
 #include "desktop_controls.h"
 #include "desktop_gamepad.h"
 #include "desktop_display.h"
+#include "desktop_presentation.h"
 #include "desktop_sound.h"
 #include "desktop_pointer.h"
 #include "input_defaults.h"
@@ -28,7 +29,7 @@ static void click(int x,int y) {
  e.type=SDL_MOUSEBUTTONDOWN;e.button.windowID=window_id;e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;desktop_settings_event(e);frame();
  e.type=SDL_MOUSEBUTTONUP;desktop_settings_event(e);frame();frame();
 }
-static void key(int code){SDL_Event e{};e.type=SDL_KEYDOWN;e.key.keysym.scancode=(SDL_Scancode)code;desktop_settings_event(e);desktop_controls::event(e);e.type=SDL_KEYUP;desktop_settings_event(e);desktop_controls::event(e);}
+static void key(int code){SDL_Event e{};e.type=SDL_KEYDOWN;e.key.windowID=window_id;e.key.keysym.scancode=(SDL_Scancode)code;e.key.keysym.sym=SDL_GetKeyFromScancode((SDL_Scancode)code);desktop_settings_event(e);desktop_controls::event(e);e.type=SDL_KEYUP;desktop_settings_event(e);desktop_controls::event(e);}
 int main(int argc,char** argv) {
     require(argc>=2,"output directory required");const std::filesystem::path out(argv[1]);require(!std::filesystem::exists(out),"fresh test directory");std::filesystem::create_directories(out);
     const auto cfg=(out/"controllers.cfg").string();SDL_SetMainReady();desktop_gamepad_configure();SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");require(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)==0,"SDL initialize");
@@ -53,6 +54,26 @@ int main(int argc,char** argv) {
         key(SDL_SCANCODE_ESCAPE);require(!desktop_settings_open(),"Sound closes with Escape");
         std::string error;require(desktop_sound::load((out/"sound.cfg").string(),25,error) && desktop_sound::current()==chosen,"closing persists sound");
         key(SDL_SCANCODE_F1);frame();capture(out/"sound-saved.png");
+    }
+    if(argc>4 && std::string(argv[4])=="presentation") {
+        click(570,95);frame();capture(out/"presentation-default.png");
+        require(!desktop_presentation::current().vsync && desktop_presentation::current().refresh_hz==0,"VSync and interpolation default off");
+        click(193,157);require(desktop_presentation::current().vsync && SDL_GL_GetSwapInterval()==1,"F1 checkbox enables real GL swap synchronization");
+        click(420,640);require(!desktop_settings_open() && !desktop_presentation::current().vsync && SDL_GL_GetSwapInterval()==0,"Discard restores opening VSync");
+        key(SDL_SCANCODE_F1);frame();frame();click(193,157);
+        require(desktop_presentation::current().vsync,"enable VSync again");
+        click(460,214);ImGui::GetIO().AddFocusEvent(true);frame();key(SDL_SCANCODE_DOWN);frame();key(SDL_SCANCODE_RETURN);frame();
+        require(desktop_presentation::current().refresh_hz==120,"F1 interpolation dropdown supports keyboard selection");
+        key(SDL_SCANCODE_ESCAPE);require(!desktop_settings_open(),"Escape saves and closes presentation settings");
+        std::string presentation_error;
+        require(desktop_presentation::load((out/"presentation.cfg").string(),presentation_error) && desktop_presentation::current()==desktop_presentation::Settings{true,120},"VSync and interpolation persist after reload");
+        key(SDL_SCANCODE_F1);frame();capture(out/"presentation-saved.png");
+        click(193,157);require(!desktop_presentation::current().vsync && SDL_GL_GetSwapInterval()==0,"VSync can be turned back off");
+        click(460,214);frame();key(SDL_SCANCODE_HOME);frame();key(SDL_SCANCODE_RETURN);frame();
+        require(desktop_presentation::current().refresh_hz==0,"interpolation can be turned back off");
+        key(SDL_SCANCODE_ESCAPE);
+        require(desktop_presentation::load((out/"presentation.cfg").string(),presentation_error) && desktop_presentation::current()==desktop_presentation::Settings{},"both-off choice persists");
+        key(SDL_SCANCODE_F1);frame();capture(out/"presentation-off.png");
     }
     desktop_controls::configuration()[0].bindings[desktop_controls::A][1]={desktop_controls::Source::Key,SDL_SCANCODE_SPACE,1};
     std::string error;require(desktop_controls::save(error),"save live mappings");key(SDL_SCANCODE_ESCAPE);require(!desktop_settings_open(),"Escape closes settings without exiting");

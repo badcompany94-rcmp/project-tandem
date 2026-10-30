@@ -153,6 +153,9 @@ struct Cmd {
     // and where they are in Batch::packed: the region for the state's texture coordinate
     // count, vertex index v at packed vertex v + base_vertex. See Batch::packed.
     uint32_t vfirst, vcount;
+    // Guest position-array address, for conservative temporal draw matching.
+    // Zero means direct or mixed sources and cannot identify an object.
+    uint32_t position_source = 0;
     int32_t base_vertex;
     EfbCopyCmd copy;
 };

@@ -3,6 +3,7 @@
 #include "desktop_gamepad.h"
 #include "desktop_display.h"
 #include "desktop_sound.h"
+#include "desktop_presentation.h"
 #include "desktop_online_ui.h"
 #include "desktop_pointer.h"
 #include "display_config.h"
@@ -29,6 +30,7 @@ desktop_display::Settings display_draft;
 int selected_port=0,listen_action=-1,listen_slot=0;
 Configuration before;
 desktop_sound::Settings sound_before;
+desktop_presentation::Settings presentation_before;
 std::string status;
 uint64_t chord_start=0;bool chord_latched=false;
 
@@ -49,8 +51,11 @@ void close(bool discard=false) {
         if(desktop_display::preview(display_draft,SDL_GetTicks64(),status))close_after_keep=true;
         select_display=true;return;
     }
-    if(discard){configuration()=before;desktop_sound::preview(sound_before);}
-    else if(!save(status) || !desktop_sound::save(status))return;
+    if(discard){
+        if(!desktop_presentation::preview(presentation_before,status))return;
+        configuration()=before;desktop_sound::preview(sound_before);
+    }
+    else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status))return;
     opened=false;dirty=false;listen_action=-1;cancel_capture();block(false);
     SDL_ShowCursor(SDL_ENABLE);desktop_gamepad_clear_quit();
     fprintf(stderr,"[settings] closed\n");
@@ -228,6 +233,21 @@ void mapping_tab() {
 }
 void display_tab() {
     ImGui::TextWrapped("Choose the monitor, window mode and resolution for this PC.");
+    auto presentation=desktop_presentation::current();
+    if(ImGui::Checkbox("VSync",&presentation.vsync)) {
+        if(desktop_presentation::preview(presentation,status))changed();
+    }
+    ImGui::TextDisabled("Synchronize frames to your display to reduce tearing. Off by default.");
+    constexpr int rates[]={0,120,144,165,240};
+    const char* const labels[]={"Off (native 60 FPS)","120 Hz","144 Hz","165 Hz","240 Hz"};
+    int selected=0;for(int i=0;i<5;++i)if(presentation.refresh_hz==rates[i])selected=i;
+    ImGui::SetNextItemWidth(300);
+    if(ImGui::Combo("High-refresh interpolation",&selected,labels,5)) {
+        presentation.refresh_hz=rates[selected];
+        if(desktop_presentation::preview(presentation,status))changed();
+    }
+    ImGui::TextWrapped("Experimental. Smooths 3D motion above 60 FPS. Gameplay stays at its original speed. Adds up to one game frame of visual delay.");
+    ImGui::TextWrapped("Choose a rate supported by your monitor. With VSync on, your desktop refresh rate also limits output. Extra rendering requires GPU headroom.");
     ImGui::Spacing();ImGui::SetNextItemWidth(420);
     const auto monitors=desktop_display::monitors();
     std::string monitor_label="Unavailable monitor";
@@ -311,12 +331,15 @@ bool desktop_settings_init(SDL_Window* win,void* context) {
     const char* sound_file=SDL_getenv("GCN_SOUND_CONFIG");
     const auto sound_path=sound_file?std::filesystem::path(sound_file):std::filesystem::path(path()).parent_path()/"sound.cfg";
     if(!desktop_sound::load(sound_path.string(),GCN_DEFAULT_AUDIO_VOLUME,error)){status=error;fprintf(stderr,"[sound-settings] %s\n",error.c_str());}
+    const char* presentation_file=SDL_getenv("GCN_PRESENTATION_CONFIG");
+    const auto presentation_path=presentation_file?std::filesystem::path(presentation_file):std::filesystem::path(path()).parent_path()/"presentation.cfg";
+    if(!desktop_presentation::load(presentation_path.string(),error)){status=error;fprintf(stderr,"[presentation-settings] %s\n",error.c_str());}
     return true;
 }
 bool desktop_settings_open(){return opened;}
 void desktop_settings_show() {
     if(!ready || opened)return;
-    before=configuration();sound_before=desktop_sound::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);SDL_ShowCursor(SDL_ENABLE);
+    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);SDL_ShowCursor(SDL_ENABLE);
     ImGui::GetIO().ClearInputKeys();
     fprintf(stderr,"[settings] opened\n");
 }
@@ -420,6 +443,6 @@ void desktop_settings_shutdown() {
     if(!ready)return;
     desktop_pointer::shutdown();
     desktop_display::shutdown();
-    if(opened && dirty){std::string error;if(!save(error))fprintf(stderr,"[input-settings] %s\n",error.c_str());if(!desktop_sound::save(error))fprintf(stderr,"[sound-settings] %s\n",error.c_str());}
+    if(opened && dirty){std::string error;if(!save(error))fprintf(stderr,"[input-settings] %s\n",error.c_str());if(!desktop_sound::save(error))fprintf(stderr,"[sound-settings] %s\n",error.c_str());if(!desktop_presentation::save(error))fprintf(stderr,"[presentation-settings] %s\n",error.c_str());}
     desktop_controls::shutdown();ImGui_ImplOpenGL3_Shutdown();ImGui_ImplSDL2_Shutdown();ImGui::DestroyContext();ready=false;
 }
