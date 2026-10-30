@@ -168,8 +168,8 @@ struct TargetPool {
     size_t bytes=0;
 };
 static TargetPool& target_pool() {static auto* pool=new TargetPool;return *pool;}
-static std::shared_ptr<const GLuint> clone_target_lease(GLuint source,bool depth=false) {
-    if(!getenv("GCN_RENDER_TARGET_POOL"))return own_texture(clone_target(source,depth));
+static std::shared_ptr<const GLuint> clone_target_lease(GLuint source,bool depth=false,bool pooled=false) {
+    if(!pooled && !getenv("GCN_RENDER_TARGET_POOL"))return own_texture(clone_target(source,depth));
     const auto description=describe_target(source,depth);GLuint target=0;
     auto& pool=target_pool();
     {
@@ -201,7 +201,7 @@ struct GpuRenderImage {
     std::vector<uint32_t> dead;
     std::array<float,4> zplane;
 };
-static GpuRenderImage save_gpu_image() {
+static GpuRenderImage save_gpu_image(bool include_displays=true,bool pooled=false) {
     if(g_vr_active || g_flat_eye!=0 || (g_frame_hook && !g_frame_hook_batch_only) ||
        (g_flat_overlay_hook && !g_flat_overlay_batch_only) || g_fp_on || getenv("GCN_THEATER_STEREO"))
         throw std::logic_error("Render checkpoints currently require a flat desktop view");
@@ -210,8 +210,8 @@ static GpuRenderImage save_gpu_image() {
     image.scale=g_scale;image.frame=g_render_frame;image.present=g_present_count;image.taken=frames_taken();image.dead=g_dead_pending;
     std::copy(std::begin(g_zplane),std::end(g_zplane),image.zplane.begin());
     image.textures=g_textures;
-    image.color=clone_target_lease(g_efb_color);image.depth=clone_target_lease(g_efb_depth,true);
-    for(const auto& x:g_xfbs)image.displays.push_back({x,clone_target_lease(x.tex)});
+    image.color=clone_target_lease(g_efb_color,false,pooled);image.depth=clone_target_lease(g_efb_depth,true,pooled);
+    if(include_displays)for(const auto& x:g_xfbs)image.displays.push_back({x,clone_target_lease(x.tex)});
     checkpoint_gl_ok();return image;
 }
 static void restore_gpu_image(const GpuRenderImage& image) {

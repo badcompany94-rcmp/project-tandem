@@ -3879,18 +3879,23 @@ static bool render_with_interpolation(Batch& b) {
     if(!eligible)render_interpolation_reset();
     // Keep an immutable input framebuffer. Previews draw into separate targets;
     // the native output stays in place for the guest and rollback checkpoints.
-    auto before=eligible?std::make_unique<GpuRenderImage>(save_gpu_image()):nullptr;
+    if(eligible && interpolation_native)interpolation.prepare(*interpolation_native,b);else interpolation.clear();
+    const bool smooth=eligible && interpolation.size();
+    // No matching geometry needs no GPU snapshot or preview copy. Full scanouts
+    // cannot use the partial XFB history; retain only the EFB and texture leases.
+    // Pool these render targets even offline instead of reallocating every frame.
+    auto before=smooth?std::make_unique<GpuRenderImage>(save_gpu_image(false,true)):nullptr;
     const bool presented=execute_batch(b,!b.suppress_present) && !b.suppress_present;
     if(eligible && presented) {
-        if(interpolation_native)interpolation.prepare(*interpolation_native,b);else interpolation.clear();
         interpolation_native=std::make_unique<Batch>(b);
-        interpolation_draw=std::make_unique<Batch>(b);
+        interpolation_draw=smooth?std::make_unique<Batch>(b):nullptr;
         interpolation_before=std::move(before);
     }
     return presented;
 }
+bool render_interpolation_ready() {return interpolation_before && interpolation.size();}
 bool render_interpolated(float alpha) {
-    if(!interpolation_before || !interpolation.size())return false;
+    if(!render_interpolation_ready())return false;
     static unsigned verified=0;
     const bool verify=getenv("GCN_INTERPOLATION_VERIFY") && verified<3 && g_present_count>120;
     const auto oracle=verify?std::make_unique<RenderImage>(read_render_image()):nullptr;
@@ -3943,6 +3948,7 @@ bool render_interpolated(float alpha) {
 #else
 void render_interpolation_enable(bool) {}
 void render_interpolation_reset() {}
+bool render_interpolation_ready() {return false;}
 bool render_interpolated(float) {return false;}
 static bool render_with_interpolation(Batch& b) {
     frame_observe(b,nullptr);g_hide.clear();

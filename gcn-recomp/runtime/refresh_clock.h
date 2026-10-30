@@ -16,5 +16,14 @@ public:
         slot = (now - epoch) * hz / 1000000000ULL + 1;
         return true;
     }
+    // A native fallback is already a complete displayable frame. Idle polls
+    // cannot consume its slot when there is no interpolated output to show.
+    bool native_frame(uint64_t now, unsigned hz, bool interpolating) {
+        if (!interpolating) { reset(); return true; }
+        return due(now,hz);
+    }
+    bool extra_frame(uint64_t now, unsigned hz, bool interpolating) {
+        return interpolating && due(now,hz);
+    }
     uint64_t deadline() const { return rate ? epoch + (slot * 1000000000ULL + rate - 1) / rate : 0; }
 };

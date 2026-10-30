@@ -1,7 +1,7 @@
 # Experimental display refresh
 
-Public Beta 2 adds experimental display options to the Alpha25 gameplay baseline.
-Both are OFF by default. [Release notes](releases/public-beta-2.md) describe downloads
+Public Beta 3 adds experimental display options to the Alpha25 gameplay baseline.
+Both are OFF by default. [Release notes](releases/public-beta-3.md) describe downloads
 and the remaining acceptance checks. Public Beta 1 remains available separately.
 
 Open **F1 → Display**:
@@ -34,14 +34,14 @@ ordinary dialogs and HUD geometry keep their proportions.
 
 ## Testing and upgrade boundaries
 
-Keep a copy of your current portable installation. To try Beta 2 separately,
+Keep a copy of your current portable installation. To try Beta 3 separately,
 overlay every file in the cumulative update onto that copy and preserve `local-data`.
 The launcher rebuilds locally from the user's own cached disc image. No generated
 game executable or disc data belongs in the update archive.
 
-All online participants need Beta 2's matching build ID (`4609e672bddd077e`). Different VSync
+All online participants need Beta 3's matching build ID (`f4e52689263937fd`). Different VSync
 and interpolation settings do not require different builds. Returning both
-settings to Off restores native presentation within Beta 2; switching
+settings to Off restores native presentation within Beta 3; switching
 back to the stable release means launching the preserved stable installation.
 
 Local checks cover settings persistence and disable paths, failed driver requests,
@@ -49,4 +49,8 @@ refresh deadlines, geometry fallbacks, GPU-state isolation, native peer hashes,
 and existing service/display/settings regressions. Background GPU activity makes
 the recorded timing runs provisional. Clean-GPU timing, visible-monitor tearing
 and smoothness/input-latency checks, and public-internet friend testing remain
-pending. Beta 2 is published as an experimental prerelease with these limits.
+pending. Beta 3 is published as an experimental prerelease with these limits.
+
+Beta 3 always presents native fallback frames when interpolation is unavailable,
+and avoids snapshots for unmatched geometry. See its release notes for the
+4× rendering tests and remaining acceptance limits.

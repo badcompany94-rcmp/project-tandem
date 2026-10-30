@@ -40,5 +40,20 @@ int main(int argc,char** argv) {
         require(clock.due(late,120+hz),"rate change reanchors");
         require(clock.due(late,0),"native mode disables refresh schedule");
     }
+    // Regression: idle refresh polls used to consume slots without showing
+    // anything, dropping native-only menus/effects to irregular sub-60 output.
+    for(const unsigned hz:{120u,144u,165u,240u}) {
+        RefreshClock clock;unsigned shown=0;
+        for(uint64_t frame=0;frame<600;++frame) {
+            const uint64_t now=1000000000ULL+frame*16683333ULL;
+            require(!clock.extra_frame(now-1000000,hz,false),"fallback idle cannot consume an output slot");
+            shown+=clock.native_frame(now,hz,false);
+            require(clock.deadline()==0,"native fallback clears interpolation schedule");
+        }
+        require(shown==600,"every native fallback frame is displayed at every target rate");
+        require(clock.native_frame(12000000000ULL,hz,true),"matching geometry resumes immediately");
+        require(!clock.extra_frame(12000000000ULL,hz,true),"no duplicate output at the same deadline");
+        require(clock.extra_frame(clock.deadline(),hz,true),"interpolation resumes on its next deadline");
+    }
     printf("PASS: presentation defaults, persistence, driver errors and 60-second fractional refresh schedules (%d driver calls)\n",calls);
 }

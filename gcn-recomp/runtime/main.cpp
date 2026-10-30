@@ -473,7 +473,7 @@ int main(int argc, char** argv) {
         if(profile_host){const auto now=host_ns();wait_ns+=now-mark;mark=now;}
         if (!b) {
             const auto now=host_ns();
-            if(refresh && native_arrived && now-native_arrived<=33333334ULL && refresh_clock.due(now,refresh)) {
+            if(refresh && native_arrived && now-native_arrived<=33333334ULL && refresh_clock.extra_frame(now,refresh,gx::render_interpolation_ready())) {
                 const float alpha=std::min(1.f,float(now-native_arrived)/16666667.f);
                 if(gx::render_interpolated(alpha)) {swap_refresh(alpha,true,now);continue;}
             }
@@ -540,7 +540,8 @@ int main(int argc, char** argv) {
             native_arrived=host_ns();
             // macOS (GL on Metal) only presents correctly with the window framebuffer bound.
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            if(!refresh){desktop_stats_present(dw,dh);desktop_settings_draw();}
+            const bool smooth=refresh && gx::render_interpolation_ready();
+            if(!smooth){desktop_stats_present(dw,dh);desktop_settings_draw();}
             if (dump_output && gx::g_dump_dir && gx::g_dump_every &&
                 gx::present_count() % gx::g_dump_every == 0) {
                 std::vector<uint8_t> pixels((size_t)dw * dh * 4), flipped(pixels.size());
@@ -559,14 +560,18 @@ int main(int argc, char** argv) {
                 record::frame(0, rw, rh);
             }
             const uint64_t swap_began=profile_host?host_ns():0;
-            if(refresh) {
+            if(smooth) {
                 const auto began=host_ns();
-                if(refresh_clock.due(began,refresh)) {
+                if(refresh_clock.native_frame(began,refresh,true)) {
                     const float alpha=std::min(1.f,float(began-native_arrived)/16666667.f);
                     const bool interpolated=gx::render_interpolated(alpha);
                     swap_refresh(interpolated?alpha:1.f,interpolated,began);
                 }
-            } else SDL_GL_SwapWindow(win);
+            } else {
+                refresh_clock.native_frame(host_ns(),refresh,false);
+                SDL_GL_SwapWindow(win);
+                if(refresh_trace)fprintf(refresh_trace,"%u,%llu,1.000000,0,0,0\n",gx::present_count(),(unsigned long long)host_ns());
+            }
             // Optional timing evidence counts only newly rendered game frames,
             // never overlay refreshes or hidden corrective rendering.
             if(profile_host) {

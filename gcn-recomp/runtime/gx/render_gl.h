@@ -47,6 +47,7 @@ bool render_execute(Batch& b);
 // checkpoint state. Discard history at correction/control boundaries.
 void render_interpolation_enable(bool enabled);
 void render_interpolation_reset();
+bool render_interpolation_ready();
 bool render_interpolated(float alpha);
 
 // Frames presented so far, for tracing what a display frame is actually showing.
