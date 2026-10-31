@@ -60,16 +60,16 @@
     },
     {
       "path": "distribution/assets/classic/hostjoin.gctex",
-      "sha256": "d9a3e5d208b5939ea9e554e479d1c4285f976698ca21ff30d94013fe2ac13466",
+      "sha256": "8284e7fc6ade969303682aab8aaa2a5483f36f29584f452c0da2edd9b52b500b",
       "bytes": 2359328,
-      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "origin": "Project-generated/adapted interface art; host kart corrected with built-in image_gen, with all pixels outside the kart region preserved",
       "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
     },
     {
       "path": "distribution/assets/classic/hostjoin.rgba",
-      "sha256": "4c0c8065a2afdfe19fe2d18ab64ad10cea19697db37fceb68d498d4da990fac3",
+      "sha256": "ca64366c9be0e65ec544aadd6d5b2e5d1a029482907ff38559005855ab63ebc5",
       "bytes": 33177612,
-      "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
+      "origin": "Project-generated/adapted interface art; host kart corrected with built-in image_gen, with all pixels outside the kart region preserved",
       "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
     },
     {
