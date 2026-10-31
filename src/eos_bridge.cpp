@@ -85,6 +85,10 @@ struct Bridge::Impl {
             if(op=="join" && members.count(peer))throw std::runtime_error("already-in-room");
             if(op=="join" && pending_kicks.count(peer))throw std::runtime_error("invalid-session");
             if(op=="start")request.object["endpoint"]="127.0.0.1:28121";
+            if(op=="lobby-settings" && peer==runtime.self() && request.has("visibility") && request.at("visibility").str()=="public") {
+                auto state=local_request(upstream,Json::dict({{"op","state"},{"token",request.at("token")}}));
+                if(state.has("room"))request.object["lobby_name"]=runtime.reserve_name(state.at("room").at("lobby_name").str());
+            }
             Json result;
             if(op=="refresh-code") {
                 struct Guard{bool& value;Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(refreshing);
@@ -104,6 +108,7 @@ struct Bridge::Impl {
             if(result.has("error"))return result;
             if(result.has("token"))members[peer].token=result.at("token").str();
             if(result.has("room")) {
+                runtime.publish(result.at("room"),"");
                 const auto& room=result.at("room");
                 std::set<std::string> present;
                 for(const auto& member:room.at("members").list()) {
@@ -124,6 +129,8 @@ struct Bridge::Impl {
                         }
                         if(found.empty())throw std::runtime_error("invalid-eos-roster");users.array.emplace_back(found);
                     }
+                    bool local_only=true;for(const auto& peer:users.list())if(peer.str()!=runtime.self() && !runtime.local_peer(peer.str()))local_only=false;
+                    result.object["connection"].object["input_delay"]=local_only?1:input_delay_ticks;
                     result.object["connection"].object["eos_users"]=std::move(users);
                 }
             }
@@ -191,7 +198,7 @@ struct Bridge::Impl {
         everyone.erase(runtime.self());
         if(game_id!=id) {
             clear_game();game_id=id;game_socket=id;
-            const bool direct=runtime.lan() || getenv("TANDEM_EOS_MESH")!=nullptr || getenv("TANDEM_EOS_ROLLBACK")!=nullptr;
+            const bool direct=runtime.native_prediction() || getenv("TANDEM_EOS_MESH")!=nullptr || getenv("TANDEM_EOS_ROLLBACK")!=nullptr;
             peers=direct || runtime.hosting()?everyone:std::set<std::string>{runtime.owner()};
             runtime.game_peers(game_socket,peers);
             if(direct) {
@@ -212,29 +219,44 @@ struct Bridge::Impl {
             puts("EOS game bridge prepared; game sockets stay on loopback");
         }
         if(mesh)response.object["connection"].object["mesh"]=true;
-        if(mesh && (runtime.lan() || getenv("TANDEM_EOS_ROLLBACK")))response.object["connection"].object["prediction"]=true;
+        if(mesh && (runtime.native_prediction() || getenv("TANDEM_EOS_ROLLBACK")))response.object["connection"].object["prediction"]=true;
         response.object["connection"].object["endpoint"]="127.0.0.1:"+std::to_string(game_port);
         // Three simulation ticks give a 50 ms budget at 60 Hz. Keep this
         // identical for every peer; the native handshake checks agreement.
-        response.object["connection"].object["input_delay"]=runtime.lan()?1:input_delay_ticks;
+        auto& connection=response.object["connection"];
+        // Only the host chooses the common starting delay. A LAN guest in a
+        // mixed room must not independently choose a different handshake value.
+        const auto delay=connection.has("input_delay")?int(connection.at("input_delay").integer(1,12)):runtime.lan()?1:input_delay_ticks;
+        connection.object["input_delay"]=delay;
     }
     Json request(const Json& request) {
         try {
             const std::string op=request.at("op").str();Json response;
+            if(op=="browse")return Json::dict({{"lobbies",runtime.browse(request.at("compatibility").str())},{"notice",runtime.browser_notice()}});
             if(op=="create") {
                 if(!runtime.owner().empty())throw std::runtime_error("already-in-room");
                 for(unsigned attempt=0;;++attempt) {
                     response=local_request(upstream,request);if(response.has("error"))return response;
-                    try{runtime.create(response.at("room").at("code").str(),request.at("compatibility").str());break;}
-                    catch(const std::exception& e){local_request(upstream,Json::dict({{"op","leave"},{"token",response.at("token")}}));
+                    try{
+                        runtime.create(response.at("room").at("code").str(),request.at("compatibility").str());
+                        const auto name=runtime.reserve_name(response.at("room").at("lobby_name").str());
+                        if(name!=response.at("room").at("lobby_name").str()){
+                            auto renamed=local_request(upstream,Json::dict({{"op","lobby-settings"},{"token",response.at("token")},{"revision",response.at("room").at("revision")},{"lobby_name",name}}));
+                            if(renamed.has("error"))throw std::runtime_error(renamed.at("error").str());response.object["room"]=renamed.at("room");
+                        }
+                        break;
+                    }
+                    catch(const std::exception& e){runtime.leave();local_request(upstream,Json::dict({{"op","leave"},{"token",response.at("token")}}));
                         if(std::string(e.what())!="room-code-in-use" || attempt>=15)throw;}
                 }
                 members[runtime.self()]={response.at("token").str(),0};
                 for(const auto& member:response.at("room").at("members").list())if(member.at("you").boolean() && member.has("id"))members[runtime.self()].uid=member.at("id").str();
+                runtime.publish(response.at("room"),request.at("compatibility").str());
             }else if(op=="join") {
                 std::string code=request.at("code").str();
                 if(!((code.size()==4 && code.find_first_not_of("0123456789")==std::string::npos) || (code.size()==8 && code.find_first_not_of("23456789ABCDEFGHJKLMNPQRSTUVWXYZ")==std::string::npos)))throw std::runtime_error("invalid-code");
-                runtime.join(code,request.at("compatibility").str());
+                if(request.has("target"))runtime.join_target(code,request.at("compatibility").str(),request.at("target"));
+                else runtime.join(code,request.at("compatibility").str());
                 try{response=remote_request(request);}catch(...){runtime.leave();throw;}
                 if(response.has("error")){runtime.leave();return response;}
             }else response=runtime.hosting()?host_request(runtime.self(),request):remote_request(request);

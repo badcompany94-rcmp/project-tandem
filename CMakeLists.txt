@@ -69,7 +69,7 @@ if(TARGET mkdd_bench)
 endif()
 
 if(WIN32)
-  add_executable(mkdd_lan src/lan_main.cpp src/lan_runtime.cpp src/eos_bridge.cpp src/eos_local_http.cpp)
+  add_executable(mkdd_lan src/lan_main.cpp src/lan_runtime.cpp src/unified_runtime.cpp src/eos_bridge.cpp src/eos_local_http.cpp)
   target_compile_features(mkdd_lan PRIVATE cxx_std_17)
   target_link_libraries(mkdd_lan PRIVATE ws2_32 winhttp bcrypt)
   target_link_libraries(mkdd PRIVATE winhttp)

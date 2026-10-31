@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include "lan_runtime.h"
+#include "unified_runtime.h"
 #include "eos_bridge.h"
 #include "eos_local_http.h"
 #include "eos_poll_wait.h"
@@ -13,15 +14,24 @@ int main(int argc,char** argv){
     using namespace mkdd::eos;
     setvbuf(stdout,nullptr,_IONBF,0);
     try{
-        if(argc<4 || argc>6 || std::string(argv[1])!="--serve"){
+        if(argc<4 || argc>7 || (std::string(argv[1])!="--serve" && std::string(argv[1])!="--unified" && std::string(argv[1])!="--hybrid-test")){
             fputs("Usage: mkdd_lan --serve <upstream-port> <ready-file> [host-ip|-] [lan-port]\n",stderr);return 2;
         }
         const unsigned upstream=unsigned(std::stoul(argv[2]));if(!upstream || upstream>65535)throw std::runtime_error("invalid upstream port");
         const std::string ready=argv[3],host=argc>=5 && std::string(argv[4])!="-"?argv[4]:"";
-        const unsigned port=argc==6?unsigned(std::stoul(argv[5])):28122;
-        LanRuntime runtime(host,port);Bridge bridge(runtime,upstream);LocalHttp http(0,false,"lan-private-test");
+        const unsigned port=argc>=6?unsigned(std::stoul(argv[5])):28122;
+        LanRuntime local(host,port);std::unique_ptr<UnifiedRuntime> unified;
+        std::unique_ptr<LanRuntime> fixture_internet;
+        const bool combined=std::string(argv[1])!="--serve";
+        if(std::string(argv[1])=="--hybrid-test"){
+            if(argc!=7)throw std::runtime_error("hybrid fixture requires two local ports");
+            fixture_internet=std::make_unique<LanRuntime>("127.0.0.1",unsigned(std::stoul(argv[6])));
+        }
+        if(combined)unified=std::make_unique<UnifiedRuntime>(local,fixture_internet.get());
+        PeerRuntime& runtime=combined?static_cast<PeerRuntime&>(*unified):static_cast<PeerRuntime&>(local);
+        Bridge bridge(runtime,upstream);LocalHttp http(0,false,combined?"unified-network":"lan-private-test");
         auto path=std::filesystem::u8path(ready),temporary=std::filesystem::u8path(ready+".tmp");
-        auto data=Json::dict({{"process_id",(int64_t)GetCurrentProcessId()},{"port",(int)http.port()},{"protocol",1},{"scope","lan-private-test"}}).dump();
+        auto data=Json::dict({{"process_id",(int64_t)GetCurrentProcessId()},{"port",(int)http.port()},{"protocol",1},{"scope",combined?"unified-network":"lan-private-test"}}).dump();
         {std::ofstream file(temporary,std::ios::binary);file<<data;if(!file)throw std::runtime_error("Cannot write LAN readiness record");}
         if(!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("Cannot publish LAN readiness record");
         puts("Project Tandem LAN helper ready (private experimental build)");

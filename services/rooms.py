@@ -61,6 +61,9 @@ class Room:
     flow: str = 'legacy'
     last_finished: str = ''
     preview: dict = field(default_factory=dict)
+    lobby_name: str = ''
+    visibility: str = 'private'
+    locked: bool = False
 
 class Rooms:
     def __init__(self, ttl=1800, max_rooms=256):
@@ -188,6 +191,7 @@ class Rooms:
         garage=Rooms.garage(room)
         humans=len({m['kart'] for m in arrangement.values()})
         return dict(code=room.code, revision=room.revision, state=room.state,
+                    lobby_name=room.lobby_name,visibility=room.visibility,locked=room.locked,
                     flow=room.flow,seating='garage' if room.layout=='mixed' else 'drivers-first' if room.flow=='staged' and room.layout=='coop' else 'individual' if room.layout=='solo' else 'adjacent',
                     mode=room.mode, layout=room.layout, rules=room.rules.copy(), capacity=8,
                     minimum_players=2,human_karts=humans,cpu_karts=8-humans if room.mode=='grand-prix' else 0,
@@ -294,6 +298,20 @@ class Rooms:
                     code=''.join(secrets.choice(alphabet) for _ in range(length))
                 token=secrets.token_urlsafe(32)
                 room=Room(code,compatibility,token,mode,layout,rules)
+                room.lobby_name=self.text(data.get('lobby_name',name),24)
+                if any(ord(c)>126 for c in room.lobby_name):raise RoomError('invalid-lobby-name')
+                room.visibility=data.get('visibility','private')
+                if room.visibility not in ('private','public'):raise RoomError('invalid-visibility')
+                if type(data.get('locked',False))!=bool:raise RoomError('invalid-lock')
+                room.locked=data.get('locked',False)
+                # Allocate under the store lock so simultaneous creates cannot
+                # pick the same display name. Discovery across hosts must also
+                # reserve names in its shared directory before advertising.
+                used={other.lobby_name.casefold() for other in self.rooms.values()}
+                base=room.lobby_name;suffix=0
+                while room.lobby_name.casefold() in used:
+                    suffix+=1;ending=f' ({suffix})'
+                    room.lobby_name=base[:24-len(ending)]+ending
                 room.flow=flow
                 room.members[token]=Member(token,name,0,initials=self.initials(data.get('initials','P1')))
                 self.rooms[code]=room
@@ -304,6 +322,9 @@ class Rooms:
                 room=self.rooms.get(code)
                 if not room:
                     raise RoomError('room-not-found')
+                if room.locked:raise RoomError('room-locked')
+                if data.get('public_join',False) is not False and data.get('public_join') is not True:raise RoomError('invalid-request')
+                if data.get('public_join') and room.visibility!='public':raise RoomError('room-private')
                 if data.get('compatibility')!=room.compatibility:
                     raise RoomError('incompatible-build')
                 if room.state!='forming':
@@ -347,7 +368,20 @@ class Rooms:
                 return dict(left=True)
             if op!='preview' and data.get('revision')!=room.revision:
                 raise RoomError('stale-room')
-            if op=='refresh-code':
+            if op=='lobby-settings':
+                if token!=room.host:raise RoomError('host-only')
+                visibility=data.get('visibility',room.visibility)
+                if visibility not in ('private','public'):raise RoomError('invalid-visibility')
+                locked=data.get('locked',room.locked)
+                if type(locked)!=bool:raise RoomError('invalid-lock')
+                lobby_name=self.text(data.get('lobby_name',room.lobby_name),24)
+                if any(ord(c)>126 for c in lobby_name):raise RoomError('invalid-lobby-name')
+                # Privacy is independent of the event and connected members.
+                # Do not reset readiness, selection, admissions or room codes.
+                room.visibility=visibility
+                room.locked=locked
+                room.lobby_name=lobby_name
+            elif op=='refresh-code':
                 if token!=room.host:raise RoomError('host-only')
                 if room.state!='forming':raise RoomError('event-started')
                 code=data.get('code')

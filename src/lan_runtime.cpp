@@ -62,6 +62,8 @@ struct LanRuntime::Impl {
     struct Stream {SOCKET socket; sockaddr_in remote{};std::string peer,input,output;Clock::time_point started=Clock::now();bool closing=false;};
     std::map<SOCKET,Stream> streams;
     std::string join_error;
+    Json advertisement;
+    std::string shared_control;
     bool welcomed=false,in_tick=false;
     unsigned traced_send=0,traced_receive=0;
 
@@ -76,7 +78,7 @@ struct LanRuntime::Impl {
     void leave(){
         close_socket(tcp);close_socket(discovery);
         for(auto& [s,c]:streams)closesocket(s);streams.clear();
-        owner.clear();control.clear();game.clear();code.clear();build.clear();peers.clear();game_members.clear();welcomed=false;
+        owner.clear();control.clear();game.clear();code.clear();build.clear();peers.clear();game_members.clear();welcomed=false;advertisement=Json();
         // Rotate the input credential between rooms; stale datagrams cannot join a new session.
         cookie=random_id();
     }
@@ -120,7 +122,8 @@ struct LanRuntime::Impl {
             if(op!="hello" || m.at("protocol").integer(1,1)!=1 || m.at("code").str()!=code)throw std::runtime_error("room-not-found");
             if(m.at("build").str()!=build){queue(c,Json::dict({{"op","error"},{"error","incompatible-build"}}));c.closing=true;return;}
             if(peers.size()>=8){queue(c,Json::dict({{"op","error"},{"error","room-full"}}));c.closing=true;return;}
-            c.peer=random_id();Peer peer;peer.endpoint=c.remote;peer.endpoint.sin_port=htons(u_short(m.at("port").integer(1,65535)));peer.cookie=id(m.at("cookie"));peers.emplace(c.peer,peer);
+            do{c.peer=random_id();}while(peers.count(c.peer) || (api.admit_identity && !api.admit_identity(c.peer)));
+            Peer peer;peer.endpoint=c.remote;peer.endpoint.sin_port=htons(u_short(m.at("port").integer(1,65535)));peer.cookie=id(m.at("cookie"));peers.emplace(c.peer,peer);
             queue(c,Json::dict({{"op","welcome"},{"self",c.peer},{"owner",self},{"control",control}}));broadcast();return;
         }
         if(!hosting() && op=="error"){join_error=m.at("error").str();return;}
@@ -154,11 +157,18 @@ struct LanRuntime::Impl {
     void discovery_tick(){
         if(discovery==INVALID_SOCKET)return;
         for(unsigned i=0;i<32;++i){
-            char data[512];sockaddr_in from{};int n=sizeof(from);int size=recvfrom(discovery,data,sizeof(data),0,(sockaddr*)&from,&n);
+            char data[1024];sockaddr_in from{};int n=sizeof(from);int size=recvfrom(discovery,data,sizeof(data),0,(sockaddr*)&from,&n);
             if(size<=0)break;if(!local_ip(from.sin_addr.s_addr))continue;
             try{auto q=Json::parse(std::string(data,size));
-                if(q.at("service").str()!="tandem-lan-1" || q.at("code").str()!=code)continue;
-                auto body=Json::dict({{"service","tandem-lan-1"},{"code",code},{"build",build},{"port",(int)port}}).dump();
+                if(q.at("service").str()!="tandem-lan-1")continue;
+                const bool browsing=q.has("browse") && q.at("browse").boolean();
+                if(browsing && (!advertisement.has("visibility") || advertisement.at("visibility").str()!="public"))continue;
+                if(!browsing && (!q.has("code") || q.at("code").str()!=code))continue;
+                auto response=advertisement.has("name")?advertisement:Json::dict({});
+                response.object["service"]="tandem-lan-1";response.object["code"]=code;response.object["build"]=build;
+                response.object["port"]=(int)port;response.object["id"]=self;
+                if(q.has("nonce"))response.object["nonce"]=q.at("nonce");
+                auto body=response.dump();
                 sendto(discovery,body.data(),int(body.size()),0,(sockaddr*)&from,sizeof(from));
             }catch(const std::exception&){}
         }
@@ -176,7 +186,7 @@ struct LanRuntime::Impl {
                 // The TCP route to the host and direct peer route can differ.
                 found->second.endpoint.sin_addr=from.sin_addr;
                 auto channel=m.at("channel").integer(0,2);auto bytes=unhex(m.at("data").str());
-                if(channel!=1 || bytes[0]!=14)continue;
+                if(channel!=1 || (bytes[0]!=14 && !(bytes.size()>66 && bytes[0]==15 && bytes[66]==14)))continue;
                 deliver(sender,m);
             }catch(const std::exception& e){if(getenv("TANDEM_LAN_TRACE"))fprintf(stderr,"[lan-udp-reject] %s\n",e.what());}
         }
@@ -231,13 +241,64 @@ struct LanRuntime::Impl {
     }
 };
 
+void LanRuntime::host_identity(const std::string& who,const std::string& control){
+    if(!impl_->owner.empty())throw std::runtime_error("already-in-room");
+    impl_->self=id(Json(who));impl_->shared_control=id(Json(control));
+}
+void LanRuntime::publish(const Json& room,const std::string& build){
+    if(!hosting())return;
+    if(!build.empty())impl_->build=build;
+    impl_->advertisement=Json::dict({{"name",room.at("lobby_name")},{"visibility",room.at("visibility")},
+        {"locked",room.at("locked")},{"players",(int)room.at("members").list().size()},{"state",room.at("state")}});
+}
+std::string LanRuntime::reserve_name(const std::string& requested){
+    auto rows=browse(impl_->build);std::set<std::string> used;
+    auto fold=[](std::string s){for(char& c:s)if(c>='A' && c<='Z')c+=32;return s;};
+    for(const auto& row:rows.list())if(row.at("id").str()!=self())used.insert(fold(row.at("name").str()));
+    for(unsigned suffix=0;suffix<256;++suffix){auto ending=suffix?" ("+std::to_string(suffix)+")":std::string();auto name=requested.substr(0,24-ending.size())+ending;if(!used.count(fold(name)))return name;}
+    throw std::runtime_error("lobby-name-unavailable");
+}
+Json LanRuntime::browse(const std::string& build){
+    SOCKET query=listener(0,true);struct Close{SOCKET s;~Close(){closesocket(s);}}close{query};
+    BOOL one=TRUE;setsockopt(query,SOL_SOCKET,SO_BROADCAST,(char*)&one,sizeof(one));
+    const auto started=Clock::now();const auto deadline=started+std::chrono::milliseconds(650);
+    std::map<std::string,Clock::time_point> sent;
+    auto next=Clock::time_point{};PollWait wait;std::map<std::string,Json> found;
+    while(Clock::now()<deadline){
+        if(Clock::now()>=next){next=Clock::now()+std::chrono::milliseconds(250);
+            const auto nonce=random_id();sent[nonce]=Clock::now();
+            auto body=Json::dict({{"service","tandem-lan-1"},{"browse",true},{"nonce",nonce}}).dump();
+            // A separate nonce per refresh prevents old packets reviving rooms.
+            for(auto host:{"255.255.255.255","127.0.0.1"}){sockaddr_in a{};a.sin_family=AF_INET;a.sin_port=htons(u_short(impl_->port));inet_pton(AF_INET,host,&a.sin_addr);sendto(query,body.data(),int(body.size()),0,(sockaddr*)&a,sizeof(a));}}
+        for(unsigned i=0;i<32;++i){char bytes[4096];sockaddr_in from{};int length=sizeof(from);int size=recvfrom(query,bytes,sizeof(bytes),0,(sockaddr*)&from,&length);if(size<=0)break;
+            if(!local_ip(from.sin_addr.s_addr))continue;
+            try{auto row=Json::parse(std::string(bytes,size));
+                if(row.at("service").str()!="tandem-lan-1" || !sent.count(row.at("nonce").str()) || row.at("visibility").str()!="public")continue;
+                auto key=id(row.at("id"));if(row.at("name").str().size()>24 || row.at("code").str().size()!=8)continue;
+                row.at("players").integer(1,8);row.at("port").integer(1,65535);row.at("locked").boolean();
+                row.object["network"]="lan";row.object["address"]=ip(from);row.object["compatible"]=row.at("build").str()==build;
+                row.object["ping_us"]=(int64_t)std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-sent.at(row.at("nonce").str())).count();
+                if(!found.count(key) || row.at("ping_us").number<found.at(key).at("ping_us").number)found[key]=std::move(row);
+            }catch(const std::exception&){}
+        }
+        tick();wait.wait();
+    }
+    Json result;result.kind=Json::Array;for(auto& [key,row]:found)result.array.push_back(std::move(row));return result;
+}
+void LanRuntime::join_target(const std::string& code,const std::string& build,const Json& row){
+    const auto old_target=impl_->target;const auto old_port=impl_->port;
+    impl_->target=row.at("address").str();impl_->port=unsigned(row.at("port").integer(1,65535));
+    try{join(code,build);if(owner()!=row.at("id").str()){leave();throw std::runtime_error("room-not-found");}}catch(...){impl_->target=old_target;impl_->port=old_port;throw;}
+    impl_->target=old_target;impl_->port=old_port;
+}
+
 LanRuntime::LanRuntime(std::string host,unsigned port):impl_(std::make_unique<Impl>(*this,std::move(host),port)){}
 LanRuntime::~LanRuntime()=default;
 void LanRuntime::tick(){impl_->tick();}
 void LanRuntime::create(const std::string& code,const std::string& build){
     auto& p=*impl_;if(!p.owner.empty())throw std::runtime_error("already-in-room");
     try{p.tcp=listener(p.port,false);p.discovery=listener(p.port,true);}catch(...){p.leave();throw;}
-    p.code=code;p.build=build;p.owner=p.self;p.control=random_id();p.peers[p.self]={};
+    p.code=code;p.build=build;p.owner=p.self;p.control=p.shared_control.empty()?random_id():p.shared_control;p.peers[p.self]={};
     puts("LAN room ready: direct local UDP inputs, no Internet login");
 }
 void LanRuntime::join(const std::string& code,const std::string& build){
@@ -262,7 +323,7 @@ std::set<std::string> LanRuntime::members()const{std::set<std::string> out;for(a
 bool LanRuntime::send(const std::string& peer,const std::string& socket,uint8_t channel,const std::vector<uint8_t>& data){
     auto& p=*impl_;if(!p.allowed(peer,socket) || data.empty() || data.size()>1170 || channel>2)return false;
     auto message=Json::dict({{"op","packet"},{"to",peer},{"from",p.self},{"socket",socket},{"channel",(int)channel},{"data",hex(data)}});
-    if(channel==1 && data[0]==14){
+    if(channel==1 && (data[0]==14 || (data.size()>66 && data[0]==15 && data[66]==14))){
         message.object["cookie"]=p.cookie;auto bytes=message.dump();if(bytes.size()>1400)return false;
         auto& destination=p.peers.at(peer).endpoint;
         int result=sendto(p.udp,bytes.data(),int(bytes.size()),0,(sockaddr*)&destination,sizeof(destination));

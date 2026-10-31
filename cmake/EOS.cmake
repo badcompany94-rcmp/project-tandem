@@ -20,7 +20,7 @@ if(MKDD_EOS)
     IMPORTED_IMPLIB "${_sdk}/Lib/EOSSDK-Win64-Shipping.lib"
     IMPORTED_LOCATION "${_sdk}/Bin/EOSSDK-Win64-Shipping.dll"
     INTERFACE_INCLUDE_DIRECTORIES "${_sdk}/Include")
-  add_executable(mkdd_eos src/eos_main.cpp src/eos_config.cpp src/eos_runtime.cpp src/eos_bridge.cpp src/eos_local_http.cpp src/eos_service.cpp)
+  add_executable(mkdd_eos src/eos_main.cpp src/eos_config.cpp src/eos_runtime.cpp src/eos_bridge.cpp src/eos_local_http.cpp src/eos_service.cpp src/lan_runtime.cpp src/unified_runtime.cpp)
   target_compile_features(mkdd_eos PRIVATE cxx_std_17)
   target_compile_definitions(mkdd_eos PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
   target_link_libraries(mkdd_eos PRIVATE mkdd_eos_sdk ws2_32 winhttp bcrypt)

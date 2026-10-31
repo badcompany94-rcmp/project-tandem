@@ -31,12 +31,28 @@ std::string one_of(const Json& value,std::initializer_list<const char*> choices)
 }
 std::string decimal(const Json& value,int64_t low,int64_t high) { return std::to_string(value.integer(low,high)); }
 void validate_reply(const Json& response,const std::string& op) {
+    if(op=="browse") {
+        // Listings are not room membership replies. Individual untrusted rows
+        // are validated/skipped by LobbyBrowser before rendering or joining.
+        if(response.at("lobbies").list().size()>200)invalid();
+        if(response.has("notice")){
+            const auto notice=response.at("notice").str();if(notice.size()>128)invalid();
+            for(unsigned char c:notice)if(c<32 || c>126)invalid();
+        }
+        return;
+    }
     if(op=="leave") {
         if(!((response.has("closed") && response.at("closed").boolean()) ||
              (response.has("left") && response.at("left").boolean())))invalid();
         return;
     }
     const Json& room=response.at("room");
+    if(room.has("visibility"))one_of(room.at("visibility"),{"private","public"});
+    if(room.has("locked"))room.at("locked").boolean();
+    if(room.has("lobby_name")){
+        const auto name=room.at("lobby_name").str();if(name.empty() || name.size()>24)invalid();
+        for(unsigned char c:name)if(c<32 || c>126)invalid();
+    }
     std::string code=room.at("code").str();
     if(!((code.size()==4 && code.find_first_not_of("0123456789")==std::string::npos) ||
          (code.size()==8 && code.find_first_not_of("23456789ABCDEFGHJKLMNPQRSTUVWXYZ")==std::string::npos)))invalid();

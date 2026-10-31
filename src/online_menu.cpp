@@ -6,6 +6,7 @@
 #include "display_config.h"
 #include "desktop_pointer.h"
 #include "desktop_online_ui.h"
+#include "lobby_browser.h"
 #include "race.h"
 #include "gx/texture.h"
 #include "replay_audit.h"
@@ -25,7 +26,7 @@ extern "C" {
 
 namespace {
 bool enabled() { return getenv("MKDD_ONLINE_MENU")!=nullptr; }
-enum class Page { Title, Type, HostJoin, Code, Lobby, Rules, Kart, Initials, Native, Battle, LeaveConfirm, Engine, KickConfirm };
+enum class Page { Title, Type, HostJoin, Code, Lobby, Rules, Kart, Initials, Native, Battle, LeaveConfirm, Engine, KickConfirm, Browser, Search };
 bool mode_advance=false;
 unsigned kick_seat=0;
 std::string kick_name,kick_id;
@@ -66,7 +67,12 @@ using mkdd::online::Json;
 Json room_reply;
 std::string token,build;
 struct Response { Json value;std::string error; };
-enum class Work { None, Create, Join, Poll, Change, Leave, Start, Select, Character };
+enum class Work { None, Create, Join, Poll, Change, Leave, Start, Select, Character, Browse };
+mkdd::online::LobbyBrowser browser;
+unsigned browser_offset=0;
+std::chrono::steady_clock::time_point next_browser,broker_seen;
+bool browser_join=false,browser_join_queued=false;
+Json browser_target;
 std::future<Response> pending;
 Work work=Work::None;
 Work queued_work=Work::None;
@@ -93,6 +99,10 @@ std::string friendly(const std::string& error) {
     if(error=="invalid-lan-address")return "USE THE HOST'S LOCAL IPV4 ADDRESS";
     if(error=="room-not-found")return "ROOM NOT FOUND";
     if(error=="room-full")return "ROOM IS FULL";
+    if(error=="room-private")return "THIS ROOM BECAME PRIVATE. ASK THE HOST FOR A CODE";
+    if(error=="room-locked")return "THE HOST HAS LOCKED THIS ROOM";
+    if(error=="internet-unavailable")return "INTERNET UNAVAILABLE. LAN ROOMS ARE STILL AVAILABLE";
+    if(error=="network-timeout")return "CONNECTION TIMED OUT. CHECK YOUR NETWORK AND TRY AGAIN";
     if(error=="event-started")return "THIS EVENT HAS ALREADY STARTED";
     if(error=="incompatible-build")return "PLAYERS NEED THE SAME GAME BUILD";
     if(error=="rollback-not-enabled")return "ONLINE HELPER NEEDS ROLLBACK. RESTART TANDEM";
@@ -140,7 +150,7 @@ void create_or_join(bool host) {
     Json request=Json::dict({{"op",host?"create":"join"},{"name",player},{"initials",initials},{"compatibility",build}});
     request.object["name"]=initials;
     if(host){request.object["mode"]="grand-prix";request.object["layout"]="mixed";request.object["flow"]="garage";}
-    else request.object["code"]=code;
+    else {request.object["code"]=code;if(browser_join){request.object["public_join"]=true;request.object["target"]=browser_target;}}
     message=host?"CREATING ROOM...":"JOINING ROOM...";
     cancelled=false;submit(host?Work::Create:Work::Join,std::move(request));
 }
@@ -422,6 +432,20 @@ void tree(uint32_t pane,unsigned depth=0) {
 void network_updates(CPU* c) {
     if(busy() && pending.wait_for(std::chrono::milliseconds(0))==std::future_status::ready) {
         Response result=pending.get();Work completed=work;work=Work::None;
+        if(completed==Work::Browse) {
+            next_browser=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+            if(result.error.empty())try{
+                browser.update(result.value.at("lobbies"),build);broker_seen=std::chrono::steady_clock::now();
+                if(online_focus>=1100 && !browser.selected.empty()) {
+                    bool found=false;auto rows=browser.visible();for(unsigned i=0;i<rows.size();++i)if(rows[i].id==browser.selected){browser_offset=(i/5)*5;online_focus=1100+(int)i;found=true;break;}
+                    if(!found){browser.selected.clear();online_focus=1003;}
+                }
+                if(page==Page::Browser || page==Page::Search)message=result.value.has("notice")?result.value.at("notice").str():"";
+            }catch(const std::exception&){message="COULD NOT READ THE LOBBY LIST";}
+            else if(page==Page::Browser || page==Page::Search)message=friendly(result.error);
+            if(browser_join_queued){browser_join_queued=false;if(page==Page::Browser)create_or_join(false);}
+            return;
+        }
         if(leave_pending) {
             leave_pending=false;queued_work=Work::None;submit(Work::Leave,Json::dict({{"op","leave"}}));return;
         }
@@ -473,6 +497,10 @@ void network_updates(CPU* c) {
         // revision forever, preventing the state poll that would refresh it.
         const bool phase_changed=native_selection && (result.error=="host-only" || result.error=="event-started" || result.error=="invalid-preview" || result.error=="invalid-character");
         if((result.error=="stale-room" || result.error=="character-taken" || phase_changed) && !busy() && !token.empty())submit(Work::Poll,Json::dict({{"op","state"}}));
+    }
+    if((page==Page::Browser || page==Page::Search) && token.empty() && !busy() && std::chrono::steady_clock::now()>=next_browser) {
+        if(build.empty())build=mkdd::online::executable_build();
+        submit(Work::Browse,Json::dict({{"op","browse"},{"compatibility",build}}));
     }
 }
 void edit_rules() {
@@ -532,7 +560,7 @@ void desktop_online(CPU* c) {
         if(!token.empty())submit(Work::Change,Json::dict({{"op","profile"},{"initials",initials}}));
     }else if(action.action==Action::Join && state.can_join) {
         if(action.text.size()!=8 || action.text.find_first_not_of(alphabet)!=std::string::npos){message="ENTER AN 8 CHARACTER ROOM CODE";return;}
-        code=action.text;native_scene(c,0);open(c,Page::HostJoin);create_or_join(false);
+        code=action.text;browser_join=false;native_scene(c,0);open(c,Page::HostJoin);create_or_join(false);
     }else if(action.action==Action::Kick && state.can_kick)submit(Work::Change,Json::dict({{"op","kick"},{"seat",(int)action.seat},{"member",action.text}}));
     else if(action.action==Action::Refresh && state.can_refresh)submit(Work::Change,Json::dict({{"op","refresh-code"}}));
 }
@@ -596,10 +624,10 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         if(!saved.empty() && saved.size()<=7 && saved.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")==std::string::npos)initials=saved;
     }
     uint32_t pressed=mem_r32(0x803b4410+0x1c),repeat=mem_r32(0x803b4410+0x30);
-    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials;
+    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search;
     const auto pointer=desktop_pointer::read();
     const unsigned choices=page==Page::HostJoin || page==Page::Type || page==Page::LeaveConfirm || page==Page::KickConfirm?2:page==Page::Engine?4:page==Page::Battle?3:page==Page::Lobby?16:38;
-    const bool navigable=page==Page::HostJoin || page==Page::Type || page==Page::Engine || page==Page::Battle || page==Page::Lobby || page==Page::Code || page==Page::Initials || page==Page::LeaveConfirm || page==Page::KickConfirm;
+    const bool navigable=page==Page::HostJoin || page==Page::Type || page==Page::Engine || page==Page::Battle || page==Page::Lobby || page==Page::Code || page==Page::Initials || page==Page::LeaveConfirm || page==Page::KickConfirm || page==Page::Browser || page==Page::Search;
     static desktop_pointer::State last_pointer;
     const bool moved=pointer.hover!=last_pointer.hover || pointer.x!=last_pointer.x || pointer.y!=last_pointer.y;
     last_pointer=pointer;
@@ -624,12 +652,40 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         const int action=*activated;
         if(navigable)pressed&=~0x100u;
         if(action==-2)pressed|=0x200;
+        else if(page==Page::Code && action==38){browser_join=false;open(c,Page::Browser);next_browser={};pressed=0;}
+        else if(page==Page::Browser && action>=1000) {
+            if(action==1000)open(c,Page::Search);
+            else if(action==1001){browser.sort=mkdd::online::LobbyBrowser::Sort((int(browser.sort)+1)%6);browser_offset=0;}
+            else if(action==1002){browser.joinable_only=!browser.joinable_only;browser_offset=0;}
+            else if(action==1003)next_browser={};
+            else if(action==1004)browser_offset=browser_offset>=5?browser_offset-5:0;
+            else if(action==1005 && browser_offset+5<browser.visible().size())browser_offset+=5;
+            else if(action>=1100){auto rows=browser.visible();unsigned index=unsigned(action-1100);
+                if(index<rows.size()){
+                    const auto& row=rows[index];browser.selected=row.id;
+                    const bool fresh=broker_seen.time_since_epoch().count() && std::chrono::steady_clock::now()-broker_seen<std::chrono::seconds(12);
+                    if(!fresh){message="LIST IS OUT OF DATE. REFRESH BEFORE JOINING";next_browser={};}
+                    else if(!row.joinable())message=friendly(!row.compatible?"incompatible-build":row.locked?"room-locked":row.players>=8?"room-full":"event-started");
+                    else {browser_join=true;browser_target=row.target;code=row.code;if(busy())browser_join_queued=true;else create_or_join(false);message="CONNECTING...  B: CANCEL";}
+                }
+            }
+        }
         else if(page==Page::HostJoin && action==34)pressed|=0x1000;
+        else if(page==Page::Lobby && (action==36 || action==37 || action==38)) {
+            if(can_act() && room_reply.has("room") && room_reply.at("room").at("host").boolean())
+                submit(Work::Change,action==38?Json::dict({{"op","lobby-settings"},{"locked",!room_reply.at("room").at("locked").boolean()}}):Json::dict({{"op","lobby-settings"},{"visibility",action==37?"public":"private"}}));
+        }
+        else if(page==Page::Search && action==38){if(browser.query.size()<24)browser.query+=' ';}
         else if(page==Page::Lobby && action>=32){const uint32_t buttons[]={0x400,0x800,0x1000,0x200};if(action<36)pressed|=buttons[action-32];}
         else if(action==38 && (page==Page::Type || page==Page::Engine || page==Page::Battle))pressed|=0x100;
         else if(action>=0 && (unsigned)action<choices){online_focus=action;selection=(unsigned)action;if(page==Page::Title)mem_w8(scene+0x168,(uint8_t)selection);pressed|=0x100;}
     }
-    for(unsigned char ch:desktop_pointer::take_text())if(page==Page::Code || page==Page::Initials) {
+    for(unsigned char ch:desktop_pointer::take_text())if(page==Page::Browser || page==Page::Search) {
+        if(ch=='\b'){if(!browser.query.empty())browser.query.pop_back();}
+        else if(ch=='\r'){if(page==Page::Search)open(c,Page::Browser);}
+        else if(ch>=32 && ch<127 && browser.query.size()<24)browser.query+=(char)ch;
+        browser_offset=0;
+    }else if(page==Page::Code || page==Page::Initials) {
         auto& draft=page==Page::Code?code:draft_initials;const unsigned maximum=page==Page::Code?8:7;
         if(ch=='\b'){if(!draft.empty())draft.pop_back();}
         else if(ch=='\r'){selection=37;pressed|=0x100;}
@@ -667,7 +723,7 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
             else if(page==Page::Type && can_act())submit(Work::Select,Json::dict({{"op","back"}}));
             else if(page!=Page::Type)open(c,Page::Type);
         } else if((pressed&0x1100) && host && can_act()) {
-            if(page==Page::HostJoin) {if(selection){code.clear();open(c,Page::Code);}else create_or_join(true);}
+            if(page==Page::HostJoin) {if(selection){browser_join=false;code.clear();open(c,Page::Code);}else create_or_join(true);}
             else if(page==Page::Type) {mode=selection?"balloon":"grand-prix";open(c,selection?Page::Battle:Page::Engine);}
             else {
                 Json rules;
@@ -676,11 +732,19 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
                 mode_advance=submit(Work::Select,Json::dict({{"op","rules"},{"mode",mode},{"rules",rules}}));
             }
         }
+    } else if(page==Page::Browser) {
+        auto rows=browser.visible();if(online_focus>=1100 && unsigned(online_focus-1100)<rows.size())browser.selected=rows[online_focus-1100].id;
+        if(pressed&0x200){browser_join_queued=false;if(busy() && work==Work::Join){cancelled=true;message="CANCELLING CONNECTION...";}else open(c,Page::Code);}
+    } else if(page==Page::Search) {
+        if(pressed&0x200)open(c,Page::Browser);
+        else if((pressed&0x100) && selection==37)open(c,Page::Browser);
+        else if((pressed&0x100) && selection==36){if(!browser.query.empty())browser.query.pop_back();browser_offset=0;}
+        else if((pressed&0x100) && selection<36 && browser.query.size()<24){browser.query+=keyboard_keys[selection];browser_offset=0;}
     } else if (page==Page::Code) {
         if(up || down || left || right){selection=(selection+38+(up?-10:down?10:left?-1:1))%38;sound(c,0x20000);}
         if(pressed&0x200){if(busy())cancelled=true;open(c,Page::HostJoin);}
         else if((pressed&0x400) || ((pressed&0x100) && selection==36)){if(!code.empty())code.pop_back();}
-        else if((pressed&0x1000) || ((pressed&0x100) && selection==37)){if(code.size()==8)create_or_join(false);else message="ENTER ALL 8 CHARACTERS";}
+        else if((pressed&0x1000) || ((pressed&0x100) && selection==37)){browser_join=false;if(code.size()==8)create_or_join(false);else message="ENTER ALL 8 CHARACTERS";}
         else if((pressed&0x100) && selection<36 && strchr(alphabet,keyboard_keys[selection]) && code.size()<8){code+=keyboard_keys[selection];if(code.size()==8)selection=37;}
     } else if(page==Page::Lobby && room_reply.has("room")) {
         const Json& room=room_reply.at("room");
@@ -800,7 +864,7 @@ extern "C" void hle_fn_80015F40(CPU* c) {
 extern "C" void hle_calc__11SequenceAppFv(CPU* c) {
     const uint32_t app=c->r[3];
     desktop_pointer::context(true);
-    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials;
+    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search;
     if(enabled())desktop_online(c);
     if(enabled() && getenv("MKDD_ROOM_RESUME")) {
         if(token.empty() && getenv("MKDD_ROOM_TOKEN")) {

@@ -2,6 +2,7 @@
 #include <windows.h>
 #include "eos_service.h"
 #include "eos_runtime.h"
+#include "unified_runtime.h"
 #include "eos_bridge.h"
 #include "eos_local_http.h"
 #include "eos_poll_wait.h"
@@ -13,15 +14,20 @@
 namespace mkdd::eos {
 int serve(const std::string& config,unsigned upstream,const std::string& ready,unsigned seconds,bool fixture) {
     if(!upstream || upstream>65535)throw std::runtime_error("invalid upstream port");
-    std::unique_ptr<Runtime> runtime;std::unique_ptr<Bridge> bridge;
+    std::unique_ptr<Runtime> internet;std::unique_ptr<LanRuntime> lan;
+    std::unique_ptr<UnifiedRuntime> runtime;std::unique_ptr<Bridge> bridge;
     if(!fixture) {
-        runtime=std::make_unique<Runtime>(Config::load(config));runtime->login();
+        try{internet=std::make_unique<Runtime>(Config::load(config));internet->login();}
+        catch(const std::exception&){fputs("Internet login unavailable; LAN play remains available\n",stderr);internet.reset();}
+        unsigned lan_port=28122;if(const char* p=getenv("TANDEM_LAN_PORT"))lan_port=unsigned(std::stoul(p));
+        lan=std::make_unique<LanRuntime>("",lan_port);
+        runtime=std::make_unique<UnifiedRuntime>(*lan,internet.get());
         bridge=std::make_unique<Bridge>(*runtime,upstream);
     }
-    LocalHttp http(0,!fixture);
+    LocalHttp http(0,!fixture,fixture?"ipc-fixture":"unified-network");
     const auto file=std::filesystem::u8path(ready),temporary=std::filesystem::u8path(ready+".tmp");
     const auto state=Json::dict({{"process_id",(int64_t)GetCurrentProcessId()},{"port",(int)http.port()},
-                                 {"protocol",1},{"scope",fixture?"ipc-fixture":"eos-internet-playtest"}}).dump();
+                                 {"protocol",1},{"scope",fixture?"ipc-fixture":"unified-network"}}).dump();
     {std::ofstream output(temporary,std::ios::binary);output<<state;if(!output)throw std::runtime_error("Cannot write EOS helper readiness record");}
     if(!MoveFileExW(temporary.c_str(),file.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))throw std::runtime_error("Cannot publish EOS helper readiness record");
     puts(fixture?"Loopback protocol fixture ready (no EOS connection)":"Project Tandem online helper ready");fflush(stdout);

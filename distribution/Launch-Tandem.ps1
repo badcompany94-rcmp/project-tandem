@@ -1,13 +1,6 @@
-param([switch]$Offline,[switch]$Lan,[string]$LanHost='',
-      [ValidateRange(1024,65535)][int]$LanPort=28122,
+param([switch]$Offline,
       [ValidateSet('Stable','Responsive')][string]$NetworkProfile='Stable',[uint32]$Frames=0)
 $ErrorActionPreference='Stop'
-if($Offline -and $Lan){throw 'Choose Offline or LAN.'}
-if($LanHost -and -not $Lan){throw 'A LAN host IP requires LAN mode.'}
-if($LanHost){
-    $lanAddress=$null
-    if(-not [Net.IPAddress]::TryParse($LanHost,[ref]$lanAddress) -or $lanAddress.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork){throw 'Use the host PC local IPv4 address.'}
-}
 $root=$PSScriptRoot;$data=Join-Path $root 'local-data'
 $settingsFile=Join-Path $data 'settings.json'
 if(-not (Test-Path -LiteralPath $settingsFile)){throw 'Run Setup-Tandem.cmd first and select your own compatible disc image.'}
@@ -34,6 +27,7 @@ foreach($key in @([Environment]::GetEnvironmentVariables('Process').Keys)) {
     if($key -like 'MKDD_NET_*' -or $key -in @('MKDD_LAN','MKDD_NETWORK_RESPONSIVE','MKDD_ROOM_PORT','MKDD_ROOM_BACKEND','MKDD_ONLINE_MENU','MKDD_EXPECT_PREDICTION','TANDEM_EOS_ROLLBACK','TANDEM_EOS_MESH','TANDEM_EOS_ORDERED_INPUT','GCN_INPUT','GCN_CLOCK','GCN_CPU_SCALE','GCN_NET_STATS','GCN_FRAME_STATS','GCN_PIPELINE_TRACE','GCN_GAME_SCHEDULING','MKDD_SYNC_TRACE','MKDD_MENU_TEST')){[Environment]::SetEnvironmentVariable($key,$null,'Process')}
 }
 if($NetworkProfile -eq 'Responsive'){$env:MKDD_NETWORK_RESPONSIVE='1'}
+foreach($key in @('TANDEM_LAN_PORT','TANDEM_BROWSER_TRACE','TANDEM_BROWSER_SELF_TEST')){[Environment]::SetEnvironmentVariable($key,$null,'Process')}
 function Quote([string]$value){return '"'+$value+'"'}
 function Health([int]$port) {
     $request=[Net.HttpWebRequest]::Create("http://127.0.0.1:$port/health");$request.Proxy=$null;$request.AllowAutoRedirect=$false;$request.Timeout=1000
@@ -43,12 +37,18 @@ $session=Join-Path $data ('sessions\'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 New-Item -ItemType Directory -Force -Path $session | Out-Null
 $online=$false;$helper=$null;$upstream=$null
 if(-not $Offline) {
+    # One player-facing launcher and menu. The helper combines LAN and Internet
+    # automatically; a missing SDK/configuration still permits offline LAN.
+    $config=Join-Path $root 'config\eos.json'
+    $Lan=(-not (Test-Path -LiteralPath (Join-Path $root 'runtime\mkdd_eos.exe'))) -or
+         (-not (Test-Path -LiteralPath (Join-Path $root 'runtime\EOSSDK-Win64-Shipping.dll'))) -or
+         (-not (Test-Path -LiteralPath $config))
+    $LanPort=28122
     # The EOS helper negotiates prediction only when this switch is present.
     # Set it before starting the helper; native-only developer fixtures are
     # insufficient to verify the normal portable launch path.
     $env:TANDEM_EOS_ROLLBACK='1';$env:MKDD_EXPECT_PREDICTION='1'
     $helperExe=Join-Path $root $(if($Lan){'runtime\mkdd_lan.exe'}else{'runtime\mkdd_eos.exe'})
-    $config=Join-Path $root 'config\eos.json'
     if(-not (Test-Path -LiteralPath $helperExe)){throw 'The selected networking helper is missing. Extract the complete private update again.'}
     if(-not $Lan -and -not (Test-Path -LiteralPath $config)){throw 'The EOS product configuration is missing.'}
     if(-not (Test-Path -LiteralPath (Join-Path $root 'Watch-Online.ps1'))){throw 'The online shutdown helper is missing. Extract the complete update again.'}
@@ -73,9 +73,8 @@ if(-not $Offline) {
             while(-not (Test-Path -LiteralPath $upReady)) {if($upstream.HasExited -or (Get-Date) -gt $deadline){throw 'Local room model did not start.'};Start-Sleep -Milliseconds 100;$upstream.Refresh()}
             $up=Get-Content -LiteralPath $upReady -Raw|ConvertFrom-Json
             if($Lan){
-                Write-Host 'Starting private LAN mode. Choose Online Play in the game to host or join locally.'
-                $lanTarget=if($LanHost){$LanHost}else{'-'}
-                $helperArgs=@('--serve',$up.port,(Quote $ready),$lanTarget,$LanPort)
+                Write-Host 'Starting networking. LAN remains available without an Internet connection.'
+                $helperArgs=@('--unified',$up.port,(Quote $ready),'-',$LanPort)
             }else{
                 Write-Host 'Connecting Project Tandem to EOS...'
                 $helperArgs=@('--serve',(Quote $localConfig),$up.port,(Quote $ready))
@@ -84,7 +83,7 @@ if(-not $Offline) {
             $deadline=(Get-Date).AddSeconds(65)
             while(-not (Test-Path -LiteralPath $ready)) {if($helper.HasExited -or (Get-Date) -gt $deadline){throw 'The networking helper did not start. Check the session logs.'};Start-Sleep -Milliseconds 100;$helper.Refresh()}
             $state=Get-Content -LiteralPath $ready -Raw|ConvertFrom-Json;$port=$state.port;$health=Health $port
-            $expectedScope=if($Lan){'lan-private-test'}else{'eos-internet-playtest'}
+            $expectedScope='unified-network'
             if($health.scope -ne $expectedScope -or $health.protocol -ne 1){throw 'The helper started in an unexpected networking mode.'}
             $serviceState=@{helper_id=$helper.Id;helper_started=$helper.StartTime.ToUniversalTime().ToString('o');helper_path=$helperExe;helper_hash=$helperHash;config_hash=$configHash;upstream_id=$upstream.Id;upstream_started=$upstream.StartTime.ToUniversalTime().ToString('o');upstream_path=$settings.python;port=$port;ready=$ready;session=$session}|ConvertTo-Json
             $serviceState|Set-Content -LiteralPath (Join-Path $session 'online-service.json') -Encoding UTF8
@@ -97,8 +96,7 @@ if(-not $Offline) {
             throw
         }
     }
-    $env:MKDD_ONLINE_MENU='1';$env:MKDD_ROOM_BACKEND=if($Lan){'lan'}else{'eos'};$env:MKDD_ROOM_PORT=[string]$port
-    if($Lan){$env:MKDD_LAN='1'}
+    $env:MKDD_ONLINE_MENU='1';$env:MKDD_ROOM_BACKEND='eos';$env:MKDD_ROOM_PORT=[string]$port
     $env:MKDD_ONLINE_NAME=if($settings.player_name){$settings.player_name}else{'Player'}
     $env:GCN_NET_STATS=$ready+'.stats.json'
     $env:GCN_FRAME_STATS='1'

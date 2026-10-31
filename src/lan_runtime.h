@@ -25,6 +25,12 @@ public:
     bool authorized(const std::string&,const std::string&)const override;
     bool lan()const override{return true;}
     std::string route()const override{return "lan";}
+    void publish(const online::Json&,const std::string&) override;
+    online::Json browse(const std::string&) override;
+    void join_target(const std::string&,const std::string&,const online::Json&) override;
+    void host_identity(const std::string&,const std::string&);
+    std::string reserve_name(const std::string&) override;
+    std::function<bool(const std::string&)> admit_identity;
 private:
     struct Impl;std::unique_ptr<Impl> impl_;
 };

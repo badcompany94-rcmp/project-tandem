@@ -135,6 +135,7 @@ void classic_room_info(CPU* c) {
     if(lobby)shine_panel(c,352,9,150,29);
     racing_text(c,"ROOM "+room.at("code").str(),x,lobby?16:24,lobby?13:12,0xffee83ff,true,true);
     racing_text(c,std::to_string(room.at("members").list().size())+"/8 PLAYERS",lobby?556:x,lobby?20:43,lobby?17:12,0xe3f2ffff,true,true);
+    if(lobby && room.has("lobby_name"))racing_text(c,room.at("lobby_name").str(),12,80,10,0xffed9aff,false,true);
 }
 void classic_footer(CPU* c,bool lobby=false) {
     racing_text(c,release_label(),10,432,8,0x9cb9ecff);
@@ -142,7 +143,15 @@ void classic_footer(CPU* c,bool lobby=false) {
         bool ready=false;for(const auto& member:room_reply.at("room").at("members").list())if(member.at("you").boolean())ready=member.at("ready").boolean();
         classic_button(c,ready?"UNREADY":"READY",9,402,75,24,32);
         classic_button(c,"BACK",90,402,55,24,35);
-        racing_text(c,"F1: SETTINGS / QUICK JOIN",154,407,10,0xb9dbffff);
+        const auto& room=room_reply.at("room");
+        const bool public_room=room.has("visibility") && room.at("visibility").str()=="public";
+        if(room.at("host").boolean()) {
+            classic_button(c,"PRIVATE",157,402,70,24,36);
+            classic_button(c,"PUBLIC",232,402,70,24,37);
+            box(c,public_room?239:164,424,56,2,0xffed9aff);
+            classic_button(c,room.at("locked").boolean()?"UNLOCK":"LOCK ROOM",307,402,80,24,38);
+        }else racing_text(c,public_room?"PUBLIC ROOM":"PRIVATE ROOM",254,407,12,0xffed9aff,true);
+        racing_text(c,"F1: SETTINGS / QUICK JOIN",379,432,8,0xb9dbffff);
         classic_button(c,"EDIT NAME",401,398,78,30,34);
         if(room_reply.at("room").at("host").boolean())classic_button(c,"CHOOSE MODE >",487,397,114,32,33,true);
         else racing_text(c,"WAITING FOR HOST",545,405,12,0xffee9aff,true);
@@ -222,15 +231,44 @@ bool classic_draw(CPU* c) {
     }else if(page==Page::Battle) {
         for(unsigned i=0;i<3;++i){const float x=38+i*185;if(classic_focused((int)i))classic_outline(c,x,124,171,190,8);hit(x,124,171,190,i);}
         racing_text(c,"ONE BATTLE, THEN BACK TO YOUR ROOM",202,350,13,0xeaf2ffff,true,true);hit(380,371,212,29,38);if(classic_focused(38))classic_outline(c,380,371,212,29);classic_footer(c);
-    }else if(page==Page::Code || page==Page::Initials) {
-        const bool naming=page==Page::Initials;
+    }else if(page==Page::Browser) {
+        shine_panel(c,92,48,424,31);racing_text(c,"SERVER BROWSER",304,49,23,0xfff2bdff,true,true);
+        classic_button(c,("SEARCH: "+(browser.query.empty()?std::string("LOBBY NAME"):browser.query)).c_str(),18,91,302,28,1000);
+        classic_button(c,mkdd::online::LobbyBrowser::sort_label(browser.sort),329,91,261,28,1001);
+        classic_button(c,browser.joinable_only?"JOINABLE ONLY: ON":"JOINABLE ONLY: OFF",18,128,180,23,1002);
+        classic_button(c,busy() && work==Work::Browse?"REFRESHING...":"REFRESH",492,128,98,23,1003);
+        auto rows=browser.visible();if(browser_offset>=rows.size())browser_offset=rows.empty()?0:unsigned((rows.size()-1)/5*5);
+        racing_text(c,std::to_string(rows.size())+" LOBBIES / LAN FIRST",210,134,11,0xeaf1ffff);
+        racing_text(c,"LOBBY",26,159,11);racing_text(c,"PLAYERS",359,159,11);racing_text(c,"PING",439,159,11);
+        const bool stale=!broker_seen.time_since_epoch().count() || std::chrono::steady_clock::now()-broker_seen>std::chrono::seconds(12);
+        for(unsigned i=browser_offset;i<std::min<unsigned>(browser_offset+5,rows.size());++i){
+            const auto& row=rows[i];float y=179+(i-browser_offset)*34.f;
+            smooth_panel(c,18,y,572,32,4,row.id==browser.selected?0x174c98ff:0x082c68ff);
+            if(classic_focused(1100+(int)i))classic_outline(c,18,y,572,32);
+            racing_text(c,row.name,26,y+1,std::min(15.f,300/std::max(1.f,classic_text_width(row.name,1))),0xfff1bdff);
+            racing_text(c,(row.network=="lan"?"LAN / ":"INTERNET / ")+row.status(),26,y+21,8,0xcce2ffff);
+            racing_text(c,std::to_string(row.players)+"/8",378,y+8,16,0xffffffff,true);
+            racing_text(c,row.ping(),462,y+10,row.ping_us<0?8:12,0xe0f5caff,true);
+            racing_text(c,stale?"STALE":row.joinable()?"JOIN >":"VIEW",551,y+10,11,0xffed9aff,true);
+            hit(18,y,572,32,1100+(int)i);
+        }
+        if(rows.empty())racing_text(c,busy()?"FINDING PUBLIC LOBBIES...":"NO MATCHING LOBBIES",304,245,19,0xffed9aff,true);
+        classic_button(c,"< PREVIOUS",195,376,98,23,1004);classic_button(c,"NEXT >",312,376,98,23,1005);
+        racing_text(c,std::to_string(rows.empty()?0:browser_offset/5+1)+" / "+std::to_string((rows.size()+4)/5),304,410,10,0xeaf1ffff,true);
+        classic_button(c,busy() && work==Work::Join?"CANCEL":"BACK",510,407,84,27,-2);
+        if(!message.empty()){box(c,18,351,572,20,0x031435ee);racing_text(c,message,304,353,std::min(11.f,560/std::max(1.f,classic_text_width(message,1))),0xffed9aff,true);}
+    }else if(page==Page::Code || page==Page::Initials || page==Page::Search) {
+        const bool naming=page==Page::Initials,searching=page==Page::Search;
         // A polished panel covers the lobby-specific subtitle on the shared base.
-        shine_panel(c,92,48,424,31);racing_text(c,naming?"YOUR NAME":"ENTER ROOM CODE",304,49,23,0xfff2bdff,true,true);
-        std::string shown=naming?draft_initials:code;while(shown.size()<(naming?7u:8u))shown+='-';
-        shine_panel(c,167,91,274,44);racing_text(c,shown,304,94,31,0xffec83ff,true,true);
-        racing_text(c,"TYPE DIRECTLY OR SELECT A KEY",304,143,13,0xe6f1ffff,true);
-        for(unsigned i=0;i<36;++i){auto [x,y]=key_position(i);y-=17;const bool allowed=naming || strchr(alphabet,keyboard_keys[i]);shine_panel(c,x-4,y-5,39,31);if(classic_focused((int)i))classic_outline(c,x-4,y-5,39,31);racing_text(c,std::string(1,keyboard_keys[i]),x+15,y-3,23,allowed?0xffffffff:0x6d7b91ff,true);if(allowed)hit(x-4,y-5,39,31,i);}
-        classic_button(c,"DELETE",86,336,122,32,36);classic_button(c,naming?"SAVE NAME":"JOIN ROOM",359,336,163,32,37,true);classic_footer(c);
+        shine_panel(c,92,48,424,31);racing_text(c,searching?"SEARCH LOBBY NAME":naming?"YOUR NAME":"ENTER ROOM CODE",304,49,23,0xfff2bdff,true,true);
+        std::string shown=searching?browser.query:naming?draft_initials:code;while(shown.size()<(searching?1u:naming?7u:8u))shown+='-';
+        shine_panel(c,167,91,274,44);racing_text(c,shown,304,94,std::min(31.f,258/std::max(1.f,classic_text_width(shown,1))),0xffec83ff,true,true);
+        racing_text(c,message.empty()?"TYPE DIRECTLY OR SELECT A KEY":message,304,143,message.empty()?13:11,0xe6f1ffff,true);
+        for(unsigned i=0;i<36;++i){auto [x,y]=key_position(i);y-=17;const bool allowed=naming || searching || strchr(alphabet,keyboard_keys[i]);shine_panel(c,x-4,y-5,39,31);if(classic_focused((int)i))classic_outline(c,x-4,y-5,39,31);racing_text(c,std::string(1,keyboard_keys[i]),x+15,y-3,23,allowed?0xffffffff:0x6d7b91ff,true);if(allowed)hit(x-4,y-5,39,31,i);}
+        classic_button(c,"DELETE",86,336,122,32,36);classic_button(c,searching?"VIEW RESULTS":naming?"SAVE NAME":"JOIN ROOM",359,336,163,32,37,true);
+        if(searching)classic_button(c,"SPACE",232,336,103,32,38);
+        else if(!naming)classic_button(c,"BROWSE PUBLIC LOBBIES",154,373,300,26,38);
+        classic_footer(c);
     }
     if(page==Page::LeaveConfirm || page==Page::KickConfirm) {
         clickable.clear();box(c,0,0,608,448,0x010927c9);shine_panel(c,112,137,384,174);
@@ -242,7 +280,7 @@ bool classic_draw(CPU* c) {
         classic_button(c,leave?"YES, LEAVE":"REMOVE PLAYER",315,262,159,31,1,true);
 
     }
-    if(!message.empty()){box(c,45,379,518,18,0x031435e8);racing_text(c,message,304,380,12,0xffed9aff,true);}
+    if(!message.empty() && page!=Page::Browser && page!=Page::Search && page!=Page::Code){box(c,45,379,518,18,0x031435e8);racing_text(c,message,304,380,12,0xffed9aff,true);}
     desktop_pointer::publish("online-"+std::to_string((int)page),clickable,16.f/9.f);
     return true;
 }
