@@ -86,9 +86,11 @@ struct Bridge::Impl {
             if(op=="join" && pending_kicks.count(peer))throw std::runtime_error("invalid-session");
             if(op=="start")request.object["endpoint"]="127.0.0.1:28121";
             Json result;
-            if(op=="lobby-settings" && request.has("lobby_name")) {
+            if(op=="lobby-settings" && (request.has("lobby_name") || (request.has("visibility") && request.at("visibility").str()=="public"))) {
                 if(peer!=runtime.self())throw std::runtime_error("host-only");
                 struct Guard{bool& value;Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(refreshing);
+                // Validate privacy-only requests too, then reserve their current
+                // name. A private LAN room may have acquired a visible namesake.
                 auto proposal=request;proposal.object["propose"]=true;
                 result=local_request(upstream,proposal);if(result.has("error"))return result;
                 try{
