@@ -255,6 +255,17 @@ class LanIntegration(unittest.TestCase):
         self.assertNotIn('error',joined)
         revision=joined['room']['revision']
         self.assertEqual(self.request(guest,'lobby-settings',revision=revision,locked=True).get('error'),'host-only')
+        self.assertEqual(self.request(guest,'lobby-settings',revision=revision,lobby_name='HIJACK').get('error'),'host-only')
+        self.action(guest,'ready',ready=True)
+        before_name=self.request(host,'state')['room']
+        renamed=self.action(host,'lobby-settings',lobby_name='Friday Karts',visibility='public')['room']
+        self.assertEqual(renamed['members'],before_name['members'])
+        self.assertEqual(renamed['code'],code)
+        row=self.request(guest,'browse',compatibility='same')['lobbies'][0]
+        self.assertEqual(row['name'],'Friday Karts');self.assertEqual(row['players'],2)
+        self.assertEqual(self.request(guest,'state')['room']['lobby_name'],'Friday Karts')
+        self.assertEqual(self.request(host,'lobby-settings',revision=before_name['revision'],lobby_name='STALE').get('error'),'stale-room')
+        self.assertEqual(self.request(host,'state')['room']['lobby_name'],'Friday Karts')
         self.action(host,'lobby-settings',locked=True,visibility='public')
         for client in (host,guest):self.action(client,'ready',ready=True)
         before=self.request(host,'state')['room']

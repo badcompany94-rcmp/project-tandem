@@ -376,6 +376,12 @@ class Rooms:
                 if type(locked)!=bool:raise RoomError('invalid-lock')
                 lobby_name=self.text(data.get('lobby_name',room.lobby_name),24)
                 if any(ord(c)>126 for c in lobby_name):raise RoomError('invalid-lobby-name')
+                used={other.lobby_name.casefold() for other in self.rooms.values() if other is not room}
+                base=lobby_name;suffix=0
+                while lobby_name.casefold() in used:
+                    if data.get('exact_name') is True:raise RoomError('lobby-name-unavailable')
+                    suffix+=1;ending=f' ({suffix})';lobby_name=base[:24-len(ending)]+ending
+                if data.get('propose') is True:return dict(lobby_name=lobby_name)
                 # Privacy is independent of the event and connected members.
                 # Do not reset readiness, selection, admissions or room codes.
                 room.visibility=visibility

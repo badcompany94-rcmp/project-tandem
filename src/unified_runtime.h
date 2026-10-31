@@ -44,5 +44,7 @@ public:
     online::Json browse(const std::string&) override;
     std::string browser_notice()const override{return !discovery_error.empty()?discovery_error:internet?"":"INTERNET UNAVAILABLE / LAN ONLY. CHECK YOUR CONNECTION";}
     std::string reserve_name(const std::string& name)override{return internet && internet->hosting()?internet->reserve_name(name):local.reserve_name(name);}
+    void commit_name()override{if(internet)internet->commit_name();}
+    void cancel_name()override{if(internet)internet->cancel_name();}
 };
 }

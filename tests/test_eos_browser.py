@@ -103,6 +103,22 @@ class EosBrowser(unittest.TestCase):
         duplicate=self.request(observer,'create',name=name,compatibility='tandem-private-directory-test')
         self.assertNotIn('error',duplicate)
         self.assertEqual(duplicate['room']['lobby_name'],name+' (1)')
+        before=self.request(host,'state')['room']
+        renamed=self.action(host,'lobby-settings',lobby_name=name+' (1)')['room']
+        self.assertEqual(renamed['lobby_name'],name+' (1) (1)')
+        self.assertEqual(renamed['code'],before['code']);self.assertEqual(renamed['members'],before['members'])
+        self.assertEqual(self.listing(host,created['room']['code'])['name'],renamed['lobby_name'])
+        # The old claim is available immediately after committing the new name.
+        reused=self.action(observer,'lobby-settings',lobby_name=name)['room']
+        self.assertEqual(reused['lobby_name'],name)
+        rejected=self.request(host,'lobby-settings',revision=before['revision'],lobby_name=name+' (1)')
+        self.assertEqual(rejected.get('error'),'stale-room')
+        freed=self.action(observer,'lobby-settings',lobby_name=name+' (1)')['room']
+        self.assertEqual(freed['lobby_name'],name+' (1)')
+        self.action(host,'lobby-settings',lobby_name=renamed['lobby_name'].lower())
+        self.action(host,'lobby-settings',visibility='private')
+        shown=self.action(host,'lobby-settings',visibility='public')['room']
+        self.assertEqual(shown['lobby_name'],renamed['lobby_name'].lower())
         self.action(host,'lobby-settings',locked=True)
         # Search the host's own listing via the explicit test-only switch. This
         # does not require inventing a second device identity on the user's PC.

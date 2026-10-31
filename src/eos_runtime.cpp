@@ -315,6 +315,7 @@ void Runtime::kick(const std::string& peer) {
 }
 void Runtime::leave() {
     listing_=online::Json();published_listing_.clear();listing_build_.clear();browsing_.clear();
+    cancel_name();
     if(!name_claim_.empty()){auto claim=name_claim_;name_claim_.clear();allocated_name_.clear();destroy_claim(claim);}
     if(!invitation_claim_.empty()){const auto claim=invitation_claim_;invitation_claim_.clear();destroy_claim(claim);}
     if(lobby_id_.empty())return;
@@ -336,19 +337,31 @@ bool Runtime::browse_packet(const std::string& peer,const std::vector<uint8_t>& 
     return EOS_P2P_SendPacket(p2p_,&options)==EOS_EResult::EOS_Success;
 }
 std::string Runtime::reserve_name(const std::string& requested){
-    if(!hosting())throw std::runtime_error("host-only");if(!allocated_name_.empty())return allocated_name_;
+    if(!hosting())throw std::runtime_error("host-only");cancel_name();
     for(unsigned suffix=0;suffix<256;++suffix){
         auto ending=suffix?" ("+std::to_string(suffix)+")":std::string();auto name=requested.substr(0,24-ending.size())+ending;
         auto folded=name;for(char& c:folded)if(c>='A' && c<='Z')c+=32;
         auto claim=invite_hash("tandem-lobby-name-v1",folded).substr(0,EOS_LOBBY_MAX_LOBBYIDOVERRIDE_LENGTH);
+        if(claim==name_claim_){pending_name_=name;return name;}
         EOS_Lobby_CreateLobbyOptions options{};options.ApiVersion=EOS_LOBBY_CREATELOBBY_API_LATEST;options.LocalUserId=user_;
         options.MaxLobbyMembers=2;options.PermissionLevel=EOS_ELobbyPermissionLevel::EOS_LPL_INVITEONLY;
         options.BucketId="TandemNamesV1";options.bDisableHostMigration=EOS_TRUE;options.LobbyId=claim.c_str();
         Result result;EOS_Lobby_CreateLobby(lobby_,&options,result.context(*this),lobby_created);wait(*this,result,"reserve lobby name");
         if(result.code==EOS_EResult::EOS_Lobby_LobbyAlreadyExists || result.code==EOS_EResult::EOS_DuplicateNotAllowed)continue;
-        check(result.code,"EOS reserve lobby name");name_claim_=result.lobby;allocated_name_=name;return name;
+        check(result.code,"EOS reserve lobby name");pending_name_claim_=result.lobby;pending_name_=name;return name;
     }
     throw std::runtime_error("lobby-name-unavailable");
+}
+void Runtime::commit_name(){
+    if(pending_name_.empty())return;
+    const auto previous=name_claim_;
+    if(!pending_name_claim_.empty())name_claim_=std::move(pending_name_claim_);
+    pending_name_claim_.clear();allocated_name_=std::move(pending_name_);pending_name_.clear();
+    if(previous!=name_claim_)try{destroy_claim(previous);}catch(const std::exception&){fputs("EOS previous name cleanup will complete on disconnect\n",stderr);}
+}
+void Runtime::cancel_name(){
+    const auto claim=std::move(pending_name_claim_);pending_name_claim_.clear();pending_name_.clear();
+    if(!claim.empty())try{destroy_claim(claim);}catch(const std::exception&){fputs("EOS cancelled name cleanup will complete on disconnect\n",stderr);}
 }
 void Runtime::publish(const online::Json& room,const std::string& build){
     using online::Json;if(!hosting())return;if(!build.empty())listing_build_=build;

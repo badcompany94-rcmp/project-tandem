@@ -26,7 +26,7 @@ extern "C" {
 
 namespace {
 bool enabled() { return getenv("MKDD_ONLINE_MENU")!=nullptr; }
-enum class Page { Title, Type, HostJoin, Code, Lobby, Rules, Kart, Initials, Native, Battle, LeaveConfirm, Engine, KickConfirm, Browser, Search };
+enum class Page { Title, Type, HostJoin, Code, Lobby, Rules, Kart, Initials, Native, Battle, LeaveConfirm, Engine, KickConfirm, Browser, Search, RoomName };
 bool mode_advance=false;
 unsigned kick_seat=0;
 std::string kick_name,kick_id;
@@ -84,6 +84,7 @@ std::string draft_mode,draft_layout,draft_engine,draft_cup;
 int draft_rounds=3;
 unsigned draft_arena=52,draft_course=36,draft_kart=0,draft_driver=7,draft_partner=8;
 std::string initials="P1",draft_initials="P1";
+std::string draft_lobby_name;
 Page profile_return=Page::Type;
 bool profile_loaded=false,native_selection=false;
 void native_room_state(CPU*);
@@ -112,6 +113,8 @@ std::string friendly(const std::string& error) {
     if(error=="stale-room")return "ROOM CHANGED. PLEASE TRY AGAIN";
     if(error=="player-changed")return "THAT PLAYER MOVED. PLEASE SELECT THEM AGAIN";
     if(error=="room-busy")return "ROOM IS UPDATING. PLEASE TRY AGAIN";
+    if(error=="invalid-lobby-name" || error=="invalid-text")return "CHOOSE A ROOM NAME WITH 1 TO 24 CHARACTERS";
+    if(error=="lobby-name-unavailable")return "THAT ROOM NAME IS UNAVAILABLE. PLEASE TRY ANOTHER";
     if(error=="invalid-session")return "THIS ROOM HAS CLOSED";
     if(error=="service-unavailable")return "ROOM SERVICE IS UNAVAILABLE";
     if(error=="invalid-kart")return "CHOOSE TWO RIDERS THAT FIT THE KART";
@@ -316,20 +319,21 @@ void draw_online(CPU* c,uint32_t scene) {
         }
         if(page==Page::HostJoin)label(c,"NAME: "+initials+"  /  N OR MENU TO EDIT",329,17,0xbbcde4ff);
         if(page==Page::Type && room_reply.has("room") && !room_reply.at("room").at("host").boolean())label(c,"HOST IS CHOOSING THE GAME MODE",329,15,0xbbcde4ff);
-    } else if (page==Page::Code || page==Page::Initials) {
-        const bool naming=page==Page::Initials;
-        label(c,naming?"YOUR NAME":"ENTER ROOM CODE",94,24,0xffe95cff);
-        std::string shown=naming?draft_initials:code;while(shown.size()<(naming?7u:8u))shown+='-';
+    } else if (page==Page::Code || page==Page::Initials || page==Page::RoomName) {
+        const bool naming=page==Page::Initials,room_naming=page==Page::RoomName;
+        label(c,room_naming?"ROOM NAME":naming?"YOUR NAME":"ENTER ROOM CODE",94,24,0xffe95cff);
+        std::string shown=room_naming?draft_lobby_name:naming?draft_initials:code;while(shown.size()<(room_naming?1u:naming?7u:8u))shown+='-';
         label(c,shown,130,30);
         for(unsigned i=0;i<36;++i) {
-            auto [x,y]=key_position(i);const bool allowed=naming || strchr(alphabet,keyboard_keys[i]);
+            auto [x,y]=key_position(i);const bool allowed=naming || room_naming || strchr(alphabet,keyboard_keys[i]);
             box(c,x-4,y-5,39,31,selection==i?0x967c28ff:0x193c6cff);
             char key[2]={keyboard_keys[i],0};text(c,key,x+5,y,21,allowed?(selection==i?0xffe95cff:0xffffffff):0x65738aff);
             if(allowed)hit(x-4,y-5,39,31,i);
         }
         text(c,selection==36?"> DELETE":"  DELETE",93,359,20,selection==36?0xffe95cff:0xffffffff);
-        text(c,((selection==37?"> ":"  ")+std::string(naming?"SAVE":"JOIN")).c_str(),377,359,20,selection==37?0xffe95cff:0xffffffff);
+        text(c,((selection==37?"> ":"  ")+std::string(naming || room_naming?"SAVE":"JOIN")).c_str(),377,359,20,selection==37?0xffe95cff:0xffffffff);
         hit(80,350,160,30,36);hit(360,350,160,30,37);
+        if(room_naming){text(c,"SPACE",255,359,20);hit(245,350,100,30,38);}
         label(c,"TYPE DIRECTLY, CLICK KEYS, OR USE YOUR CONTROLLER",392,11,0xbbcde4ff);
     } else if (page==Page::LeaveConfirm && room_reply.has("room")) {
         label(c,"LEAVE ROOM?",111,30,0xffe95cff);
@@ -624,10 +628,10 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         if(!saved.empty() && saved.size()<=7 && saved.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")==std::string::npos)initials=saved;
     }
     uint32_t pressed=mem_r32(0x803b4410+0x1c),repeat=mem_r32(0x803b4410+0x30);
-    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search;
+    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search || page==Page::RoomName;
     const auto pointer=desktop_pointer::read();
     const unsigned choices=page==Page::HostJoin || page==Page::Type || page==Page::LeaveConfirm || page==Page::KickConfirm?2:page==Page::Engine?4:page==Page::Battle?3:page==Page::Lobby?16:38;
-    const bool navigable=page==Page::HostJoin || page==Page::Type || page==Page::Engine || page==Page::Battle || page==Page::Lobby || page==Page::Code || page==Page::Initials || page==Page::LeaveConfirm || page==Page::KickConfirm || page==Page::Browser || page==Page::Search;
+    const bool navigable=page==Page::HostJoin || page==Page::Type || page==Page::Engine || page==Page::Battle || page==Page::Lobby || page==Page::Code || page==Page::Initials || page==Page::LeaveConfirm || page==Page::KickConfirm || page==Page::Browser || page==Page::Search || page==Page::RoomName;
     static desktop_pointer::State last_pointer;
     const bool moved=pointer.hover!=last_pointer.hover || pointer.x!=last_pointer.x || pointer.y!=last_pointer.y;
     last_pointer=pointer;
@@ -675,7 +679,12 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
             if(can_act() && room_reply.has("room") && room_reply.at("room").at("host").boolean())
                 submit(Work::Change,action==38?Json::dict({{"op","lobby-settings"},{"locked",!room_reply.at("room").at("locked").boolean()}}):Json::dict({{"op","lobby-settings"},{"visibility",action==37?"public":"private"}}));
         }
-        else if(page==Page::Search && action==38){if(browser.query.size()<24)browser.query+=' ';}
+        else if(page==Page::Lobby && action==39){
+            if(can_act() && room_reply.has("room") && room_reply.at("room").at("host").boolean()){
+                draft_lobby_name=room_reply.at("room").at("lobby_name").str();open(c,Page::RoomName);
+            }
+        }
+        else if((page==Page::Search || page==Page::RoomName) && action==38){auto& draft=page==Page::Search?browser.query:draft_lobby_name;if(draft.size()<24)draft+=' ';}
         else if(page==Page::Lobby && action>=32){const uint32_t buttons[]={0x400,0x800,0x1000,0x200};if(action<36)pressed|=buttons[action-32];}
         else if(action==38 && (page==Page::Type || page==Page::Engine || page==Page::Battle))pressed|=0x100;
         else if(action>=0 && (unsigned)action<choices){online_focus=action;selection=(unsigned)action;if(page==Page::Title)mem_w8(scene+0x168,(uint8_t)selection);pressed|=0x100;}
@@ -685,6 +694,10 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         else if(ch=='\r'){if(page==Page::Search)open(c,Page::Browser);}
         else if(ch>=32 && ch<127 && browser.query.size()<24)browser.query+=(char)ch;
         browser_offset=0;
+    }else if(page==Page::RoomName) {
+        if(ch=='\b'){if(!draft_lobby_name.empty())draft_lobby_name.pop_back();}
+        else if(ch=='\r'){selection=37;pressed|=0x100;}
+        else if(ch>=32 && ch<127 && draft_lobby_name.size()<24)draft_lobby_name+=(char)ch;
     }else if(page==Page::Code || page==Page::Initials) {
         auto& draft=page==Page::Code?code:draft_initials;const unsigned maximum=page==Page::Code?8:7;
         if(ch=='\b'){if(!draft.empty())draft.pop_back();}
@@ -740,6 +753,13 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         else if((pressed&0x100) && selection==37)open(c,Page::Browser);
         else if((pressed&0x100) && selection==36){if(!browser.query.empty())browser.query.pop_back();browser_offset=0;}
         else if((pressed&0x100) && selection<36 && browser.query.size()<24){browser.query+=keyboard_keys[selection];browser_offset=0;}
+    } else if(page==Page::RoomName) {
+        if((pressed&0x200) && can_act())open(c,Page::Lobby);
+        else if((pressed&0x100) && selection==36){if(!draft_lobby_name.empty())draft_lobby_name.pop_back();}
+        else if((pressed&0x100) && selection==37 && can_act()){
+            if(draft_lobby_name.find_first_not_of(' ')==std::string::npos)message="CHOOSE A ROOM NAME WITH 1 TO 24 CHARACTERS";
+            else submit(Work::Change,Json::dict({{"op","lobby-settings"},{"lobby_name",draft_lobby_name}}));
+        }else if((pressed&0x100) && selection<36 && draft_lobby_name.size()<24)draft_lobby_name+=keyboard_keys[selection];
     } else if (page==Page::Code) {
         if(up || down || left || right){selection=(selection+38+(up?-10:down?10:left?-1:1))%38;sound(c,0x20000);}
         if(pressed&0x200){if(busy())cancelled=true;open(c,Page::HostJoin);}
@@ -836,7 +856,7 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         else if((pressed&0x100) && can_act())submit(Work::Change,Json::dict({{"op","kart"},
             {"choice",Json::dict({{"kart",(int)draft_kart},{"driver",(int)draft_driver},{"partner",(int)draft_partner}})}}));
     }
-    if((page==Page::Lobby || page==Page::Rules || page==Page::Kart || page==Page::Initials || page==Page::LeaveConfirm || page==Page::KickConfirm || page==Page::Type || page==Page::Engine || page==Page::Battle) && !token.empty() && !busy() && std::chrono::steady_clock::now()>=next_poll)
+    if((page==Page::Lobby || page==Page::Rules || page==Page::Kart || page==Page::Initials || page==Page::RoomName || page==Page::LeaveConfirm || page==Page::KickConfirm || page==Page::Type || page==Page::Engine || page==Page::Battle) && !token.empty() && !busy() && std::chrono::steady_clock::now()>=next_poll)
         submit(Work::Poll,Json::dict({{"op","state"}}));
     animate(c,scene);
 }
@@ -864,7 +884,7 @@ extern "C" void hle_fn_80015F40(CPU* c) {
 extern "C" void hle_calc__11SequenceAppFv(CPU* c) {
     const uint32_t app=c->r[3];
     desktop_pointer::context(true);
-    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search;
+    desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search || page==Page::RoomName;
     if(enabled())desktop_online(c);
     if(enabled() && getenv("MKDD_ROOM_RESUME")) {
         if(token.empty() && getenv("MKDD_ROOM_TOKEN")) {

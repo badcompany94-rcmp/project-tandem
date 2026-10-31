@@ -85,12 +85,19 @@ struct Bridge::Impl {
             if(op=="join" && members.count(peer))throw std::runtime_error("already-in-room");
             if(op=="join" && pending_kicks.count(peer))throw std::runtime_error("invalid-session");
             if(op=="start")request.object["endpoint"]="127.0.0.1:28121";
-            if(op=="lobby-settings" && peer==runtime.self() && request.has("visibility") && request.at("visibility").str()=="public") {
-                auto state=local_request(upstream,Json::dict({{"op","state"},{"token",request.at("token")}}));
-                if(state.has("room"))request.object["lobby_name"]=runtime.reserve_name(state.at("room").at("lobby_name").str());
-            }
             Json result;
-            if(op=="refresh-code") {
+            if(op=="lobby-settings" && request.has("lobby_name")) {
+                if(peer!=runtime.self())throw std::runtime_error("host-only");
+                struct Guard{bool& value;Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(refreshing);
+                auto proposal=request;proposal.object["propose"]=true;
+                result=local_request(upstream,proposal);if(result.has("error"))return result;
+                try{
+                    request.object["lobby_name"]=runtime.reserve_name(result.at("lobby_name").str());
+                    request.object.erase("propose");request.object["exact_name"]=true;
+                    result=local_request(upstream,request);
+                    if(result.has("error"))runtime.cancel_name();else runtime.commit_name();
+                }catch(...){runtime.cancel_name();throw;}
+            }else if(op=="refresh-code") {
                 struct Guard{bool& value;Guard(bool& v):value(v){value=true;}~Guard(){value=false;}} guard(refreshing);
                 auto proposal=request;proposal.object.erase("code");proposal.object["propose"]=true;
                 const auto before=local_request(upstream,Json::dict({{"op","state"},{"token",request.at("token")}}));
@@ -244,6 +251,7 @@ struct Bridge::Impl {
                             auto renamed=local_request(upstream,Json::dict({{"op","lobby-settings"},{"token",response.at("token")},{"revision",response.at("room").at("revision")},{"lobby_name",name}}));
                             if(renamed.has("error"))throw std::runtime_error(renamed.at("error").str());response.object["room"]=renamed.at("room");
                         }
+                        runtime.commit_name();
                         break;
                     }
                     catch(const std::exception& e){runtime.leave();local_request(upstream,Json::dict({{"op","leave"},{"token",response.at("token")}}));

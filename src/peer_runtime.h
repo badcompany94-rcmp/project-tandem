@@ -35,6 +35,9 @@ public:
     virtual void join_target(const std::string& code,const std::string& build,const online::Json&){join(code,build);}
     virtual std::string browser_notice()const{return {};}
     virtual std::string reserve_name(const std::string& requested){return requested;}
+    // A replacement keeps the previous claim until the room accepts the edit.
+    virtual void commit_name(){}
+    virtual void cancel_name(){}
     std::function<void(const std::string&,const std::string&,uint8_t,const std::vector<uint8_t>&)> packet;
     std::function<void()> idle;
 };

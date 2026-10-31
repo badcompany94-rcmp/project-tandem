@@ -39,6 +39,8 @@ public:
     void publish(const online::Json&,const std::string&) override;
     online::Json browse(const std::string&) override;
     std::string reserve_name(const std::string&) override;
+    void commit_name() override;
+    void cancel_name() override;
     void retain(std::shared_ptr<void> context,std::function<bool()> done){contexts_.push_back({std::move(context),std::move(done)});}
 private:
     Config config_;
@@ -53,7 +55,7 @@ private:
     std::map<std::string,std::string> routes_;
     online::Json listing_;
     std::string listing_build_,published_listing_;
-    std::string name_claim_,allocated_name_;
+    std::string name_claim_,allocated_name_,pending_name_claim_,pending_name_;
     struct Probe {std::vector<uint8_t> nonce;int64_t sent=0,elapsed=-1;};
     std::map<std::string,Probe> browsing_;
     int64_t browse_window_=0;unsigned browse_replies_=0;

@@ -7,6 +7,41 @@ spec=importlib.util.spec_from_file_location('visibility_rooms',Path(__file__).re
 service=importlib.util.module_from_spec(spec);sys.modules[spec.name]=service;spec.loader.exec_module(service)
 
 class LobbyVisibilityTests(unittest.TestCase):
+    def test_rename_proposal_is_nonmutating_and_commit_preserves_live_room(self):
+        store=service.Rooms();host=store.request(dict(op='create',name='Johnny',compatibility='test',visibility='public',locked=False))
+        guest=store.request(dict(op='join',name='P2',compatibility='test',code=host['room']['code']))
+        room=store.rooms[host['room']['code']]
+        for member in room.members.values():member.ready=True
+        store.launch_event(room,'127.0.0.1:28121')
+        before=store.request(dict(op='state',token=host['token']))
+        edit=dict(op='lobby-settings',token=host['token'],revision=room.revision,lobby_name='Friday Karts')
+        self.assertEqual(store.request(dict(edit,propose=True)),dict(lobby_name='Friday Karts'))
+        self.assertEqual(store.request(dict(op='state',token=host['token'])),before)
+        after=store.request(edit)
+        self.assertEqual(after['room']['lobby_name'],'Friday Karts')
+        self.assertEqual(after['room']['members'],before['room']['members'])
+        self.assertEqual(after['room']['code'],before['room']['code'])
+        self.assertEqual(after['room']['launch'],before['room']['launch'])
+        self.assertEqual(after['connection'],before['connection'])
+        self.assertEqual(store.request(dict(op='state',token=guest['token']))['room']['lobby_name'],'Friday Karts')
+
+    def test_rename_validation_permissions_and_duplicate_allocation(self):
+        store=service.Rooms();host=store.request(dict(op='create',name='HOST',compatibility='test'))
+        other=store.request(dict(op='create',name='Friday Karts',compatibility='test'))
+        guest=store.request(dict(op='join',name='P2',compatibility='test',code=host['room']['code']))
+        revision=guest['room']['revision']
+        before=store.request(dict(op='state',token=host['token']))
+        for values,error in [(dict(token=guest['token'],revision=revision,lobby_name='Hijack'),'host-only'),
+                (dict(token=host['token'],revision=revision-1,lobby_name='Stale'),'stale-room'),
+                *[(dict(token=host['token'],revision=revision,lobby_name=name),'invalid') for name in ('','   ','A'*25,'bad\nname','🌈')],
+                (dict(token=host['token'],revision=revision,lobby_name='friday karts',exact_name=True),'lobby-name-unavailable')]:
+            with self.assertRaisesRegex(service.RoomError,error):store.request(dict(op='lobby-settings',**values))
+            self.assertEqual(store.request(dict(op='state',token=host['token'])),before)
+        renamed=store.request(dict(op='lobby-settings',token=host['token'],revision=revision,lobby_name='friday karts'))
+        self.assertEqual(renamed['room']['lobby_name'],'friday karts (1)')
+        again=store.request(dict(op='lobby-settings',token=host['token'],revision=renamed['room']['revision'],lobby_name='friday karts (1)'))
+        self.assertEqual(again['room']['lobby_name'],'friday karts (1)')
+
     def test_private_default_and_code_join(self):
         store=service.Rooms();created=store.request(dict(op='create',name='HOST',compatibility='test'))
         self.assertEqual(created['room']['visibility'],'private')
