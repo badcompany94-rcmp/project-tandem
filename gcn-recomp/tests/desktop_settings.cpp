@@ -51,6 +51,30 @@ int main(int argc,char** argv) {
         e.type=SDL_MOUSEBUTTONDOWN;e.button.windowID=SDL_GetWindowID(win);e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;desktop_settings_event(e);frame();
         e.type=SDL_MOUSEBUTTONUP;desktop_settings_event(e);frame();frame();capture(out/"mapping.png");
     }
+    if(argc>4 && std::string(argv[4])=="triggers") {
+        using desktop_controls::configuration;
+        require(configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f,"trigger sliders default to 50 percent");
+        click(190,445);click(760,445);
+        require(configuration()[0].trigger_left<=.2f && configuration()[0].trigger_right>=.9f,"real mouse input changes independent trigger sliders");
+        capture(out/"triggers-adjusted.png");
+        click(420,640);require(!desktop_settings_open() && configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f,"Discard restores both opening click points");
+        key(SDL_SCANCODE_F1);frame();frame();click(190,445);click(760,445);
+        const auto left=configuration()[0].trigger_left,right=configuration()[0].trigger_right;
+        click(250,640);require(!desktop_settings_open(),"Save closes trigger settings");
+        std::string error;require(desktop_controls::load(cfg.c_str(),error) && configuration()[0].trigger_left==left && configuration()[0].trigger_right==right,"trigger settings persist through reload");
+        key(SDL_SCANCODE_F1);frame();frame();click(330,125);
+        require(configuration()[1].trigger_left==.5f && configuration()[1].trigger_right==.5f,"second port keeps independent defaults");
+        click(190,445);const auto second_left=configuration()[1].trigger_left;require(second_left<.2f,"second port slider adjusts selected port");
+        click(225,125);require(configuration()[0].trigger_left==left && configuration()[0].trigger_right==right,"switching ports preserves first port values");
+        click(300,530);
+        require(configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f && configuration()[1].trigger_left==second_left,"Reset restores only selected port to 50 percent");
+        click(420,640);
+        require(configuration()[0].trigger_left==left && configuration()[0].trigger_right==right && configuration()[1].trigger_left==.5f,"Discard restores reset and second port edits");
+        key(SDL_SCANCODE_F1);frame();frame();click(300,530);key(SDL_SCANCODE_ESCAPE);
+        require(desktop_controls::load(cfg.c_str(),error) && configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f,"50 percent reset persists after saving");
+        key(SDL_SCANCODE_F1);frame();capture(out/"triggers-reset.png");
+        printf("PASS: trigger sliders, per-port selection, save/reload, Discard and Reset through real SDL UI events\n");
+    }
     if(argc>4 && std::string(argv[4])=="sound") {
         require(desktop_sound::current().volume==25,"game startup volume is 25 percent");
         click(500,162);require(desktop_sound::current().volume>50,"Sound slider applies live");

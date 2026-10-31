@@ -2,6 +2,8 @@
 
 Project Tandem supports rooms for **2–8 people**, with solo and shared karts in the same event. Online use needs an Internet connection. EOS provides device guest identities, lobby discovery, connection setup, and relay fallback; players do not need an Epic player account.
 
+**Everyone in an online room must use the same build ID.** After updating, make sure every player updates before hosting or joining. Different builds cannot play together, even when both installations are based on the same gameplay version. Controller mappings, trigger click points, VSync and interpolation choices may differ between players.
+
 ## Start a session
 
 1. Launch normally and choose Online Play.
@@ -11,7 +13,7 @@ Project Tandem supports rooms for **2–8 people**, with solo and shared karts i
 5. The host chooses the mode, then everyone selects characters and karts.
 6. The host chooses the cup or arena and starts the event.
 
-All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 4 uses **build `cb95d2f1e45e147e`**, based on Alpha25 gameplay. Older builds cannot share a room with Beta 4. Experimental VSync/interpolation settings may differ between players.
+All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 5 uses **build `890fd1f362f5b190`**, based on Alpha25 gameplay. Older builds cannot share a room with Beta 5. Experimental VSync/interpolation settings may differ between players.
 
 ## Characters and kart roles
 

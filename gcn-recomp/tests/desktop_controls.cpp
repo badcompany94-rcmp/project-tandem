@@ -12,6 +12,7 @@
 #include <SDL.h>
 using namespace desktop_controls;
 bool pad_motor(int){return false;}
+void test_trigger_click_points(const std::filesystem::path&);
 static int checks;
 static void require(bool ok,const char* why){++checks;if(!ok){fprintf(stderr,"FAIL: %s (%s)\n",why,SDL_GetError());exit(1);}}
 static bool exclude(int i){return std::string(SDL_JoystickNameForIndex(i)).find("Port test ")!=0;}
@@ -40,6 +41,8 @@ int main(int argc,char** argv) {
     const auto file=std::filesystem::path(argc>1?argv[1]:"controller-test.cfg");
     require(!std::filesystem::exists(file),"test output must be fresh");std::string error;
     require(load(file.string().c_str(),error),"missing config uses defaults");
+    test_trigger_click_points(file.string()+".triggers");
+    require(load(file.string().c_str(),error),"restore main controls fixture after trigger tests");
     {Pad a(0),b(1),c(2),d(3);const auto list=devices();require(list.size()==4,"four test devices");
     for(int p=0;p<4;++p)require(assign(p,Device::Controller,list[p].id,list[p].name),"assign distinct port");
     read();a.button(0,true);b.button(1,true);c.button(2,true);d.button(3,true);

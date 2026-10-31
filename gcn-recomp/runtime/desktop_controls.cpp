@@ -230,10 +230,14 @@ bool load(const char* file,std::string& error) {
     if(ec || std::filesystem::file_size(config_path,ec)>65536){error="Controller settings file is too large or unreadable.";return false;}
     std::ifstream in(config_path);std::string tag;int version;
     if(!(in>>tag>>version) || tag!="GCN_CONTROLLERS" || version<1 || version>3){error="Unsupported controller settings format.";return false;}
-    auto next=defaults();std::array<bool,4> seen{};std::string line;std::getline(in,line);
+    auto next=defaults();std::array<bool,4> seen{},trigger_seen{};std::string line;std::getline(in,line);
     while(std::getline(in,line)) {
-        if(line.empty() || line[0]=='#')continue;
-        std::istringstream row(line);row>>tag;int p;
+        if(line.empty())continue;
+        // Optional extensions are comments to older v1-v3 readers, so rolling
+        // back keeps the user's existing assignments and bindings readable.
+        const bool extension=line[0]=='#';
+        std::istringstream row(extension?line.substr(1):line);row>>tag;int p;
+        if(extension && (!row || tag!="trigger"))continue;
         if(tag=="port") {
             int device,keyboard;Port data;
             if(!(row>>p>>device>>keyboard>>data.deadzone>>data.mouse_sensitivity>>std::quoted(data.controller_id)>>std::quoted(data.controller_name)) ||
@@ -241,13 +245,21 @@ bool load(const char* file,std::string& error) {
                !std::isfinite(data.deadzone) || data.deadzone<.02f || data.deadzone>.5f ||
                !std::isfinite(data.mouse_sensitivity) || data.mouse_sensitivity<.001f || data.mouse_sensitivity>.2f ||
                (device==(int)Device::Controller && data.controller_id.empty())){error="Invalid controller port settings.";return false;}
-            data.device=(Device)device;data.keyboard=keyboard!=0;data.bindings=next[p].bindings;next[p]=data;seen[p]=true;
+            data.device=(Device)device;data.keyboard=keyboard!=0;data.bindings=next[p].bindings;
+            data.trigger_left=next[p].trigger_left;data.trigger_right=next[p].trigger_right;
+            next[p]=data;seen[p]=true;
         }else if(tag=="bind") {
             int a,slot,source;Binding b;
             if(!(row>>p>>a>>slot>>source>>b.index>>b.sign) || !valid_port(p) || a<0 || a>=ActionCount || slot<0 || slot>2 || source<0 || source>6){error="Invalid controller binding.";return false;}
             b.source=(Source)source;
             if(!valid_binding(b) || (slot==0 && b.source!=Source::None && !controller_source(b.source)) || (slot>0 && controller_source(b.source))){error="Invalid controller input source.";return false;}
             next[p].bindings[a][slot]=b;
+        }else if(tag=="trigger") {
+            float left,right;
+            if(!(row>>p>>left>>right) || !valid_port(p) || trigger_seen[p] ||
+               !std::isfinite(left) || !std::isfinite(right) || left<.1f || left>1.f || right<.1f || right>1.f){error="Invalid trigger click points.";return false;}
+            row>>std::ws;if(!row.eof()){error="Invalid trigger click points.";return false;}
+            next[p].trigger_left=left;next[p].trigger_right=right;trigger_seen[p]=true;
         }else {error="Unknown controller settings entry.";return false;}
     }
     for(int p=0;p<4;++p) {
@@ -302,6 +314,7 @@ bool save(std::string& error) {
         const auto& port=configuration()[p];
         out<<"port "<<p<<' '<<(int)port.device<<' '<<port.keyboard<<' '<<port.deadzone<<' '<<port.mouse_sensitivity<<' '
             <<std::quoted(port.controller_id)<<' '<<std::quoted(port.controller_name)<<'\n';
+        out<<"# trigger "<<p<<' '<<port.trigger_left<<' '<<port.trigger_right<<'\n';
         for(int a=0;a<ActionCount;++a)for(int s=0;s<3;++s) {
             const auto& b=port.bindings[a][s];out<<"bind "<<p<<' '<<a<<' '<<s<<' '<<(int)b.source<<' '<<b.index<<' '<<b.sign<<'\n';
         }
@@ -377,7 +390,13 @@ void sample(std::array<PadState,4>& pads,uint64_t now) {
         if(!out.connected)continue;
         float values[ActionCount]{};
         const bool menu=desktop_pointer::menu_enabled.load();
-        for(int a=0;a<ActionCount;++a)for(const auto& b:port.bindings[a])values[a]=std::max(values[a],value(b,pad,keyboard && !menu,port));
+        for(int a=0;a<ActionCount;++a)for(const auto& b:port.bindings[a]) {
+            float v=value(b,pad,keyboard && !menu,port);
+            if(a<LAnalog && b.source==Source::Axis &&
+               (b.index==SDL_CONTROLLER_AXIS_TRIGGERLEFT || b.index==SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
+                v=v>=(b.index==SDL_CONTROLLER_AXIS_TRIGGERLEFT?port.trigger_left:port.trigger_right)?1.f:0.f;
+            values[a]=std::max(values[a],v);
+        }
         if(menu && keyboard && !desktop_pointer::text_enabled) {
             const int menu_keys[]={SDL_SCANCODE_RETURN,SDL_SCANCODE_BACKSPACE,SDL_SCANCODE_X,SDL_SCANCODE_Y,SDL_SCANCODE_R,SDL_SCANCODE_N,
                 SDL_SCANCODE_UP,SDL_SCANCODE_DOWN,SDL_SCANCODE_LEFT,SDL_SCANCODE_RIGHT};

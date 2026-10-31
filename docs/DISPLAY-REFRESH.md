@@ -1,7 +1,7 @@
 # Experimental display refresh
 
-Public Beta 4 includes experimental display options to the Alpha25 gameplay baseline.
-Both are OFF by default. [Release notes](releases/public-beta-4.md) describe downloads
+Public Beta 5 includes experimental display options to the Alpha25 gameplay baseline.
+Both are OFF by default. [Release notes](releases/public-beta-5.md) describe downloads
 and the remaining acceptance checks. Public Beta 1 remains available separately.
 
 Open **F1 → Display**:

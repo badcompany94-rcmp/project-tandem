@@ -46,6 +46,10 @@ Xbox defaults: A=A, B=B, X=X, Y=Y, RB=Z, triggers=L/R, Menu=Start. Here **Menu**
 
 ## Settings and exit
 
+In **F1 → Control mapping**, select **Port 1–4** to set independent **Left trigger click point** and **Right trigger click point** values from **10% to 100%**. Both default to **50%**. These set how far a physical controller trigger must be pulled before its assigned digital button activates, including L/R clicks or a trigger remapped to Z. Analog trigger travel is unchanged. Settings are saved per port; **Discard changes** restores the opening values, and **Reset this port's bindings** restores both click points to 50%.
+
+Existing controller settings load with 50% defaults. New trigger settings are stored in an optional comment extension that older builds ignore, preserving their ability to read the other saved assignments and bindings. An older build uses its original trigger behavior. Advanced `controls.txt` mappings retain their own explicit thresholds.
+
 - F1 opens controller/port assignments, racing bindings, display, sound, and online settings.
 - Display settings offer common 16:9 resolutions and windowed, fullscreen, or borderless modes. Borderless uses the desktop resolution.
 - Display also includes independent experimental VSync and high-refresh interpolation options, both OFF by default and switchable back off. See [display options and limits](DISPLAY-REFRESH.md).

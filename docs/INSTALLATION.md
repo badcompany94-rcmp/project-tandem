@@ -32,6 +32,8 @@ The hash identifies the executable extracted from the disc, not the whole ISO. U
 3. Accept file replacement and keep `local-data` intact.
 4. Run `Launch-Tandem.cmd`. It rebuilds the local game if the version changed.
 
+**Update everyone before playing online.** Every member of a room must run the same build ID; different builds cannot join or play together. Controller settings, trigger click points and display choices do not need to match.
+
 Cumulative updates support Alpha12 and later portable installs directly. Intermediate patches are unnecessary. For an older install missing the portable tools, extract the full package over the existing game folder instead.
 
 Saves, controller mappings, display/sound settings, and the cached disc stay under `local-data`. The cache lets later updates work even if your original ISO moves. If a folder was moved and its build cache contains old absolute paths, setup preserves the old cache and rebuilds at the new location.

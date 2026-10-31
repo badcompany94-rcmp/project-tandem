@@ -20,6 +20,7 @@ struct Port {
     std::string controller_id,controller_name;
     bool keyboard=false;
     float deadzone=.12f,mouse_sensitivity=.025f;
+    float trigger_left=.5f,trigger_right=.5f;
     // One gamepad binding and two keyboard/mouse alternatives per action.
     std::array<std::array<Binding,3>,ActionCount> bindings{};
 };
