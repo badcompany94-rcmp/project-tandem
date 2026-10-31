@@ -81,7 +81,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the room code, or join using **Join Room** or **F1 → Online → Quick join**. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 5 — `890fd1f362f5b190`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 5. Display option choices may differ between players.
+Current compatibility: **Public Beta 5 — `ea33ed0094297cc5`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 5. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 

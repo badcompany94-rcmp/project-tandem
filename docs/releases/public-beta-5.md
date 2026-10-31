@@ -2,7 +2,7 @@
 
 Adds independent left/right trigger click-point settings requested in [issue #8](https://github.com/badcompany94-rcmp/project-tandem/issues/8), based on wodgey's proposal and initial patch.
 
-**Online requires matching builds.** All players must update to build `890fd1f362f5b190` to play together. Different builds cannot share a room; trigger and display settings may differ.
+**Online requires matching builds.** All players must update to build `ea33ed0094297cc5` to play together. Different builds cannot share a room; trigger and display settings may differ.
 
 ## New settings
 
@@ -29,6 +29,6 @@ The Beta 4 cursor stutter fix and corrected Host Room artwork remain included. *
 - **Existing Alpha12+ / Beta installations:** `Project-Tandem-Public-Beta-5-Cumulative-Update.zip`. Close the game, copy all contents over the folder containing `Launch-Tandem.cmd`, replace files, and keep `local-data`. Launch normally to rebuild from your cached image. Saves and settings are preserved.
 - `SHA256SUMS.txt` contains archive checksums. GitHub's automatic source ZIPs are for development.
 
-**Build compatibility: `890fd1f362f5b190`**, based on Alpha25 gameplay. Everyone in an online room must use this matching build; trigger settings and display options may differ. Beta 4 and previous releases remain available separately.
+**Build compatibility: `ea33ed0094297cc5`**, based on Alpha25 gameplay. Everyone in an online room must use this matching build; trigger settings and display options may differ. Beta 4 and previous releases remain available separately.
 
 Downloads contain no disc image, extracted game data, generated game source, compiled game, saves, device login cache or developer account credentials. Bundled setup tools and the existing public EOS client configuration are retained.

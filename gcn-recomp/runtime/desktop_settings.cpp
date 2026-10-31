@@ -229,8 +229,8 @@ void mapping_tab() {
     ImGui::SetNextItemWidth(180);if(ImGui::SliderFloat("Stick dead zone",&port.deadzone,.02f,.5f,"%.2f"))changed();
     ImGui::SameLine();ImGui::SetNextItemWidth(180);if(ImGui::SliderFloat("Mouse sensitivity",&port.mouse_sensitivity,.001f,.2f,"%.3f",ImGuiSliderFlags_Logarithmic))changed();
     int left_click=int(std::lround(port.trigger_left*100)),right_click=int(std::lround(port.trigger_right*100));
-    ImGui::SetNextItemWidth(180);if(ImGui::SliderInt("Left trigger click point",&left_click,10,100,"%d%%")){port.trigger_left=left_click/100.f;changed();}
-    ImGui::SameLine();ImGui::SetNextItemWidth(180);if(ImGui::SliderInt("Right trigger click point",&right_click,10,100,"%d%%")){port.trigger_right=right_click/100.f;changed();}
+    ImGui::SetNextItemWidth(180);if(ImGui::SliderInt("Left trigger click point",&left_click,10,100,"%d%%",ImGuiSliderFlags_AlwaysClamp)){port.trigger_left=left_click/100.f;changed();}
+    ImGui::SameLine();ImGui::SetNextItemWidth(180);if(ImGui::SliderInt("Right trigger click point",&right_click,10,100,"%d%%",ImGuiSliderFlags_AlwaysClamp)){port.trigger_right=right_click/100.f;changed();}
     ImGui::TextDisabled("Click points affect trigger-to-button bindings; analog travel stays unchanged.");
     preview_pad(selected_port);
     if(ImGui::Button("Reset this port's bindings")){port.bindings=defaults()[selected_port].bindings;port.deadzone=.12f;port.mouse_sensitivity=.025f;port.trigger_left=port.trigger_right=.5f;changed();}

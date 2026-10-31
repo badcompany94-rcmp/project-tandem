@@ -54,6 +54,17 @@ int main(int argc,char** argv) {
     if(argc>4 && std::string(argv[4])=="triggers") {
         using desktop_controls::configuration;
         require(configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f,"trigger sliders default to 50 percent");
+        auto typed_percentage=[&](int x,const char* text) {
+            ImGui::GetIO().AddFocusEvent(true);frame();SDL_SetModState(KMOD_CTRL);
+            SDL_Event ctrl{};ctrl.type=SDL_KEYDOWN;ctrl.key.windowID=window_id;ctrl.key.keysym.scancode=SDL_SCANCODE_LCTRL;ctrl.key.keysym.sym=SDLK_LCTRL;ctrl.key.keysym.mod=KMOD_CTRL;desktop_settings_event(ctrl);frame();
+            click(x,445);ctrl.type=SDL_KEYUP;ctrl.key.keysym.mod=KMOD_NONE;SDL_SetModState(KMOD_NONE);desktop_settings_event(ctrl);frame();
+            SDL_Event typing{};typing.type=SDL_TEXTINPUT;typing.text.windowID=window_id;SDL_strlcpy(typing.text.text,text,sizeof(typing.text.text));desktop_settings_event(typing);frame();key(SDL_SCANCODE_RETURN);frame();
+        };
+        typed_percentage(250,"-20");typed_percentage(680,"200");
+        capture(out/"triggers-typed-limits.png");
+        printf("Typed limits: left=%.3f right=%.3f\n",configuration()[0].trigger_left,configuration()[0].trigger_right);
+        require(configuration()[0].trigger_left==.1f && configuration()[0].trigger_right==1.f,"typed trigger percentages clamp to 10-100 percent");
+        click(420,640);key(SDL_SCANCODE_F1);frame();frame();
         click(190,445);click(760,445);
         require(configuration()[0].trigger_left<=.2f && configuration()[0].trigger_right>=.9f,"real mouse input changes independent trigger sliders");
         capture(out/"triggers-adjusted.png");
@@ -73,7 +84,7 @@ int main(int argc,char** argv) {
         key(SDL_SCANCODE_F1);frame();frame();click(300,530);key(SDL_SCANCODE_ESCAPE);
         require(desktop_controls::load(cfg.c_str(),error) && configuration()[0].trigger_left==.5f && configuration()[0].trigger_right==.5f,"50 percent reset persists after saving");
         key(SDL_SCANCODE_F1);frame();capture(out/"triggers-reset.png");
-        printf("PASS: trigger sliders, per-port selection, save/reload, Discard and Reset through real SDL UI events\n");
+        printf("PASS: trigger sliders, typed input limits, per-port selection, save/reload, Discard and Reset through real SDL UI events\n");
     }
     if(argc>4 && std::string(argv[4])=="sound") {
         require(desktop_sound::current().volume==25,"game startup volume is 25 percent");
