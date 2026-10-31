@@ -1,7 +1,7 @@
 # Experimental display refresh
 
-Public Beta 3 adds experimental display options to the Alpha25 gameplay baseline.
-Both are OFF by default. [Release notes](releases/public-beta-3.md) describe downloads
+Public Beta 4 includes experimental display options to the Alpha25 gameplay baseline.
+Both are OFF by default. [Release notes](releases/public-beta-4.md) describe downloads
 and the remaining acceptance checks. Public Beta 1 remains available separately.
 
 Open **F1 → Display**:
@@ -54,3 +54,6 @@ pending. Beta 3 is published as an experimental prerelease with these limits.
 Beta 3 always presents native fallback frames when interpolation is unavailable,
 and avoids snapshots for unmatched geometry. See its release notes for the
 4× rendering tests and remaining acceptance limits.
+
+Beta 4 avoids redundant native cursor changes and isolates F1 cursor ownership.
+See its release notes for cursor and input regression coverage.

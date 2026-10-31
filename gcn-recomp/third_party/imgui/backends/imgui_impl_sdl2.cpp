@@ -741,18 +741,22 @@ static void ImGui_ImplSDL2_UpdateMouseCursor()
     if (io.MouseDrawCursor || imgui_cursor == ImGuiMouseCursor_None)
     {
         // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-        SDL_ShowCursor(SDL_FALSE);
+        if (SDL_ShowCursor(SDL_QUERY) != SDL_DISABLE)
+            SDL_ShowCursor(SDL_DISABLE);
     }
     else
     {
         // Show OS mouse cursor
         SDL_Cursor* expected_cursor = bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow];
-        if (bd->MouseLastCursor != expected_cursor)
+        // Project Tandem's game menus also own native cursors. Check SDL's
+        // actual handle so reopening settings cannot trust a stale cache.
+        if (SDL_GetCursor() != expected_cursor)
         {
             SDL_SetCursor(expected_cursor); // SDL function doesn't have an early out (see #6113)
             bd->MouseLastCursor = expected_cursor;
         }
-        SDL_ShowCursor(SDL_TRUE);
+        if (SDL_ShowCursor(SDL_QUERY) != SDL_ENABLE)
+            SDL_ShowCursor(SDL_ENABLE);
     }
 }
 

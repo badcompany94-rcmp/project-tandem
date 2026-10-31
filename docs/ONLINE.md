@@ -11,7 +11,7 @@ Project Tandem supports rooms for **2–8 people**, with solo and shared karts i
 5. The host chooses the mode, then everyone selects characters and karts.
 6. The host chooses the cup or arena and starts the event.
 
-All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 3 uses **build `f4e52689263937fd`**, based on Alpha25 gameplay. Older builds cannot share a room with Beta 3. Experimental VSync/interpolation settings may differ between players.
+All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 4 uses **build `cb95d2f1e45e147e`**, based on Alpha25 gameplay. Older builds cannot share a room with Beta 4. Experimental VSync/interpolation settings may differ between players.
 
 ## Characters and kart roles
 

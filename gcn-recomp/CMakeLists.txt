@@ -485,7 +485,7 @@ function(gcn_add_game)
     endif()
   endif()
   if(GCN_INPUT_TESTS AND NOT GCN_BENCH_ONLY AND NOT ANDROID)
-    add_executable(gamepad_test ${GCN_RECOMP_DIR}/tests/desktop_gamepad.cpp ${RT}/desktop_gamepad.cpp)
+    add_executable(gamepad_test ${GCN_RECOMP_DIR}/tests/desktop_gamepad.cpp ${RT}/desktop_gamepad.cpp ${RT}/input_defaults.cpp)
     _gcn_set_standards(gamepad_test)
     target_include_directories(gamepad_test PRIVATE ${RT})
     target_link_libraries(gamepad_test PRIVATE ${GCN_SDL_TARGET})
@@ -493,12 +493,16 @@ function(gcn_add_game)
     _gcn_set_standards(desktop_controls_test)
     target_include_directories(desktop_controls_test PRIVATE ${RT})
     target_link_libraries(desktop_controls_test PRIVATE ${GCN_SDL_TARGET})
-    add_executable(desktop_settings_test ${GCN_RECOMP_DIR}/tests/desktop_settings.cpp
+    add_executable(desktop_settings_test ${GCN_RECOMP_DIR}/tests/desktop_settings.cpp ${GCN_RECOMP_DIR}/tests/desktop_cursor.cpp
+      ${GCN_IMGUI}/backends/imgui_impl_sdl2.cpp
       ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
       ${RT}/gx/gl_load.cpp ${RT}/png.cpp ${GLAD_SOURCE})
     _gcn_set_standards(desktop_settings_test)
     target_include_directories(desktop_settings_test PRIVATE ${RT} ${GLAD_INCLUDE_DIR})
-    target_compile_definitions(desktop_settings_test PRIVATE ${GCN_GL_DEFS} GCN_DEFAULT_AUDIO_VOLUME=${G_DEFAULT_AUDIO_VOLUME})
+    # Count cursor mutations from our runtime and the real SDL backend. The
+    # instrumented backend overrides the archive copy only in this test target.
+    target_compile_definitions(desktop_settings_test PRIVATE ${GCN_GL_DEFS} GCN_DEFAULT_AUDIO_VOLUME=${G_DEFAULT_AUDIO_VOLUME}
+      SDL_SetCursor=gcn_test_set_cursor SDL_ShowCursor=gcn_test_show_cursor)
     target_link_libraries(desktop_settings_test PRIVATE gcn_desktop_ui ${GCN_PLATFORM_LIBS})
     add_executable(desktop_display_test ${GCN_RECOMP_DIR}/tests/desktop_display.cpp ${RT}/desktop_display.cpp ${RT}/input_defaults.cpp)
     _gcn_set_standards(desktop_display_test)

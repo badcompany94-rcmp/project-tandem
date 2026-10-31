@@ -111,13 +111,17 @@ void script(SDL_Window* window,uint32_t frame) {
 void update(SDL_Window* window,bool settings_open) {
     if(input_default("desktop_custom_cursor",0)==0)return;
     if(text_enabled && !settings_open && !SDL_IsTextInputActive())SDL_StartTextInput();
-    load();const bool visible=settings_open || (menu_enabled && mouse_active);
+    // Settings owns the native cursor while open. Reasserting the game's
+    // default here would fight ImGui's arrow/text/resize cursors every frame.
+    if(settings_open)return;
+    load();const bool visible=menu_enabled && mouse_active;
     if(!settings_open && menu_enabled){int x,y;SDL_GetMouseState(&x,&y);std::lock_guard lock(mutex);
         if(mouse_active && !SDL_getenv("GCN_POINTER_SCRIPT"))position(window,x,y);
         else if(mouse_active){state.hover=-1;for(const auto& area:regions)if(state.x>=area.x && state.x<area.x+area.w && state.y>=area.y && state.y<area.y+area.h)state.hover=area.action;}
         else state.hover=-1;}
-    if(visible){auto* next=settings_open?SDL_GetDefaultCursor():SDL_GetTicks64()-clicked_at<110 && tap?tap:read().hover>=0 && hover?hover:idle?idle:SDL_GetDefaultCursor();SDL_SetCursor(next);}
-    SDL_ShowCursor(visible?SDL_ENABLE:SDL_DISABLE);
+    if(visible){auto* next=SDL_GetTicks64()-clicked_at<110 && tap?tap:read().hover>=0 && hover?hover:idle?idle:SDL_GetDefaultCursor();if(SDL_GetCursor()!=next)SDL_SetCursor(next);}
+    const auto visibility=visible?SDL_ENABLE:SDL_DISABLE;
+    if(SDL_ShowCursor(SDL_QUERY)!=visibility)SDL_ShowCursor(visibility);
 }
 void shutdown(){SDL_SetCursor(SDL_GetDefaultCursor());if(idle)SDL_FreeCursor(idle);if(hover)SDL_FreeCursor(hover);if(tap)SDL_FreeCursor(tap);idle=hover=tap=nullptr;loaded=false;}
 }

@@ -57,7 +57,7 @@ void close(bool discard=false) {
     }
     else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status))return;
     opened=false;dirty=false;listen_action=-1;cancel_capture();block(false);
-    SDL_ShowCursor(SDL_ENABLE);desktop_gamepad_clear_quit();
+    if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);desktop_gamepad_clear_quit();
     fprintf(stderr,"[settings] closed\n");
 }
 void changed(){dirty=true;status.clear();}
@@ -309,7 +309,7 @@ void sound_tab() {
 bool desktop_settings_init(SDL_Window* win,void* context) {
     window=win;IMGUI_CHECKVERSION();ImGui::CreateContext();
     auto& io=ImGui::GetIO();io.IniFilename=nullptr;io.LogFilename=nullptr;
-    io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_NavEnableGamepad;
+    io.ConfigFlags|=ImGuiConfigFlags_NavEnableKeyboard|ImGuiConfigFlags_NavEnableGamepad|ImGuiConfigFlags_NoMouseCursorChange;
     // Font data is embedded in Dear ImGui; the default avoids any host font dependency.
     ImGui::StyleColorsDark();auto& style=ImGui::GetStyle();style.FontSizeBase=17.f;
     style.WindowRounding=10;style.FrameRounding=5;style.GrabRounding=5;
@@ -339,7 +339,7 @@ bool desktop_settings_init(SDL_Window* win,void* context) {
 bool desktop_settings_open(){return opened;}
 void desktop_settings_show() {
     if(!ready || opened)return;
-    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);SDL_ShowCursor(SDL_ENABLE);
+    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);
     ImGui::GetIO().ClearInputKeys();
     fprintf(stderr,"[settings] opened\n");
 }
@@ -385,6 +385,11 @@ void desktop_settings_draw() {
     if(!ready || (!opened && !display_settings_hint()))return;
     // The backend's manual mode borrows the existing handles and opens no duplicates.
     auto* pad=desktop_gamepad_active();ImGui_ImplSDL2_SetGamepadMode(ImGui_ImplSDL2_GamepadMode_Manual,pad?&pad:nullptr,pad?1:0);
+    // The passive F1 hint must not reveal or replace the game's cursor. Only
+    // the interactive settings window transfers cursor ownership to ImGui.
+    auto& io=ImGui::GetIO();
+    if(opened)io.ConfigFlags&=~ImGuiConfigFlags_NoMouseCursorChange;
+    else io.ConfigFlags|=ImGuiConfigFlags_NoMouseCursorChange;
     ImGui_ImplOpenGL3_NewFrame();ImGui_ImplSDL2_NewFrame();ImGui::NewFrame();
     if(!opened) {
         const float pulse=.78f+.22f*std::sin(float(SDL_GetTicks64()%4000)*(6.2831853f/4000));

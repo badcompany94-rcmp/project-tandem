@@ -20,6 +20,7 @@
 #include "imgui_internal.h"
 bool write_png(const char*,const uint8_t*,int,int);
 bool pad_motor(int){return false;}
+void test_desktop_cursor(SDL_Window*,void(*)());
 static void require(bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s: %s\n",why,SDL_GetError());exit(1);}}
 static void frame(){glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,1280,720);glClearColor(.1f,.12f,.15f,1);glClear(GL_COLOR_BUFFER_BIT);desktop_settings_draw();glFinish();}
 static void capture(const std::filesystem::path& path){std::vector<uint8_t> image(1280*720*4),flip(image.size());glReadPixels(0,0,1280,720,GL_RGBA,GL_UNSIGNED_BYTE,image.data());for(int y=0;y<720;++y)std::copy_n(image.data()+(719-y)*1280*4,1280*4,flip.data()+y*1280*4);require(write_png(path.string().c_str(),flip.data(),1280,720),"capture UI");}
@@ -35,7 +36,12 @@ int main(int argc,char** argv) {
     const auto cfg=(out/"controllers.cfg").string();SDL_SetMainReady();desktop_gamepad_configure();SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");require(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)==0,"SDL initialize");
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION,3);SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION,3);
     auto* win=SDL_CreateWindow("Controller settings validation",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,1280,720,SDL_WINDOW_OPENGL|SDL_WINDOW_HIDDEN);require(win,"window");window_id=SDL_GetWindowID(win);auto ctx=SDL_GL_CreateContext(win);require(ctx,"GL context");require(gl_load_with(SDL_GL_GetProcAddress)>=33,"GL loader");
-    SDL_setenv("GCN_INPUT_CONFIG",cfg.c_str(),1);desktop_gamepad_refresh();require(desktop_settings_init(win,ctx),"settings initialize");key(SDL_SCANCODE_F1);require(desktop_settings_open() && desktop_controls::blocked(),"F1 opens and captures input");
+    SDL_setenv("GCN_INPUT_CONFIG",cfg.c_str(),1);desktop_gamepad_refresh();require(desktop_settings_init(win,ctx),"settings initialize");
+    if(argc>2 && std::string(argv[2])=="cursor") {
+        test_desktop_cursor(win,frame);
+        desktop_settings_shutdown();desktop_gamepad_shutdown();SDL_GL_DeleteContext(ctx);SDL_DestroyWindow(win);SDL_Quit();return 0;
+    }
+    key(SDL_SCANCODE_F1);require(desktop_settings_open() && desktop_controls::blocked(),"F1 opens and captures input");
     frame();frame();capture(out/"ports.png");
     // The optional mode selects Mapping using real platform events. Coordinates
     // correspond to the visible tab in the deterministic 1280x720 layout.

@@ -2,11 +2,11 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–8 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**[Download Public Beta 3 for Windows (experimental display features)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.3)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+**[Download Public Beta 4 for Windows (experimental display features)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.4)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
 **Bring your own compatible disc image.** Project Tandem verifies your USA `GM4E01` ISO/CISO and recompiles the game on your PC. Downloads contain the recompiler, runtime, project features, and installation tools. They do not include a disc image or a compiled copy of the game.
 
-**Beta 3 fixes dropped native fallback frames when interpolation is enabled.** VSync and interpolation remain experimental, independent and OFF by default in **F1 → Display**. Output rate still depends on the scene and PC. [Changes and testing](docs/releases/public-beta-3.md) · [Display options and limits](docs/DISPLAY-REFRESH.md) · [Previous Beta 2](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.2)
+**Beta 4 fixes redundant cursor updates behind reported hybrid-GPU stutter and corrects the Host Room kart artwork.** VSync and interpolation remain experimental, independent and OFF by default in **F1 → Display**. [Changes and testing](docs/releases/public-beta-4.md) · [Display options and limits](docs/DISPLAY-REFRESH.md) · [Previous Beta 3](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.3)
 
 ## Features
 
@@ -79,7 +79,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the room code, or join using **Join Room** or **F1 → Online → Quick join**. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 3 — `f4e52689263937fd`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 3. Display option choices may differ between players.
+Current compatibility: **Public Beta 4 — `cb95d2f1e45e147e`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 4. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 
