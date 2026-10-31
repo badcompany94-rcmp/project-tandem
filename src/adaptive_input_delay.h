@@ -5,11 +5,15 @@
 #include <array>
 namespace mkdd::online {
 class AdaptiveInputDelay {
+    bool responsive_=false;
     unsigned delay_=1, samples_=0, slow_=0, network_spikes_=0, healthy_=0;
     double elapsed_=0, network_=0;
     std::array<double,64> arrivals_{};
     unsigned arrivals_count_=0,arrivals_next_=0;
 public:
+    // Opt-in experiment: retain the same measured delivery floor and pressure
+    // response, but drain excess headroom faster after the link recovers.
+    explicit AdaptiveInputDelay(bool responsive=false):responsive_(responsive){}
     // Extra queuing is a fallback for poor delivery, not a universal latency
     // increase. The transport budget is separate from the rewind history.
     static constexpr unsigned maximum=16;
@@ -61,7 +65,8 @@ public:
             // Lower after three quiet seconds and while the latest
             // sample equals the last queued input, so draining skips no change.
             const unsigned floor=arrivals_count_>=16?delivery_delay():0;
-            if(healthy_>=3 && unchanged_input && delay_>floor){--delay_;healthy_=0;}
+            const unsigned quiet_windows=responsive_ && delay_>floor+2?1:3;
+            if(healthy_>=quiet_windows && unchanged_input && delay_>floor){--delay_;healthy_=0;}
         }else healthy_=0;
         out.changed=delay_!=out.delay;out.delay=delay_;reset_window();return out;
     }

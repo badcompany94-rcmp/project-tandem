@@ -10,6 +10,8 @@
 DeviceFragment checkpoint_graphics_render(bool) { throw std::logic_error("No renderer for checkpoint"); }
 
 namespace gx {
+// No texture contents exist in the headless benchmark renderer.
+uint64_t render_texture_hash(uint32_t) { return 0; }
 void render_set_eye_hook(EyeHook) {}
 void render_set_first_person(bool) {}
 bool render_first_person() { return false; }

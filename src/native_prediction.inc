@@ -34,7 +34,7 @@ struct NativePrediction {
     unsigned shared_delay=1;
     bool pacing_prepared=false;
     uint64_t sent=0,received=0;
-    mkdd::online::AdaptiveInputDelay pacing;
+    mkdd::online::AdaptiveInputDelay pacing{getenv("MKDD_NETWORK_RESPONSIVE")!=nullptr};
     uint64_t pacing_time=0;
     double pacing_work=0;
     ReplayGuard guard;

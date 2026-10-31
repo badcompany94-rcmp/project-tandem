@@ -1,5 +1,6 @@
 #include "diagnostic_log.h"
 #include "desktop_stats.h"
+#include "desktop_overlay.h"
 #include "performance_stats.h"
 #include "gx/gl.h"
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -18,7 +20,7 @@ uint64_t milliseconds() {
         std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 PerformanceStats stats(milliseconds());
-bool enabled=true,dirty=true;
+bool enabled=false,dirty=true;
 GLuint program,vao,vbo,cache_texture,cache_fbo;
 GLint size_uniform=-1;
 GLsizei vertex_count=0;
@@ -27,6 +29,7 @@ std::vector<std::string> geometry_lines;
 int cache_w,cache_h;
 uint64_t drawn_at,network_read_at,sample_at,log_at;
 double fps=-1;int buffer_ms=-1;
+int jitter_ms=-1;std::string route;
 const char* network_path(){return std::getenv("GCN_NET_STATS");}
 
 // Preserve the renderer's GL state, including the state behind its caches.
@@ -91,6 +94,9 @@ bool initialize() {
 // Original 5x7 diagnostic glyphs; no font or texture assets are required.
 std::array<unsigned char,7> glyph(char c) {
     switch(c) {
+    case 'A':return {14,17,17,31,17,17,17};case 'C':return {14,17,16,16,16,17,14};
+    case 'D':return {30,17,17,17,17,17,30};case 'J':return {7,2,2,2,18,18,12};
+    case 'X':return {17,17,10,4,10,17,17};case 'Y':return {17,17,10,4,4,4,4};
     case '0':return {14,17,19,21,25,17,14};case '1':return {4,12,4,4,4,4,14};
     case '2':return {14,17,1,2,4,8,31};case '3':return {30,1,1,14,1,1,30};
     case '4':return {2,6,10,18,31,2,2};case '5':return {31,16,16,30,1,1,30};
@@ -129,9 +135,17 @@ void read_network(uint64_t now) {
        number(json,"rtt_ms",rtt) && number(json,"rtt_age_ms",age) && age>=0 && age<9e15 &&
        number(json,"buffer_ms",buffer) && buffer>=0 && buffer<=1000) {
         stats.network((uint64_t)sequence,rtt,(uint64_t)age,now);buffer_ms=(int)buffer;
+        double jitter;jitter_ms=number(json,"jitter_ms",jitter) && jitter>=0 && jitter<=60000?int(jitter):-1;
+        route.clear();
+        for(const auto* name:{"lan","direct","relay","mixed"}){
+            const auto key=json.find("\"route\"");if(key==std::string::npos)break;
+            const auto colon=json.find(':',key),begin=json.find('"',colon+1);
+            if(begin!=std::string::npos && json.compare(begin+1,strlen(name),name)==0 && begin+1+strlen(name)<json.size() && json[begin+1+strlen(name)]=='"')route=name;
+        }
     }
 }
 bool draw(int width,int height,bool fresh,bool host_ui=false) {
+    if(enabled!=desktop_overlay::current()){enabled=desktop_overlay::current();dirty=true;}
     const auto now=milliseconds();
     if(fresh)stats.frame(now);
     if(width<=0 || height<=0 || (!fresh && (!cache_fbo || (!host_ui && !enabled && !dirty) || (!dirty && now<drawn_at+(host_ui?16:100)))))return false;
@@ -164,6 +178,8 @@ bool draw(int width,int height,bool fresh,bool host_ui=false) {
     else {
         if(rtt<0)lines.emplace_back("RTT --");else {snprintf(label,sizeof(label),"RTT %.0f MS",rtt);lines.emplace_back(label);}
         if(buffer_ms>=0){snprintf(label,sizeof(label),"BUF %d MS",buffer_ms);lines.emplace_back(label);}
+        if(jitter_ms>=0){snprintf(label,sizeof(label),"JIT %d MS",jitter_ms);lines.emplace_back(label);}
+        if(!route.empty()){std::string upper=route;for(auto& c:upper)c=char(c-'a'+'A');lines.push_back(upper);}
     }
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER,0);glViewport(0,0,width,height);
     glUseProgram(program);
@@ -192,8 +208,11 @@ bool draw(int width,int height,bool fresh,bool host_ui=false) {
     return true;
 }
 }
-void desktop_stats_enable(bool value){enabled=value;dirty=true;}
-void desktop_stats_toggle(){desktop_stats_enable(!enabled);}
+void desktop_stats_enable(bool value){desktop_overlay::preview(value);}
+void desktop_stats_toggle(){
+    desktop_stats_enable(!desktop_overlay::current());std::string error;
+    if(!desktop_overlay::save(error))diagnostic_log("[overlay-settings] %s\n",error.c_str());
+}
 void desktop_stats_present(int width,int height){draw(width,height,true);}
 bool desktop_stats_idle(int width,int height,bool host_ui){return draw(width,height,false,host_ui);}
 void desktop_stats_shutdown() {

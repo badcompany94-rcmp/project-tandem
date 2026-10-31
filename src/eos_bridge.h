@@ -1,11 +1,12 @@
 #pragma once
-#include "eos_runtime.h"
+#include "peer_runtime.h"
+#include "online_json.h"
 #include <memory>
 
 namespace mkdd::eos {
 class Bridge {
 public:
-    Bridge(Runtime&,unsigned upstream_port);
+    Bridge(PeerRuntime&,unsigned upstream_port);
     ~Bridge();
     online::Json request(const online::Json&);
     void pump();

@@ -84,8 +84,8 @@ Json room_request(const Json& request) {
     Handle session(WinHttpOpen(L"Native private-room development/1",WINHTTP_ACCESS_TYPE_NO_PROXY,
                               WINHTTP_NO_PROXY_NAME,WINHTTP_NO_PROXY_BYPASS,0));
     const char* backend=getenv("MKDD_ROOM_BACKEND");
-    if(backend && strcmp(backend,"eos")!=0 && strcmp(backend,"local")!=0)throw std::runtime_error("invalid-room-backend");
-    const int timeout=backend && strcmp(backend,"eos")==0?50000:2000;
+    if(backend && strcmp(backend,"eos")!=0 && strcmp(backend,"lan")!=0 && strcmp(backend,"local")!=0)throw std::runtime_error("invalid-room-backend");
+    const int timeout=backend && (strcmp(backend,"eos")==0 || strcmp(backend,"lan")==0)?50000:2000;
     WinHttpSetTimeouts(session.value,2000,2000,timeout,timeout);
     Handle connection(WinHttpConnect(session.value,L"127.0.0.1",(INTERNET_PORT)port,0));
     Handle http(WinHttpOpenRequest(connection.value,L"POST",L"/v1/room",nullptr,WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES,0));

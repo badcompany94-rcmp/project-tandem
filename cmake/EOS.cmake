@@ -22,6 +22,7 @@ if(MKDD_EOS)
     INTERFACE_INCLUDE_DIRECTORIES "${_sdk}/Include")
   add_executable(mkdd_eos src/eos_main.cpp src/eos_config.cpp src/eos_runtime.cpp src/eos_bridge.cpp src/eos_local_http.cpp src/eos_service.cpp)
   target_compile_features(mkdd_eos PRIVATE cxx_std_17)
+  target_compile_definitions(mkdd_eos PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
   target_link_libraries(mkdd_eos PRIVATE mkdd_eos_sdk ws2_32 winhttp bcrypt)
   add_custom_command(TARGET mkdd_eos POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:mkdd_eos_sdk>" "$<TARGET_FILE_DIR:mkdd_eos>")

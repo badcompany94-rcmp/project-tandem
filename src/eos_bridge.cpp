@@ -30,7 +30,7 @@ SOCKET listener(unsigned& port) {
 void nodelay(SOCKET s){int one=1;setsockopt(s,IPPROTO_TCP,TCP_NODELAY,(const char*)&one,sizeof(one));}
 }
 struct Bridge::Impl {
-    Runtime& runtime;unsigned upstream;
+    PeerRuntime& runtime;unsigned upstream;
     Reassembler receiver;
     PeerPings pings;uint64_t next_ping=0;
     struct Outgoing {std::string peer,socket;uint8_t channel;std::vector<uint8_t> data;Clock::time_point queued=Clock::now();};
@@ -49,7 +49,7 @@ struct Bridge::Impl {
     std::map<std::string,Stream> streams;
     Clock::time_point next_cleanup=Clock::now();
 
-    Impl(Runtime& r,unsigned p):runtime(r),upstream(p) {
+    Impl(PeerRuntime& r,unsigned p):runtime(r),upstream(p) {
         WSADATA data{};if(WSAStartup(MAKEWORD(2,2),&data))throw std::runtime_error("Winsock startup failed");
         runtime.packet=[this](const auto& peer,const auto& socket,uint8_t channel,const auto& data){received(peer,socket,channel,data);};
         runtime.idle=[this]{pump();};
@@ -191,7 +191,7 @@ struct Bridge::Impl {
         everyone.erase(runtime.self());
         if(game_id!=id) {
             clear_game();game_id=id;game_socket=id;
-            const bool direct=getenv("TANDEM_EOS_MESH")!=nullptr || getenv("TANDEM_EOS_ROLLBACK")!=nullptr;
+            const bool direct=runtime.lan() || getenv("TANDEM_EOS_MESH")!=nullptr || getenv("TANDEM_EOS_ROLLBACK")!=nullptr;
             peers=direct || runtime.hosting()?everyone:std::set<std::string>{runtime.owner()};
             runtime.game_peers(game_socket,peers);
             if(direct) {
@@ -212,11 +212,11 @@ struct Bridge::Impl {
             puts("EOS game bridge prepared; game sockets stay on loopback");
         }
         if(mesh)response.object["connection"].object["mesh"]=true;
-        if(mesh && getenv("TANDEM_EOS_ROLLBACK"))response.object["connection"].object["prediction"]=true;
+        if(mesh && (runtime.lan() || getenv("TANDEM_EOS_ROLLBACK")))response.object["connection"].object["prediction"]=true;
         response.object["connection"].object["endpoint"]="127.0.0.1:"+std::to_string(game_port);
         // Three simulation ticks give a 50 ms budget at 60 Hz. Keep this
         // identical for every peer; the native handshake checks agreement.
-        response.object["connection"].object["input_delay"]=input_delay_ticks;
+        response.object["connection"].object["input_delay"]=runtime.lan()?1:input_delay_ticks;
     }
     Json request(const Json& request) {
         try {
@@ -335,13 +335,16 @@ struct Bridge::Impl {
             [this](const auto& packet){return runtime.send(packet.peer,packet.socket,packet.channel,packet.data);});
     }
 };
-Bridge::Bridge(Runtime& runtime,unsigned port):impl_(std::make_unique<Impl>(runtime,port)){}
+Bridge::Bridge(PeerRuntime& runtime,unsigned port):impl_(std::make_unique<Impl>(runtime,port)){}
 Bridge::~Bridge()=default;
 Json Bridge::request(const Json& request){return impl_->request(request);}
 void Bridge::pump(){impl_->pump();}
 Json Bridge::statistics(uint64_t sequence)const {
     const auto values=impl_->pings.summary(milliseconds());
     return Json::dict({{"format",1},{"sequence",(int64_t)sequence},{"rtt_ms",values.rtt_ms},
-        {"rtt_age_ms",(int64_t)values.age_ms},{"peers",(int)values.peers},{"buffer_ms",input_buffer_ms}});
+        {"rtt_age_ms",(int64_t)values.age_ms},{"peers",(int)values.peers},
+        {"transport",impl_->runtime.lan()?"lan":"eos"},
+        {"route",impl_->runtime.route()},{"jitter_ms",values.jitter_ms},
+        {"buffer_ms",impl_->runtime.lan()?1000/60:input_buffer_ms}});
 }
 }

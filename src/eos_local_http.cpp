@@ -19,12 +19,12 @@ std::string lower(std::string s){for(char& c:s)if(c>='A' && c<='Z')c+=32;return 
 }
 struct LocalHttp::Impl {
     struct Client {SOCKET socket;std::string input,output;Clock::time_point started=Clock::now();};
-    SOCKET listener=INVALID_SOCKET;unsigned port=0;bool eos_ready=false;std::vector<Client> clients;
+    SOCKET listener=INVALID_SOCKET;unsigned port=0;bool eos_ready=false;std::string scope;std::vector<Client> clients;
     ~Impl(){for(auto& c:clients)closesocket(c.socket);if(listener!=INVALID_SOCKET)closesocket(listener);WSACleanup();}
 };
-LocalHttp::LocalHttp(unsigned port,bool eos_ready):impl_(std::make_unique<Impl>()) {
+LocalHttp::LocalHttp(unsigned port,bool eos_ready,std::string scope):impl_(std::make_unique<Impl>()) {
     WSADATA data{};if(WSAStartup(MAKEWORD(2,2),&data))throw std::runtime_error("Winsock startup failed");
-    auto& p=*impl_;p.eos_ready=eos_ready;p.listener=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);if(p.listener==INVALID_SOCKET)throw std::runtime_error("loopback-socket-failed");
+    auto& p=*impl_;p.eos_ready=eos_ready;p.scope=scope.empty()?(eos_ready?"eos-internet-playtest":"ipc-fixture"):std::move(scope);p.listener=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);if(p.listener==INVALID_SOCKET)throw std::runtime_error("loopback-socket-failed");
     BOOL exclusive=TRUE;setsockopt(p.listener,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,(const char*)&exclusive,sizeof(exclusive));
     sockaddr_in address{};address.sin_family=AF_INET;address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);address.sin_port=htons((u_short)port);
     if(bind(p.listener,(sockaddr*)&address,sizeof(address)) || listen(p.listener,16))throw std::runtime_error("loopback-listen-failed");
@@ -65,7 +65,7 @@ void LocalHttp::poll(const std::function<Json(const Json&)>& handler) {
                     }
                     if(c.input.size()<end+4+length){++it;continue;}
                     if(c.input.size()!=end+4+length)throw std::runtime_error("invalid-http-body");
-                    if(health)result=Json::dict({{"service","mkdd-eos-rooms"},{"protocol",1},{"scope",p.eos_ready?"eos-internet-playtest":"ipc-fixture"}});
+                    if(health)result=Json::dict({{"service","mkdd-eos-rooms"},{"protocol",1},{"scope",p.scope}});
                     else result=handler(Json::parse(c.input.substr(end+4,length)));
                     if(result.has("error"))status=400;
                     const std::string body=result.dump();

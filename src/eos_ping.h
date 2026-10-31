@@ -9,7 +9,7 @@
 namespace mkdd::eos {
 // Independent helper-to-helper probes, not simulation frame acknowledgements.
 class PeerPings {
-    struct Probe {uint64_t nonce=0,sent=0,replied=0;int rtt=-1;bool waiting=false;};
+    struct Probe {uint64_t nonce=0,sent=0,replied=0;int rtt=-1,last=-1,jitter=0;bool waiting=false;};
     std::map<std::string,Probe> peers_;
     uint64_t next_=1;
     static std::vector<uint8_t> packet(uint8_t kind,uint64_t nonce) {
@@ -36,17 +36,20 @@ public:
         auto& p=peers_.at(peer);
         if(p.waiting && p.nonce==nonce && now>=p.sent && now-p.sent<=60000) {
             const int sample=(int)(now-p.sent);p.rtt=p.rtt<0?sample:(p.rtt*3+sample+2)/4;
+            if(p.last>=0){const int difference=sample>p.last?sample-p.last:p.last-sample;p.jitter=(p.jitter*3+difference+2)/4;}
+            p.last=sample;
             p.replied=now;p.waiting=false;
         }
         return {};
     }
-    struct Summary {int rtt_ms=-1;uint64_t age_ms=0;unsigned peers=0;};
+    struct Summary {int rtt_ms=-1;uint64_t age_ms=0;unsigned peers=0;int jitter_ms=-1;};
     Summary summary(uint64_t now)const {
         Summary out;out.peers=(unsigned)peers_.size();
         if(peers_.empty())return out;
         for(const auto& [peer,p]:peers_) {
             if(p.rtt<0 || now<p.replied || now-p.replied>3000)return {-1,3001,out.peers};
             out.rtt_ms=std::max(out.rtt_ms,p.rtt);out.age_ms=std::max(out.age_ms,now-p.replied);
+            out.jitter_ms=std::max(out.jitter_ms,p.jitter);
         }
         return out;
     }

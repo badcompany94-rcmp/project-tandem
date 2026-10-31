@@ -9,7 +9,7 @@ using online::Json;
 // This listener is never exposed to the Internet or used for NAT traversal.
 class LocalHttp {
 public:
-    explicit LocalHttp(unsigned port=0,bool eos_ready=false);
+    explicit LocalHttp(unsigned port=0,bool eos_ready=false,std::string scope="");
     ~LocalHttp();
     unsigned port()const;
     void poll(const std::function<Json(const Json&)>& handler);

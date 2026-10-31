@@ -6,6 +6,7 @@
 #include <eos_version.h>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <thread>
 
 namespace {

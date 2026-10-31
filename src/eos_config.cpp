@@ -1,4 +1,5 @@
 #include "eos_config.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>

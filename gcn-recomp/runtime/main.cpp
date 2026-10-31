@@ -246,6 +246,7 @@ int main(int argc, char** argv) {
     // --telemetry[=host:port]: the game's motion to a motion platform (telemetry.h).
     const char* telemetry_to = getenv("GCN_TELEMETRY");
     int scale = 2;
+    int stats_override = -1;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--log-all")) for (auto& e : g_log_enabled) e = true;
         else if (!strncmp(argv[i], "--log=", 6)) {
@@ -278,7 +279,8 @@ int main(int argc, char** argv) {
         else if (!strncmp(argv[i], "--record-size=", 14)) sscanf(argv[i] + 14, "%dx%d", &record_w, &record_h);
         else if (!strcmp(argv[i], "--headless")) headless = true;
         else if (!strcmp(argv[i], "--hidden")) hidden = true;
-        else if (!strcmp(argv[i], "--no-stats")) desktop_stats_enable(false);
+        else if (!strcmp(argv[i], "--no-stats")) stats_override=0;
+        else if (!strcmp(argv[i], "--stats")) stats_override=1;
         else if (!strcmp(argv[i], "--fast")) fast = true;
         else if (!strncmp(argv[i], "--frames=", 9)) frame_limit = (uint32_t)strtoul(argv[i] + 9, nullptr, 10);
         else if (!strcmp(argv[i], "--cull-swap")) gx::g_cull_swap = true;
@@ -397,6 +399,7 @@ int main(int argc, char** argv) {
     LOG(LOG_GX, "GL: %s / %s", glGetString(GL_RENDERER), glGetString(GL_VERSION));
     if (gl_debug) gl_debug_enable(SDL_GL_GetProcAddress);
     if(!desktop_settings_init(win,ctx))fatal("Cannot initialize desktop settings");
+    if(stats_override>=0)desktop_stats_enable(stats_override!=0);
     if(getenv("GCN_SETTINGS_OPEN"))desktop_settings_show();
     // Beside the memory card: both are state this machine accumulates for this game.
     plat_make_dirs("saves");

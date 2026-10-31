@@ -1,6 +1,7 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include "desktop_stats.h"
+#include "desktop_overlay.h"
 #include "gx/gl.h"
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +13,13 @@ void require(bool value,const char* message){if(!value)throw std::runtime_error(
 int main(int argc,char** argv) {
     try {
         require(argc==3,"metrics JSON and PNG paths required");
+        require(!desktop_overlay::current(),"counter defaults off");
+        std::string error;const std::string preferences=std::string(argv[1])+".overlay";
+        std::filesystem::remove(preferences);
+        require(desktop_overlay::load(preferences,error) && !desktop_overlay::current(),"fresh settings keep counter off");
+        desktop_stats_toggle();require(desktop_overlay::current(),"F10 turns counter on");
+        desktop_overlay::preview(false);
+        require(desktop_overlay::load(preferences,error) && desktop_overlay::current(),"counter choice survives reload");
         {std::ofstream file(argv[1]);file<<"{\"format\":1,\"sequence\":1,\"rtt_ms\":40,\"rtt_age_ms\":0,\"buffer_ms\":200}";}
 #ifdef _WIN32
         _putenv_s("GCN_NET_STATS",argv[1]);

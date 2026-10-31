@@ -4,6 +4,7 @@
 #include "desktop_gamepad.h"
 #include "desktop_display.h"
 #include "desktop_presentation.h"
+#include "desktop_overlay.h"
 #include "desktop_sound.h"
 #include "desktop_pointer.h"
 #include "input_defaults.h"
@@ -50,6 +51,20 @@ int main(int argc,char** argv) {
         SDL_Event e{};e.type=SDL_MOUSEMOTION;e.motion.windowID=SDL_GetWindowID(win);e.motion.x=x;e.motion.y=y;desktop_settings_event(e);frame();
         e.type=SDL_MOUSEBUTTONDOWN;e.button.windowID=SDL_GetWindowID(win);e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;desktop_settings_event(e);frame();
         e.type=SDL_MOUSEBUTTONUP;desktop_settings_event(e);frame();frame();capture(out/"mapping.png");
+    }
+    if(argc>4 && std::string(argv[4])=="overlay") {
+        require(!desktop_overlay::current(),"FPS counter starts off in fresh settings");
+        click(570,95);frame();capture(out/"counter-default.png");
+        click(573,154);frame();require(desktop_overlay::current(),"F1 checkbox enables the counter");
+        click(420,640);require(!desktop_settings_open() && !desktop_overlay::current(),"Discard restores opening counter setting");
+        key(SDL_SCANCODE_F1);frame();frame();key(SDL_SCANCODE_F10);require(desktop_overlay::current(),"F10 works while F1 is open");key(SDL_SCANCODE_ESCAPE);
+        require(!desktop_settings_open() && desktop_overlay::current(),"save keeps counter enabled");
+        std::string error;desktop_overlay::preview(false);
+        require(desktop_overlay::load((out/"overlay.cfg").string(),error) && desktop_overlay::current(),"counter choice survives reload");
+        key(SDL_SCANCODE_F1);frame();frame();key(SDL_SCANCODE_F10);key(SDL_SCANCODE_ESCAPE);
+        require(desktop_overlay::load((out/"overlay.cfg").string(),error) && !desktop_overlay::current(),"counter can be turned off and saved again");
+        desktop_settings_shutdown();desktop_gamepad_shutdown();SDL_GL_DeleteContext(ctx);SDL_DestroyWindow(win);SDL_Quit();
+        puts("PASS: FPS default off, settings shortcut, Discard, save/reload and disabling");return 0;
     }
     if(argc>4 && std::string(argv[4])=="triggers") {
         using desktop_controls::configuration;

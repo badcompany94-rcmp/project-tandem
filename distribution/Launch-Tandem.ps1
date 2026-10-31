@@ -1,5 +1,13 @@
-param([switch]$Offline,[uint32]$Frames=0)
+param([switch]$Offline,[switch]$Lan,[string]$LanHost='',
+      [ValidateRange(1024,65535)][int]$LanPort=28122,
+      [ValidateSet('Stable','Responsive')][string]$NetworkProfile='Stable',[uint32]$Frames=0)
 $ErrorActionPreference='Stop'
+if($Offline -and $Lan){throw 'Choose Offline or LAN.'}
+if($LanHost -and -not $Lan){throw 'A LAN host IP requires LAN mode.'}
+if($LanHost){
+    $lanAddress=$null
+    if(-not [Net.IPAddress]::TryParse($LanHost,[ref]$lanAddress) -or $lanAddress.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork){throw 'Use the host PC local IPv4 address.'}
+}
 $root=$PSScriptRoot;$data=Join-Path $root 'local-data'
 $settingsFile=Join-Path $data 'settings.json'
 if(-not (Test-Path -LiteralPath $settingsFile)){throw 'Run Setup-Tandem.cmd first and select your own compatible disc image.'}
@@ -23,8 +31,9 @@ if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-
 foreach($file in @($settings.game_image,$settings.game_executable,$settings.python)){if(-not (Test-Path -LiteralPath $file -PathType Leaf)){throw "Required local file missing: $file. Run setup again."}}
 if(Get-Process -Name mkdd -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq $settings.game_executable}){throw 'This package is already running. Close its game window before starting another session.'}
 foreach($key in @([Environment]::GetEnvironmentVariables('Process').Keys)) {
-    if($key -like 'MKDD_NET_*' -or $key -in @('MKDD_ROOM_PORT','MKDD_ROOM_BACKEND','MKDD_ONLINE_MENU','MKDD_EXPECT_PREDICTION','TANDEM_EOS_ROLLBACK','TANDEM_EOS_MESH','TANDEM_EOS_ORDERED_INPUT','GCN_INPUT','GCN_CLOCK','GCN_CPU_SCALE','GCN_NET_STATS','GCN_FRAME_STATS','GCN_PIPELINE_TRACE','GCN_GAME_SCHEDULING','MKDD_SYNC_TRACE','MKDD_MENU_TEST')){[Environment]::SetEnvironmentVariable($key,$null,'Process')}
+    if($key -like 'MKDD_NET_*' -or $key -in @('MKDD_LAN','MKDD_NETWORK_RESPONSIVE','MKDD_ROOM_PORT','MKDD_ROOM_BACKEND','MKDD_ONLINE_MENU','MKDD_EXPECT_PREDICTION','TANDEM_EOS_ROLLBACK','TANDEM_EOS_MESH','TANDEM_EOS_ORDERED_INPUT','GCN_INPUT','GCN_CLOCK','GCN_CPU_SCALE','GCN_NET_STATS','GCN_FRAME_STATS','GCN_PIPELINE_TRACE','GCN_GAME_SCHEDULING','MKDD_SYNC_TRACE','MKDD_MENU_TEST')){[Environment]::SetEnvironmentVariable($key,$null,'Process')}
 }
+if($NetworkProfile -eq 'Responsive'){$env:MKDD_NETWORK_RESPONSIVE='1'}
 function Quote([string]$value){return '"'+$value+'"'}
 function Health([int]$port) {
     $request=[Net.HttpWebRequest]::Create("http://127.0.0.1:$port/health");$request.Proxy=$null;$request.AllowAutoRedirect=$false;$request.Timeout=1000
@@ -38,14 +47,18 @@ if(-not $Offline) {
     # Set it before starting the helper; native-only developer fixtures are
     # insufficient to verify the normal portable launch path.
     $env:TANDEM_EOS_ROLLBACK='1';$env:MKDD_EXPECT_PREDICTION='1'
-    $helperExe=Join-Path $root 'runtime\mkdd_eos.exe';$config=Join-Path $root 'config\eos.json'
-    if(-not (Test-Path -LiteralPath $helperExe) -or -not (Test-Path -LiteralPath $config)){throw 'The EOS runtime or product configuration is missing. Extract the complete test package again.'}
+    $helperExe=Join-Path $root $(if($Lan){'runtime\mkdd_lan.exe'}else{'runtime\mkdd_eos.exe'})
+    $config=Join-Path $root 'config\eos.json'
+    if(-not (Test-Path -LiteralPath $helperExe)){throw 'The selected networking helper is missing. Extract the complete private update again.'}
+    if(-not $Lan -and -not (Test-Path -LiteralPath $config)){throw 'The EOS product configuration is missing.'}
     if(-not (Test-Path -LiteralPath (Join-Path $root 'Watch-Online.ps1'))){throw 'The online shutdown helper is missing. Extract the complete update again.'}
-    $eosData=Join-Path $data 'eos';New-Item -ItemType Directory -Force -Path $eosData | Out-Null
-    $localConfig=Join-Path $eosData 'eos.json'
-    Copy-Item -LiteralPath $config -Destination $localConfig -Force
+    if(-not $Lan){
+        $eosData=Join-Path $data 'eos';New-Item -ItemType Directory -Force -Path $eosData | Out-Null
+        $localConfig=Join-Path $eosData 'eos.json'
+        Copy-Item -LiteralPath $config -Destination $localConfig -Force
+    }
     $helperHash=(Get-FileHash -LiteralPath $helperExe -Algorithm SHA256).Hash
-    $configHash=(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash
+    $configHash=if($Lan){'lan-no-eos-config'}else{(Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash}
     $latestFile=Join-Path $data 'online-service.json'
     if(Test-Path -LiteralPath $latestFile) {
         # Each launch starts a fresh room session. An old running match must
@@ -59,12 +72,20 @@ if(-not $Offline) {
             $deadline=(Get-Date).AddSeconds(15)
             while(-not (Test-Path -LiteralPath $upReady)) {if($upstream.HasExited -or (Get-Date) -gt $deadline){throw 'Local room model did not start.'};Start-Sleep -Milliseconds 100;$upstream.Refresh()}
             $up=Get-Content -LiteralPath $upReady -Raw|ConvertFrom-Json
-            Write-Host 'Connecting Project Tandem to EOS...'
-            $helper=Start-Process -FilePath $helperExe -ArgumentList @('--serve',(Quote $localConfig),$up.port,(Quote $ready)) -WorkingDirectory $session -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $session 'eos-stdout.log') -RedirectStandardError (Join-Path $session 'eos-stderr.log')
+            if($Lan){
+                Write-Host 'Starting private LAN mode. Choose Online Play in the game to host or join locally.'
+                $lanTarget=if($LanHost){$LanHost}else{'-'}
+                $helperArgs=@('--serve',$up.port,(Quote $ready),$lanTarget,$LanPort)
+            }else{
+                Write-Host 'Connecting Project Tandem to EOS...'
+                $helperArgs=@('--serve',(Quote $localConfig),$up.port,(Quote $ready))
+            }
+            $helper=Start-Process -FilePath $helperExe -ArgumentList $helperArgs -WorkingDirectory $session -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $session 'eos-stdout.log') -RedirectStandardError (Join-Path $session 'eos-stderr.log')
             $deadline=(Get-Date).AddSeconds(65)
-            while(-not (Test-Path -LiteralPath $ready)) {if($helper.HasExited -or (Get-Date) -gt $deadline){throw 'EOS login did not complete. Check your Internet connection and the session logs.'};Start-Sleep -Milliseconds 100;$helper.Refresh()}
+            while(-not (Test-Path -LiteralPath $ready)) {if($helper.HasExited -or (Get-Date) -gt $deadline){throw 'The networking helper did not start. Check the session logs.'};Start-Sleep -Milliseconds 100;$helper.Refresh()}
             $state=Get-Content -LiteralPath $ready -Raw|ConvertFrom-Json;$port=$state.port;$health=Health $port
-            if($health.scope -ne 'eos-internet-playtest' -or $health.protocol -ne 1){throw 'The online helper did not authenticate with EOS.'}
+            $expectedScope=if($Lan){'lan-private-test'}else{'eos-internet-playtest'}
+            if($health.scope -ne $expectedScope -or $health.protocol -ne 1){throw 'The helper started in an unexpected networking mode.'}
             $serviceState=@{helper_id=$helper.Id;helper_started=$helper.StartTime.ToUniversalTime().ToString('o');helper_path=$helperExe;helper_hash=$helperHash;config_hash=$configHash;upstream_id=$upstream.Id;upstream_started=$upstream.StartTime.ToUniversalTime().ToString('o');upstream_path=$settings.python;port=$port;ready=$ready;session=$session}|ConvertTo-Json
             $serviceState|Set-Content -LiteralPath (Join-Path $session 'online-service.json') -Encoding UTF8
             $serviceState|Set-Content -LiteralPath $latestFile -Encoding UTF8
@@ -76,7 +97,8 @@ if(-not $Offline) {
             throw
         }
     }
-    $env:MKDD_ONLINE_MENU='1';$env:MKDD_ROOM_BACKEND='eos';$env:MKDD_ROOM_PORT=[string]$port
+    $env:MKDD_ONLINE_MENU='1';$env:MKDD_ROOM_BACKEND=if($Lan){'lan'}else{'eos'};$env:MKDD_ROOM_PORT=[string]$port
+    if($Lan){$env:MKDD_LAN='1'}
     $env:MKDD_ONLINE_NAME=if($settings.player_name){$settings.player_name}else{'Player'}
     $env:GCN_NET_STATS=$ready+'.stats.json'
     $env:GCN_FRAME_STATS='1'

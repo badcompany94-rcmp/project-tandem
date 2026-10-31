@@ -6,6 +6,7 @@
 #include <eos_connect.h>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 
@@ -145,9 +146,24 @@ void EOS_CALL Runtime::incoming(const EOS_P2P_OnIncomingConnectionRequestInfo* i
     }catch(const std::exception&){fputs("EOS rejected a connection request\n",stderr);}
 }
 void EOS_CALL Runtime::established(const EOS_P2P_OnPeerConnectionEstablishedInfo* info) {
+    auto& runtime=*static_cast<Runtime*>(info->ClientData);
+    if(info->RemoteUserId){
+        const auto route=info->NetworkType==EOS_ENetworkConnectionType::EOS_NCT_DirectConnection?"direct":
+            info->NetworkType==EOS_ENetworkConnectionType::EOS_NCT_RelayedConnection?"relay":"unknown";
+        try{runtime.routes_[id(info->RemoteUserId)]=route;}catch(const std::exception&){}
+    }
     // Diagnostics reveal the route type, never credentials, codes or peer IDs.
     if(info->NetworkType==EOS_ENetworkConnectionType::EOS_NCT_DirectConnection)puts("EOS route: direct peer-to-peer");
     else if(info->NetworkType==EOS_ENetworkConnectionType::EOS_NCT_RelayedConnection)puts("EOS route: Epic relay fallback");
+}
+std::string Runtime::route()const {
+    const auto relevant=game_peers_.empty()?members():game_peers_;
+    std::string result;
+    for(const auto& peer:relevant)if(peer!=self_){
+        auto found=routes_.find(peer);if(found==routes_.end())return "unknown";
+        if(result.empty())result=found->second;else if(result!=found->second)return "mixed";
+    }
+    return result.empty()?"unknown":result;
 }
 void EOS_CALL Runtime::membership(const EOS_Lobby_LobbyMemberStatusReceivedCallbackInfo* info) {
     auto& r=*static_cast<Runtime*>(info->ClientData);

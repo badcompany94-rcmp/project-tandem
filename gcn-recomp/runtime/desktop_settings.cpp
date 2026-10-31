@@ -4,6 +4,7 @@
 #include "desktop_display.h"
 #include "desktop_sound.h"
 #include "desktop_presentation.h"
+#include "desktop_overlay.h"
 #include "desktop_online_ui.h"
 #include "desktop_pointer.h"
 #include "display_config.h"
@@ -31,6 +32,7 @@ int selected_port=0,listen_action=-1,listen_slot=0;
 Configuration before;
 desktop_sound::Settings sound_before;
 desktop_presentation::Settings presentation_before;
+bool overlay_before=false;
 std::string status;
 uint64_t chord_start=0;bool chord_latched=false;
 
@@ -53,9 +55,9 @@ void close(bool discard=false) {
     }
     if(discard){
         if(!desktop_presentation::preview(presentation_before,status))return;
-        configuration()=before;desktop_sound::preview(sound_before);
+        configuration()=before;desktop_sound::preview(sound_before);desktop_overlay::preview(overlay_before);
     }
-    else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status))return;
+    else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status) || !desktop_overlay::save(status))return;
     opened=false;dirty=false;listen_action=-1;cancel_capture();block(false);
     if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);desktop_gamepad_clear_quit();
     fprintf(stderr,"[settings] closed\n");
@@ -66,6 +68,8 @@ void online_tab() {
     const auto state=read();
     if(!state.available){ImGui::TextDisabled("Online controls are available from the main menu.");return;}
     ImGui::TextDisabled("%s",state.version.c_str());
+    if(SDL_getenv("MKDD_LAN"))ImGui::TextWrapped("LAN mode: local network only. Internet services are not used.");
+    ImGui::TextDisabled("Network pacing: %s",SDL_getenv("MKDD_NETWORK_RESPONSIVE")?"Responsive (experimental)":"Stable");
     if(!state.code.empty())ImGui::Text("Room %s",state.code.c_str());
     if(state.can_refresh) {
         ImGui::SameLine();if(ImGui::Button("Refresh code"))ImGui::OpenPopup("Refresh room code?");
@@ -241,6 +245,9 @@ void display_tab() {
     if(ImGui::Checkbox("VSync",&presentation.vsync)) {
         if(desktop_presentation::preview(presentation,status))changed();
     }
+    ImGui::SameLine(380);bool counter=desktop_overlay::current();
+    if(ImGui::Checkbox("Show FPS/network counter (F10)",&counter)){desktop_overlay::preview(counter);changed();}
+    if(ImGui::IsItemHovered())ImGui::SetTooltip("Off by default. Your choice is saved with settings.");
     ImGui::TextDisabled("Synchronize frames to your display to reduce tearing. Off by default.");
     constexpr int rates[]={0,120,144,165,240};
     const char* const labels[]={"Off (native 60 FPS)","120 Hz","144 Hz","165 Hz","240 Hz"};
@@ -338,12 +345,15 @@ bool desktop_settings_init(SDL_Window* win,void* context) {
     const char* presentation_file=SDL_getenv("GCN_PRESENTATION_CONFIG");
     const auto presentation_path=presentation_file?std::filesystem::path(presentation_file):std::filesystem::path(path()).parent_path()/"presentation.cfg";
     if(!desktop_presentation::load(presentation_path.string(),error)){status=error;fprintf(stderr,"[presentation-settings] %s\n",error.c_str());}
+    const char* overlay_file=SDL_getenv("GCN_OVERLAY_CONFIG");
+    const auto overlay_path=overlay_file?std::filesystem::path(overlay_file):std::filesystem::path(path()).parent_path()/"overlay.cfg";
+    if(!desktop_overlay::load(overlay_path.string(),error)){status=error;fprintf(stderr,"[overlay-settings] %s\n",error.c_str());}
     return true;
 }
 bool desktop_settings_open(){return opened;}
 void desktop_settings_show() {
     if(!ready || opened)return;
-    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);
+    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();overlay_before=desktop_overlay::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);
     ImGui::GetIO().ClearInputKeys();
     fprintf(stderr,"[settings] opened\n");
 }
@@ -359,6 +369,7 @@ bool desktop_settings_event(const SDL_Event& e) {
         if(opened)close();else desktop_settings_show();return true;
     }
     if(opened && e.type==SDL_KEYDOWN && !e.key.repeat && e.key.keysym.scancode==SDL_SCANCODE_F11) {desktop_settings_toggle_fullscreen();return true;}
+    if(opened && e.type==SDL_KEYDOWN && !e.key.repeat && e.key.keysym.scancode==SDL_SCANCODE_F10){desktop_overlay::preview(!desktop_overlay::current());changed();return true;}
     if(opened) {
         if(e.type==SDL_KEYDOWN && !e.key.repeat && e.key.keysym.scancode==SDL_SCANCODE_ESCAPE) {
             if(capturing()){cancel_capture();listen_action=-1;}else close();return true;

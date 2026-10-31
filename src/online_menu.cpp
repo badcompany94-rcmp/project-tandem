@@ -31,7 +31,7 @@ unsigned kick_seat=0;
 std::string kick_name,kick_id;
 const char* keyboard_keys="1234567890QWERTYUIOPASDFGHJKLZXCVBNM";
 std::vector<desktop_pointer::Region> clickable;
-std::string release_label(){return "ALPHA 25  /  "+mkdd::online::executable_build().substr(0,8);}
+std::string release_label(){return std::string(getenv("MKDD_LAN")?"PRIVATE LAN  /  ":"ALPHA 25  /  ")+mkdd::online::executable_build().substr(0,8);}
 void hit(float x,float y,float w,float h,int action){clickable.push_back({x/608,y/448,w/608,h/448,action});}
 std::pair<float,float> key_position(unsigned i) {
     unsigned row=i<10?0:i<20?1:i<29?2:3,first=row==0?0:row==1?10:row==2?20:29;
@@ -87,6 +87,10 @@ void restore_menu_unlocks();
 namespace content=mkdd::online::content;
 
 std::string friendly(const std::string& error) {
+    if(error=="lan-room-not-found")return "LAN ROOM NOT FOUND. CHECK CODE OR HOST IP";
+    if(error=="lan-connect-failed")return "CANNOT REACH LAN HOST. CHECK PRIVATE FIREWALL";
+    if(error=="lan-port-in-use")return "A LAN HOST IS ALREADY RUNNING ON THIS PC";
+    if(error=="invalid-lan-address")return "USE THE HOST'S LOCAL IPV4 ADDRESS";
     if(error=="room-not-found")return "ROOM NOT FOUND";
     if(error=="room-full")return "ROOM IS FULL";
     if(error=="event-started")return "THIS EVENT HAS ALREADY STARTED";
@@ -278,11 +282,11 @@ void draw_online(CPU* c,uint32_t scene) {
     if (valid(title)) mem_w8(title+0xb0,visible);
     c->r[3]=ortho;call_indirect(c,mem_r32(mem_r32(ortho)+0x14));
     if(classic_draw(c)){*c=saved;return;}
-    if(page==Page::Lobby)classic_heading(c,"ONLINE PLAY","CHOOSE YOUR KART");
+    if(page==Page::Lobby)classic_heading(c,getenv("MKDD_LAN")?"LAN PLAY":"ONLINE PLAY","CHOOSE YOUR KART");
     else if(page==Page::Type)classic_heading(c,"CHOOSE GAME MODE","HOST CHOOSES THE MODE");
     else if(page==Page::Engine)classic_heading(c,"GRAND PRIX","CHOOSE ENGINE CLASS");
     else if(page==Page::Battle)classic_heading(c,"BATTLE MODE","CHOOSE YOUR BATTLE");
-    else label(c,"ONLINE PLAY",22,30,0xffe95cff);
+    else label(c,getenv("MKDD_LAN")?"LAN PLAY":"ONLINE PLAY",22,30,0xffe95cff);
     if (page==Page::Type || page==Page::HostJoin) {
         if(page==Page::Type) {
             for(unsigned i=0;i<2;++i){const float x=22+i*292;classic_card(c,x,135,272,206,selection==i);
@@ -563,7 +567,7 @@ extern "C" void hle_fn_8012D88C(CPU* c) {
         fprintf(stderr,"[menu] title=%08x screen=%08x\n",scene,mem_r32(scene+0x158));
         tree(mem_r32(scene+0x158));
     }
-    const char* labels[]={"START GAME","ONLINE PLAY","RECORDS","OPTIONS"};
+    const char* labels[]={"START GAME",getenv("MKDD_LAN")?"LAN PLAY":"ONLINE PLAY","RECORDS","OPTIONS"};
     clickable.clear();
     for (unsigned i=0;i<4;++i) {
         const uint32_t pane=mem_r32(scene+0x10+12*(8+i));

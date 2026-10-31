@@ -68,5 +68,17 @@ int main(){
  const unsigned settled=prepared.delay();
  for(int i=0;i<64;++i){prepared.received(-1);prepared.received(std::numeric_limits<double>::quiet_NaN());prepared.received(50,17,0);}
  require(prepared.prepare()==settled,"invalid adjusted samples cannot erase measured latency");
+ AdaptiveInputDelay responsive(true),stable;
+ for(unsigned i=0;i<64;++i){responsive.received(220);stable.received(220);}
+ require(responsive.prepare()==15 && stable.prepare()==15,"profiles share conservative poor-link startup");
+ for(unsigned i=0;i<64;++i){responsive.received(25);stable.received(25);}
+ for(unsigned i=0;i<60*3;++i){responsive.observe(1000.0/60,.1,true);stable.observe(1000.0/60,.1,true);}
+ require(responsive.delay()==12 && stable.delay()==14,"responsive recovery drains excess headroom faster");
+ for(unsigned i=0;i<60*20;++i)responsive.observe(1000.0/60,.1,false);
+ require(responsive.delay()==12,"responsive never discards a changed input to lower latency");
+ for(unsigned i=0;i<60*30;++i)responsive.observe(1000.0/60,.1,true);
+ require(responsive.delay()==3,"responsive retains measured delivery floor");
+ for(unsigned i=0;i<60*30;++i)responsive.observe(25,5,true);
+ require(responsive.delay()==16,"responsive retains maximum poor-link fallback");
  puts("PASS: queue-corrected delivery, countdown warmup, bounded pressure response, safe recovery and graphics isolation");
 }
