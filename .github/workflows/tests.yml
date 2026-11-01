@@ -16,3 +16,9 @@ jobs:
         run: python tools/check_public_tree.py
       - name: Test room state and source identity
         run: python -m unittest discover -s tests -p 'test*.py'
+      - name: Test sixteen-peer input delivery and recovery
+        run: |
+          g++ -std=c++17 -O2 -Igcn-recomp/runtime gcn-recomp/tests/input_mesh.cpp -o /tmp/tandem-input-mesh
+          /tmp/tandem-input-mesh
+          g++ -std=c++17 -O2 -Igcn-recomp/runtime gcn-recomp/tests/redundant_input.cpp -o /tmp/tandem-redundant-input
+          /tmp/tandem-redundant-input
