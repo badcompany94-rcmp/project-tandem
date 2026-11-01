@@ -16,9 +16,20 @@ jobs:
         run: python tools/check_public_tree.py
       - name: Test room state and source identity
         run: python -m unittest discover -s tests -p 'test*.py'
+      - name: Test portable disc discovery
+        run: |
+          g++ -std=c++20 -O2 -Igcn-recomp/runtime gcn-recomp/tests/game_image.cpp -o /tmp/tandem-game-image
+          /tmp/tandem-game-image
       - name: Test sixteen-peer input delivery and recovery
         run: |
           g++ -std=c++17 -O2 -Igcn-recomp/runtime gcn-recomp/tests/input_mesh.cpp -o /tmp/tandem-input-mesh
           /tmp/tandem-input-mesh
           g++ -std=c++17 -O2 -Igcn-recomp/runtime gcn-recomp/tests/redundant_input.cpp -o /tmp/tandem-redundant-input
           /tmp/tandem-redundant-input
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Test launcher state, jobs, paths and errors
+        shell: powershell
+        run: ./tests/launcher_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-launcher-check"

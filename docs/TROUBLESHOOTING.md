@@ -12,6 +12,21 @@
 
 **Windows blocks a downloaded file:** check that the ZIP came from the project's official release and compare its SHA-256 with the release checksums. Do not disable antivirus or install an unverified replacement binary to bypass a warning. An unsigned beta may be unfamiliar to Windows; report the exact warning.
 
+## Controllers, moved folders and launcher
+
+**USB GameCube adapter missing:** Beta 7 adds experimental Nintendo-compatible
+057e:0337 adapter support on Windows. See [adapter mode, existing WinUSB driver
+and F1 port assignments](GAMECUBE-ADAPTERS.md). Physical hardware confirmation
+is still needed; include your adapter make/model and switch mode in a report.
+
+**Batocera says no game image:** update/rebuild on Windows before moving the
+complete installed folder. See [Batocera paths and offline launch configuration](BATOCERA.md).
+Direct mkdd.exe launches bypass Windows settings.json and online services.
+
+**Graphical launcher fails:** use Launch-Tandem.cmd as the direct fallback.
+Setup/repair and Play jobs retain errors under local-data/launcher-logs.
+[Launcher preview and current limits](LAUNCHER.md).
+
 ## Multiplayer
 
 **Cannot join:** compare the version and short build ID shown in each player's lobby/F1 menu, then verify the room code. Every player must finish the same update and any automatic rebuild.

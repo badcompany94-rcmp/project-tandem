@@ -7,13 +7,13 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**[Download Public Beta 6 for Windows (experimental networking)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.6)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+**[Download Public Beta 7 for Windows (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.7)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
 **Bring your own compatible disc image.** Project Tandem verifies your USA `GM4E01` ISO/CISO and recompiles the game on your PC. Downloads contain the recompiler, runtime, project features, and installation tools. They do not include a disc image or a compiled copy of the game.
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 6 adds experimental LAN/Internet public lobbies, a searchable server browser, editable room names, privacy/lock controls and up to 16 people in eight shared karts.** The counter defaults off on fresh settings; VSync and interpolation remain independent, experimental and off by default. [Changes, validation and remaining limits](docs/releases/public-beta-6.md) · [LAN and browser guide](docs/LAN.md) · [Previous Beta 5](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.5)
+**Beta 7 adds experimental Windows GameCube USB adapter support, portable disc lookup for moved installations, and a graphical Windows launcher preview.** Physical adapter and Batocera/Wine confirmation is still needed. It retains Beta 6's unified LAN/Internet browser and 16-person rooms. The counter defaults off on fresh settings; VSync and interpolation remain independent, experimental and off by default. [Changes, validation and remaining limits](docs/releases/public-beta-7.md) · [LAN and browser guide](docs/LAN.md) · [Previous Beta 6](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.6)
 
 ## Features
 
@@ -25,6 +25,8 @@ Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem 
 - **Stay together between events.** Return to the same lobby, change seats and modes, edit your name, and keep session medal stars.
 - **Natural 16:9 widescreen.** See more of the course with correctly proportioned HUD elements. Choose common 16:9 resolutions, windowed mode, fullscreen, or borderless fullscreen.
 - **Controller and local multiplayer settings.** Xbox, PlayStation, and Switch controller support through SDL, rebindable controls, and separate device assignments for offline GameCube ports.
+- **GameCube USB adapters on Windows.** Experimental native support for Nintendo-compatible Wii U/Switch-mode adapters, with four separately assignable ports, analog triggers and rumble. Requires an existing compatible WinUSB driver. [Supported hardware and testing limits](docs/GAMECUBE-ADAPTERS.md).
+- **Graphical Windows launcher preview.** Play, set up/repair, open update downloads, read controls and find logs from one window. Updates are still installed manually. [Launcher guide](docs/LAUNCHER.md).
 - **Online prediction and adaptive buffering.** Peer-to-peer gameplay uses EOS connection setup and relay fallback. The optional F10 overlay shows FPS, RTT, and the current input buffer; it defaults off on fresh settings. Performance depends on the PCs and connection.
 - **Portable setup and updates.** Compiler tools are bundled. Update by copying the full patch ZIP over your existing folder while preserving `local-data`.
 
@@ -35,7 +37,7 @@ Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem 
 1. Open **[Releases](https://github.com/badcompany94-rcmp/project-tandem/releases)** and download the Windows full package. GitHub's automatic **Source code** archives are for development, not the player installer.
 2. Extract the ZIP completely into a writable folder.
 3. Run `Setup-Tandem.cmd` and select your own supported USA ISO/CISO.
-4. Allow setup to verify the disc and compile locally, then run `Launch-Tandem.cmd`.
+4. Allow setup to verify the disc and compile locally, then open **Project Tandem.lnk** or **ProjectTandem.exe**. The existing `Launch-Tandem.cmd` remains available.
 
 The player package includes its build tools. You do not need Visual Studio, a separate Windows SDK, or Python installation. Online players do not need an Epic player account or developer setup. Ordinary home connections use automatic connection setup and relay fallback without a VPN or manual port forwarding; restrictive networks can still prevent a connection.
 
@@ -86,7 +88,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 6 — `db77d19767b75cad`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 6. Display option choices may differ between players.
+Current compatibility: **Public Beta 7 — `a0cfea16f09d7018`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 7. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 

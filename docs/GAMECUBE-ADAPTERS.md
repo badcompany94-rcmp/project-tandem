@@ -1,6 +1,6 @@
 # GameCube USB adapters
 
-The adapter follow-up adds a Windows WinUSB backend for Nintendo WUP-028 and
+Public Beta 7 adds experimental a Windows WinUSB backend for Nintendo WUP-028 and
 compatible Wii U/Switch-mode adapters exposing USB **057e:0337**. The four
 connected pads appear individually as **GameCube USB Adapter N Port 1–4** in
 **F1 > Controller ports**. Assign them there for local multiplayer. Online play

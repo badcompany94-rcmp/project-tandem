@@ -5,14 +5,14 @@ Issue #10 reports a Windows installation launched through Batocera returning
 launcher and its `local-data/settings.json`. Older executables search their
 Windows build-time path and `rom/` relative to the frontend's working folder.
 
-The follow-up executable discovers the portable cached image next to the
+The Public Beta 7 executable discovers the portable cached image next to the
 installation, or `rom/` beside the executable/package, independently of the
 working folder. ISO/CISO and uppercase extensions are supported. Explicit image
 arguments take priority and an invalid explicit path fails without silently
 choosing a different disc. `--print-game-image` prints the selected image and
 exits without starting a game. Missing-image errors list the checked locations.
 
-For an existing Windows build, prepare it on Windows with your own supported
+Update/rebuild to Beta 7 on Windows with your own supported
 USA disc image first. Copy the complete installed folder, including your private
 `local-data/game-image.iso` or `.ciso`, to
 `/userdata/roms/windows/Project Tandem.pc/` on your own Batocera device. Do not
@@ -34,5 +34,6 @@ on Linux. Editing Windows `settings.json` does not configure this direct launch.
 
 This direct-executable example is for **offline play**; it does not start the
 Windows networking helper or shutdown watcher. Native Linux/Steam Deck and Wine
-online support need separate validation. Windows relocation tests cover the new
-disc resolver; real Batocera/Wine hardware testing remains pending.
+online support need separate validation. Disc-resolver fixtures pass on Windows and Linux, and an actual relocated
+Windows game boots from an unrelated working folder. Real Batocera/Wine
+hardware testing remains pending.

@@ -6,7 +6,10 @@ Download the Windows full package from Releases. Extract the entire ZIP before r
 
 Setup verifies the packaged files and the disc's `main.dol` SHA-1, caches a private copy of your ISO under `local-data`, and compiles the native game. The progress display covers verification, disc checking, configuration, compilation, and final checks. First setup can take several minutes and substantial disk space.
 
-Run `Launch-Tandem.cmd` after setup. To play without starting the online services, use:
+After setup, open **Project Tandem.lnk** or **ProjectTandem.exe** for the
+[graphical launcher preview](LAUNCHER.md). Its Play button starts the same
+unified LAN/Internet game. `Launch-Tandem.cmd` also launches directly.
+To play without starting online services, use:
 
 ```powershell
 .\Launch-Tandem.cmd -Offline
@@ -30,7 +33,7 @@ The hash identifies the executable extracted from the disc, not the whole ISO. U
 1. Close Tandem and allow automatic online cleanup to finish.
 2. Open the cumulative update ZIP and copy **all** contents into the existing folder containing `Launch-Tandem.cmd`.
 3. Accept file replacement and keep `local-data` intact.
-4. Run `Launch-Tandem.cmd`. It rebuilds the local game if the version changed.
+4. Run `Launch-Tandem.cmd` once. It rebuilds the local game if the version changed and creates the graphical launcher. You can then use Project Tandem.lnk or ProjectTandem.exe. The launcher's Update downloads button opens GitHub; it does not install updates automatically.
 
 **Update everyone before playing online.** Every member of a room must run the same build ID; different builds cannot join or play together. Controller settings, trigger click points and display choices do not need to match.
 
