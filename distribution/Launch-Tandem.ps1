@@ -21,6 +21,13 @@ if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-
 } else {
     Save-TandemSettings $root $settings $image
 }
+# A launcher-only release can share the previous gameplay ID. Finish its local
+# bootstrap upgrade even when the native game itself does not need rebuilding.
+$launcherBuilder=Join-Path $root 'Build-Launcher.ps1'
+if(Test-Path -LiteralPath $launcherBuilder) {
+    try { & $launcherBuilder -Root $root }
+    catch { Write-Warning 'Close the launcher and run Setup-Tandem.cmd to finish its update. The direct game launch remains available.' }
+}
 foreach($file in @($settings.game_image,$settings.game_executable,$settings.python)){if(-not (Test-Path -LiteralPath $file -PathType Leaf)){throw "Required local file missing: $file. Run setup again."}}
 if(Get-Process -Name mkdd -ErrorAction SilentlyContinue | Where-Object {$_.Path -eq $settings.game_executable}){throw 'This package is already running. Close its game window before starting another session.'}
 foreach($key in @([Environment]::GetEnvironmentVariables('Process').Keys)) {
