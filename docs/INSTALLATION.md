@@ -1,6 +1,10 @@
 # Install and update Project Tandem
 
-## First installation
+## Linux community build
+
+For Linux, see **[Slex’s Project Tandem Linux](https://github.com/slex2jf/Project-Tandem-Linux)**. This is a separately maintained community adaptation; follow the instructions in that repository. Windows/Linux online compatibility has not yet been verified.
+
+## First installation on Windows
 
 Download the Windows full package from Releases. Extract the entire ZIP before running anything, into a folder where your Windows user can write files. Run `Setup-Tandem.cmd`, select your own supported USA `GM4E01` ISO/CISO, and wait for the five setup stages to finish.
 

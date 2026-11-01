@@ -7,7 +7,11 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**[Download Public Beta 9 for Windows (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.9)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+**Downloads:** [Windows — official Public Beta 9 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.9) · **[Linux — community build by Slex](https://github.com/slex2jf/Project-Tandem-Linux)**
+
+[Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+
+The Linux adaptation is maintained separately by Slex. Windows/Linux online compatibility has not yet been verified.
 
 **Bring your own compatible disc image.** Project Tandem verifies your USA `GM4E01` ISO/CISO and recompiles the game on your PC. Downloads contain the recompiler, runtime, project features, and installation tools. They do not include a disc image or a compiled copy of the game.
 
