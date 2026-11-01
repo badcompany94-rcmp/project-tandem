@@ -69,8 +69,8 @@ Save-TandemSettings $root $savedSettings $GameImage
 $pending=Join-Path $data 'update-pending.json'
 if(Test-Path -LiteralPath $pending){Remove-Item -LiteralPath $pending}
 try { & (Join-Path $source 'distribution\Build-Launcher.ps1') -Root $root }
-catch { Write-Warning 'The game is ready, but the graphical launcher preview could not be built. Launch-Tandem.cmd still works.' }
+catch { Write-Warning 'The game is ready, but the graphical launcher could not be built. Launch-Tandem.cmd still works.' }
 try { & (Join-Path $source 'distribution\Create-Shortcut.ps1') -Root $root }
 catch { Write-Warning 'The game is ready, but the optional artwork shortcut could not be created. Launch-Tandem.cmd still works.' }
 Show-TandemProgress '5/5 Final checks' 100 'Ready to play' -Complete
-Write-Host 'Project Tandem is ready. Use Launch-Tandem.cmd. If your ISO moves, the launcher will help locate it.'
+Write-Host 'Project Tandem is ready. Open Project Tandem.lnk or ProjectTandem.exe to play and receive updates. Launch-Tandem.cmd is also available.'
