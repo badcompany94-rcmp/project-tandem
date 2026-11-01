@@ -37,7 +37,7 @@ static void run(unsigned count,uint64_t first,unsigned seed) {
  printf("PASS: %u peers, 500 exact inputs each, 20%% loss + burst loss + reorder + duplicates (seed %u)\n",count,seed);
 }
 int main(){try {
- for(unsigned peers:{2u,5u,8u})for(unsigned seed:{17u,2049u})run(peers,seed==17?1:13,seed);
+ for(unsigned peers:{2u,5u,8u,16u})for(unsigned seed:{17u,2049u})run(peers,seed==17?1:13,seed);
  std::vector<std::vector<uint8_t>> output;
  RedundantInput sender(2,0,1,[&](unsigned,const auto& b){output.push_back(b);},[](unsigned,const auto&){});
  sender.native(input(1,0));sender.pump(0);auto original=output.back();

@@ -71,7 +71,7 @@ template<class Fn> static void rejected(Fn fn) {
 }
 int main() {
     try {
-        for(unsigned count:{2u,4u,8u}){group(count,false);group(count,true);}
+        for(unsigned count:{2u,4u,8u,16u}){group(count,false);group(count,true);}
         net::Admission ticket{};ticket[0]=0x88;
         rejected([&]{InputMesh peer(2,0,ticket);peer.native(hello(0));});
         rejected([]{InputMesh peer(2,0,{});auto p=hello(1,2);p[40]=1;std::vector<uint8_t> data{10};data.insert(data.end(),p.begin(),p.end());peer.peer(1,data);});
