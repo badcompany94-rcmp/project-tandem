@@ -5,27 +5,27 @@
 
 # Project Tandem — Mario Kart: Double Dash!! Online on PC
 
-Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–8 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
+Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**[Download Public Beta 5 for Windows (experimental display features)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.5)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+**[Download Public Beta 6 for Windows (experimental networking)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.6)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
 **Bring your own compatible disc image.** Project Tandem verifies your USA `GM4E01` ISO/CISO and recompiles the game on your PC. Downloads contain the recompiler, runtime, project features, and installation tools. They do not include a disc image or a compiled copy of the game.
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 5 adds independent left/right trigger click points in F1 → Control mapping, with 50% defaults and unchanged analog travel.** The Beta 4 cursor fix remains included. VSync and interpolation remain experimental, independent and OFF by default. [Changes and testing](docs/releases/public-beta-5.md) · [Controls](docs/CONTROLS.md) · [Previous Beta 4](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.4)
+**Beta 6 adds experimental LAN/Internet public lobbies, a searchable server browser, editable room names, privacy/lock controls and up to 16 people in eight shared karts.** The counter defaults off on fresh settings; VSync and interpolation remain independent, experimental and off by default. [Changes, validation and remaining limits](docs/releases/public-beta-6.md) · [LAN and browser guide](docs/LAN.md) · [Previous Beta 5](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.5)
 
 ## Features
 
 - **Mouse and keyboard menus, separate racing controls.** Click through the offline and online menus, type names and room codes, then enter a race with a dedicated driving layout. The controls switch automatically. Race bindings stay active through race results and the award ceremony, and can be rebound in F1.
 - **Switch between mouse/keyboard and controller.** Player one accepts both by default: use a mouse in the lobby and pick up a controller to drive. F1 also supports explicit device assignments.
-- **Online play for 2–8 people.** Host a room and share its eight-character code. Take an empty kart or join a friend's back seat. Solo and shared karts can race together.
+- **Online play for 2–16 people.** Host a private room with an eight-character code, or make it public in the searchable lobby browser. Nearby LAN rooms appear first. Up to eight drivers and eight passengers share eight karts; solo and shared karts can race together.
 - **Grand Prix and Battle.** Play a cup with CPUs filling Grand Prix slots, or compete in Balloon Battle, Shine Thief, and Bob-omb Blast. Battle requires at least two opposing karts.
 - **Shared character selection.** Everyone sees live player markers and named, locked choices on the original character grid, with their own kart preview below. Solo players choose two characters; shared teammates choose one each.
 - **Stay together between events.** Return to the same lobby, change seats and modes, edit your name, and keep session medal stars.
 - **Natural 16:9 widescreen.** See more of the course with correctly proportioned HUD elements. Choose common 16:9 resolutions, windowed mode, fullscreen, or borderless fullscreen.
 - **Controller and local multiplayer settings.** Xbox, PlayStation, and Switch controller support through SDL, rebindable controls, and separate device assignments for offline GameCube ports.
-- **Online prediction and adaptive buffering.** Peer-to-peer gameplay uses EOS connection setup and relay fallback. The F10 overlay shows FPS, RTT, and the current input buffer. Performance depends on the PCs and connection.
+- **Online prediction and adaptive buffering.** Peer-to-peer gameplay uses EOS connection setup and relay fallback. The optional F10 overlay shows FPS, RTT, and the current input buffer; it defaults off on fresh settings. Performance depends on the PCs and connection.
 - **Portable setup and updates.** Compiler tools are bundled. Update by copying the full patch ZIP over your existing folder while preserving `local-data`.
 
 ![Shared character choices on the original grid, with named reservations and a local kart preview](docs/images/character-selection.png)
@@ -84,9 +84,9 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 ## Play with friends
 
-Choose **Online Play → Host Room** and share the room code, or join using **Join Room** or **F1 → Online → Quick join**. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
+Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 5 — `ea33ed0094297cc5`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 5. Display option choices may differ between players.
+Current compatibility: **Public Beta 6 — `db77d19767b75cad`**, based on Alpha25 gameplay. Everyone must update to the same build; Older builds cannot share a room with Beta 6. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 

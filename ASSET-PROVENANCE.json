@@ -141,6 +141,26 @@
       "bytes": 458784,
       "origin": "Project-generated/adapted interface art, including local upscaling and conversion",
       "rights": "Not game-disc extraction; MIT code license does not grant third-party character or trademark rights"
+    },
+    {
+      "path": "distribution/assets/project-tandem.png",
+      "sha256": "2a2a887e2b5e9c6286329818286ed0fab84a90a77cab2bd678be429371c1d160",
+      "bytes": 537928,
+      "origin": "POOTERMAN community fan artwork, offered for project header and icon in GitHub issue #11; original PNG preserved, ICO resized for Windows",
+      "artist": "POOTERMAN",
+      "source": "https://github.com/badcompany94-rcmp/project-tandem/issues/11",
+      "portfolio": "https://www.deviantart.com/pooterman",
+      "rights": "Contributed for this project; not a grant of third-party character/trademark rights or a separate MIT artwork license"
+    },
+    {
+      "path": "distribution/assets/project-tandem.ico",
+      "sha256": "7add7b101663692364407148d7c357577b2a941d6cfcdab72a5bfccd5d18add4",
+      "bytes": 246351,
+      "origin": "POOTERMAN community fan artwork, offered for project header and icon in GitHub issue #11; original PNG preserved, ICO resized for Windows",
+      "artist": "POOTERMAN",
+      "source": "https://github.com/badcompany94-rcmp/project-tandem/issues/11",
+      "portfolio": "https://www.deviantart.com/pooterman",
+      "rights": "Contributed for this project; not a grant of third-party character/trademark rights or a separate MIT artwork license"
     }
   ]
 }

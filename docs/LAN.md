@@ -1,6 +1,6 @@
-# Private LAN preview
+# LAN and public lobby browser
 
-This Windows preview is private and experimental. It has not been published as a release. Everyone in a room needs the same private build ID. Public Beta 5 and the existing Steam Deck test build cannot join this preview.
+Public Beta 6 includes experimental unified LAN/Internet rooms. Everyone needs build `db77d19767b75cad`. Public Beta 5 and the existing Steam Deck test build cannot join this version. See [release validation and remaining limits](releases/public-beta-6.md).
 
 ## Host and join
 

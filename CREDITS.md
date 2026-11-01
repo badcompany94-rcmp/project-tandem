@@ -3,7 +3,8 @@
 ## Recompiler and runtime
 
 - **Ethan Nicholas** — the upstream [mariokartdd-recomp](https://github.com/ethannicholas/mariokartdd-recomp) project and [gcn-recomp](https://github.com/ethannicholas/gcn-recomp) recompiler/runtime. Their MIT copyright and license notices are preserved.
-- **Project Tandem contributors and friend testers** — online rooms and shared kart flow, networking/prediction work, widescreen/HUD adaptations, desktop controls/settings, menu integration, portable installation, and testing.
+- **badcompany94-rcmp** — Project Tandem development: online rooms and shared kart flow, networking/prediction work, widescreen/HUD adaptations, desktop controls/settings, menu integration, and portable installation.
+- **Friend testers** — testing and feedback.
 - **decomp-toolkit contributors** — tooling used by the upstream project to describe executable layout. Function-address and symbol metadata are build inputs, not a distributed copy of the game executable.
 
 This source snapshot vendors the runtime files used by the Windows release. `UPSTREAM.json` records the source revisions it builds on; Project Tandem includes local changes beyond those revisions.
@@ -21,6 +22,8 @@ This source snapshot vendors the runtime files used by the Windows release. `UPS
 See [third-party notices](THIRD-PARTY-NOTICES.md) and the license files supplied with each component.
 
 ## Interface artwork and font
+
+**POOTERMAN** ([P00TERMAN on GitHub](https://github.com/P00TERMAN), [DeviantArt](https://www.deviantart.com/pooterman)) contributed the project header and application/shortcut icon artwork in [issue #11](https://github.com/badcompany94-rcmp/project-tandem/issues/11). The original PNG is preserved, with resized ICO copies. Thank you for the awesome contribution! See [artwork credit](docs/ARTWORK.md).
 
 Project-specific menu illustrations, kart/seat presentation, and the hand cursor were generated and adapted during Project Tandem development, rather than copied from the disc's asset archives. The source tree includes the assets needed for this interface. This statement describes their production method; it does not grant rights in depicted Nintendo characters or other third-party intellectual property.
 

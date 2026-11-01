@@ -1,6 +1,6 @@
-# Private networking investigation
+# Networking investigation
 
-No public push, release or issue update is authorized for this work yet.
+These notes describe the networking investigation behind experimental Public Beta 6. See [current validation and limits](releases/public-beta-6.md).
 
 The current Internet path already uses EOS direct peer connections with relay fallback, redundant input datagrams, rollback and adaptive buffering. A change of hosting provider alone would not remove local simulation/checkpoint costs or excess queued input.
 
