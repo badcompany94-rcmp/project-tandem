@@ -17,6 +17,7 @@
 #include <windows.h>
 #include <setupapi.h>
 #include <winusb.h>
+#include <objbase.h>
 #endif
 
 namespace gc_adapter {
@@ -88,11 +89,45 @@ int next_adapter=1;
 const GUID interfaces[]={
     {0xa5dcbf10,0x6530,0x11d2,{0x90,0x1f,0x00,0xc0,0x4f,0xb9,0x51,0xed}},
     {0xdee824ef,0x729b,0x4a0e,{0x9c,0x14,0xb7,0x11,0x7d,0x33,0xa8,0x17}}};
+std::vector<GUID> adapter_interfaces() {
+    std::vector<GUID> result(std::begin(interfaces),std::end(interfaces));
+    // WinUSB installers may register a device-specific interface GUID. Read it
+    // from the adapter's hardware key, rather than requiring Zadig's defaults.
+    auto list=SetupDiGetClassDevsW(nullptr,L"USB",nullptr,DIGCF_PRESENT|DIGCF_ALLCLASSES);
+    if(list==INVALID_HANDLE_VALUE)return result;
+    for(DWORD i=0;;++i) {
+        SP_DEVINFO_DATA data{};data.cbSize=sizeof(data);
+        if(!SetupDiEnumDeviceInfo(list,i,&data))break;
+        wchar_t hardware[4096]{};DWORD type=0;
+        if(!SetupDiGetDeviceRegistryPropertyW(list,&data,SPDRP_HARDWAREID,&type,reinterpret_cast<PBYTE>(hardware),sizeof(hardware)-sizeof(wchar_t),nullptr))continue;
+        bool adapter=false;
+        for(const wchar_t* p=hardware;*p;p+=wcslen(p)+1) {
+            std::wstring id=p;for(auto& c:id)c=towlower(c);
+            const std::wstring prefix=L"usb\\vid_057e&pid_0337";
+            if(id.compare(0,prefix.size(),prefix)==0 && (id.size()==prefix.size() || id[prefix.size()]==L'&'))adapter=true;
+        }
+        if(!adapter)continue;
+        auto key=SetupDiOpenDevRegKey(list,&data,DICS_FLAG_GLOBAL,0,DIREG_DEV,KEY_QUERY_VALUE);
+        if(key==INVALID_HANDLE_VALUE)continue;
+        HKEY parameters=nullptr;RegOpenKeyExW(key,L"Device Parameters",0,KEY_QUERY_VALUE,&parameters);
+        for(auto registry:{key,parameters})if(registry)for(const wchar_t* name:{L"DeviceInterfaceGUIDs",L"DeviceInterfaceGUID"}) {
+            wchar_t value[4096]{};DWORD bytes=sizeof(value)-2*sizeof(wchar_t),kind=0;
+            if(RegQueryValueExW(registry,name,nullptr,&kind,reinterpret_cast<PBYTE>(value),&bytes)!=ERROR_SUCCESS || (kind!=REG_SZ && kind!=REG_MULTI_SZ))continue;
+            for(wchar_t* p=value;*p;p+=wcslen(p)+1) {
+                GUID guid{};
+                if(SUCCEEDED(CLSIDFromString(p,&guid)) && std::none_of(result.begin(),result.end(),[&](const GUID& existing){return IsEqualGUID(existing,guid);}))result.push_back(guid);
+            }
+        }
+        if(parameters)RegCloseKey(parameters);RegCloseKey(key);
+    }
+    SetupDiDestroyDeviceInfoList(list);return result;
+}
 std::set<std::wstring> enumerate() {
     std::set<std::wstring> result;
     std::set<std::wstring> seen;
-    for(int g=1;g>=0;--g) {
-        const auto& guid=interfaces[g];
+    const auto guids=adapter_interfaces();
+    for(auto g=guids.rbegin();g!=guids.rend();++g) {
+        const auto& guid=*g;
         auto list=SetupDiGetClassDevsW(&guid,nullptr,nullptr,DIGCF_PRESENT|DIGCF_DEVICEINTERFACE);
         if(list==INVALID_HANDLE_VALUE)continue;
         for(DWORD i=0;;++i) {
