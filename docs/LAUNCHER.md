@@ -18,8 +18,15 @@ failure leaves the existing game playable and provides a retryable status.
 
 When a newer Windows release is available, read **What's new**, close the game,
 then click **Install update**. Installation is not forced while playing.
-The launcher closes itself and opens an update progress window so it can safely
-replace its own files. The updater:
+From Beta 10 onward, the launcher stays open until Windows confirms that the
+update progress window is visible. The update window is brought forward and
+stays open through downloading, verification, installation and any local build.
+If it cannot open, the launcher stays available and reports the failure. The
+launcher closes only after that handoff, so its files can be replaced safely.
+Older releases still use their previous updater when installing this hotfix;
+the visibility fix applies to updates started after Beta 10 is installed.
+
+The updater:
 
 1. Confirms the selected official release, downloads its cumulative package and
    checks the GitHub SHA-256 asset digest. Missing or changed bundled tools cause

@@ -1,7 +1,7 @@
 # Experimental display refresh
 
-Public Beta 9 retains experimental display options on the Alpha25 gameplay baseline.
-Both are OFF by default. [Release notes](releases/public-beta-9.md) describe downloads
+Public Beta 10 retains experimental display options on the Alpha25 gameplay baseline.
+Both are OFF by default. [Release notes](releases/public-beta-10.md) describe downloads
 and the remaining acceptance checks. Previous releases remain available separately.
 
 Open **F1 → Display**:
@@ -40,7 +40,7 @@ while preserving `local-data`. The launcher rebuilds locally from the user's own
 cached disc image when needed. No generated game executable or disc data belongs
 in the update archive.
 
-All online participants need Beta 9's matching build ID (`000dbce82144c576`). Different
+All online participants need Beta 10 / Beta 9 shared build ID (`000dbce82144c576`). Different
 VSync and interpolation settings do not require different builds. Returning both
 settings to Off restores native presentation. Keep a separate copy if you want
 to compare with an older release.
@@ -50,7 +50,7 @@ refresh deadlines, geometry fallbacks, GPU-state isolation, native peer hashes,
 and existing service/display/settings regressions. Background GPU activity makes
 the recorded timing runs provisional. Clean-GPU timing, visible-monitor tearing
 and smoothness/input-latency checks, and public-internet friend testing remain
-pending. These options remain experimental in Public Beta 9.
+pending. These options remain experimental in Public Beta 10.
 
 Beta 3 always presents native fallback frames when interpolation is unavailable,
 and avoids snapshots for unmatched geometry. See its release notes for the

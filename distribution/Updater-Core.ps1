@@ -249,6 +249,41 @@ function Set-TandemTransaction([string]$Root,$Record,[string]$Phase) {
     $Record.Phase=$Phase;$Record.OwnerId=$PID;$Record.OwnerStarted=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
     Write-TandemJson (Join-Path $Root 'local-data/update-transaction.json') $Record
 }
+function Start-TandemUpdateProcess([string]$Root,[string[]]$Arguments,[string]$WorkingDirectory,[switch]$Headless,[switch]$LegacyUi) {
+    # CREATE_NO_WINDOW suppresses the console without requesting SW_HIDE.
+    # The launcher waits for a visible UI before
+    # it exits, so a startup failure cannot strand the player without progress.
+    $ready=$null;$child=$null
+    if(-not $Headless -and -not $LegacyUi) {
+        $ready=Assert-TandemSafePath $Root (Join-Path $Root ('local-data/updates/ui-ready-'+[guid]::NewGuid().ToString('N')+'.json'))
+        $Arguments+=@('-ReadyFile',$ready)
+    }
+    $info=New-Object Diagnostics.ProcessStartInfo
+    $info.FileName=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    $info.Arguments=Join-TandemArguments $Arguments;$info.WorkingDirectory=$WorkingDirectory
+    $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.WindowStyle='Normal'
+    $info.EnvironmentVariables.Remove('PSMODULEPATH')
+    try {
+        $child=[Diagnostics.Process]::Start($info)
+        if(-not $Headless -and -not $LegacyUi) {
+            $deadline=[DateTime]::UtcNow.AddSeconds(20)
+            while($true) {
+                if([IO.File]::Exists($ready)) {
+                    $visible=Read-TandemJson $ready
+                    if($visible.ProcessId -eq $child.Id -and $visible.Visible){break}
+                    throw 'The update progress window could not be displayed. The launcher will stay open.'
+                }
+                if($child.HasExited -or [DateTime]::UtcNow -gt $deadline){throw 'The update progress window could not start. The launcher will stay open; please try again.'}
+                if('System.Windows.Forms.Application' -as [type]){[Windows.Forms.Application]::DoEvents()}
+                Start-Sleep -Milliseconds 50
+            }
+        }
+        return $child
+    }catch {
+        if($child){if(-not $child.HasExited){$child.Kill();$child.WaitForExit()};$child.Dispose()}
+        throw
+    }finally {if($ready -and [IO.File]::Exists($ready)){[IO.File]::Delete($ready)}}
+}
 function New-TandemUpdateWorker([string]$Root,[string]$Tag,[int]$BootstrapId=0,[string]$BootstrapStarted='',[switch]$Headless) {
     if(-not (Get-TandemVersion $Tag)){throw 'No update version was selected.'}
     $lock=Get-TandemUpdateLock $Root
@@ -259,13 +294,17 @@ function New-TandemUpdateWorker([string]$Root,[string]$Tag,[int]$BootstrapId=0,[
         foreach($name in @('Updater-Core.ps1','Update-Tandem.ps1','Update-Build.ps1','Tandem-Paths.ps1','Launcher-Core.ps1')){Copy-TandemAtomic (Join-Path $PSScriptRoot $name) (Join-Path $active $name)}
         $art=Join-Path $Root 'source/distribution/assets/project-tandem.png'
         if([IO.File]::Exists($art)){Copy-TandemAtomic $art (Join-Path $active 'artwork.png')}
+        foreach($pair in @(@('source/distribution/assets/project-tandem.ico','artwork.ico'),@('source/distribution/launcher/TaskbarIdentity.cs','TaskbarIdentity.cs'))) {
+            $asset=Join-Path $Root $pair[0]
+            if([IO.File]::Exists($asset)){Copy-TandemAtomic $asset (Join-Path $active $pair[1])}
+        }
         $record=[pscustomobject]@{Format=1;Id=[guid]::NewGuid().ToString('N');Root=[IO.Path]::GetFullPath($Root);Tag=$Tag;Phase='Starting';OwnerId=0;OwnerStarted=''}
         Set-TandemTransaction $Root $record 'Starting'
         $arguments=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',(Join-Path $active 'Update-Tandem.ps1'),'-Root',$Root,'-TransactionId',$record.Id,
             '-WaitId',[string]$PID,'-WaitStarted',(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o'))
         if($BootstrapId){$arguments+=@('-BootstrapId',[string]$BootstrapId,'-BootstrapStarted',$BootstrapStarted)}
         if($Headless){$arguments+='-Headless'}
-        try {return Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList (Join-TandemArguments $arguments) -WorkingDirectory $active -WindowStyle Hidden -PassThru}
+        try {return Start-TandemUpdateProcess $Root $arguments $active -Headless:$Headless}
         catch {[IO.File]::Delete((Join-Path $Root 'local-data/update-transaction.json'));throw}
     }finally {$lock.Dispose()}
 }

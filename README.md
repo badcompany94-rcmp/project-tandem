@@ -7,7 +7,7 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**Downloads:** [Windows — official Public Beta 9 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.9) · **[Linux — community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
+**Downloads:** [Windows — official Public Beta 10 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.10) · **[Linux — community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
 
 [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
@@ -17,7 +17,7 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 9 fixes Linux source compilation in the online menu**, thanks to [malespiaut](https://github.com/malespiaut). Windows menu machine code is unchanged by the fix. The launcher also uses POOTERMAN's fan-art icon in the Windows taskbar. This release retains automatic Windows updates and experimental networking/display features; it does not add a packaged Linux/Steam Deck installer. [Changes, compatibility and validation](docs/releases/public-beta-9.md) · [Launcher guide](docs/LAUNCHER.md) · [Previous Beta 8](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.8)
+**Beta 10 keeps update progress visible.** The launcher waits for the update window to appear before closing; that window reports downloading, verification, installation and any needed build. Failed window startup leaves the launcher open. The taskbar fan-art icon and Linux source compilation fix from Beta 9 are retained. [Changes and compatibility](docs/releases/public-beta-10.md) · [Launcher guide](docs/LAUNCHER.md)
 
 ## Features
 
@@ -92,7 +92,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 9 - `000dbce82144c576`**, based on Alpha25 gameplay. The source portability change produces a new build ID, so Beta 8 and earlier cannot join. Update every player to Beta 9 before playing together. Display option choices may differ between players.
+Current compatibility: **Public Beta 10 - `000dbce82144c576`**, based on Alpha25 gameplay. Beta 9 has the same gameplay build and remains online-compatible. Beta 8 and earlier cannot join. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 

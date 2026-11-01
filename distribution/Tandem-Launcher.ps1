@@ -11,7 +11,7 @@ if($TestView -ne 'Current' -and -not $SelfTest){throw 'TestView is only availabl
 $Root=[IO.Path]::GetFullPath($Root)
 Add-Type -Path (Join-Path $Root 'source/distribution/launcher/TaskbarIdentity.cs')
 [TandemTaskbarIdentity]::InitializeProcess()
-$script:job=$null;$script:latestLog=$null;$script:checkJob=$null;$script:candidate=$null
+$script:job=$null;$script:latestLog=$null;$script:checkJob=$null;$script:candidate=$null;$script:updateHandoff=$false
 $script:lastCheck=$null;$script:checkError='';$script:lastCheckAttempt=[DateTime]::MinValue
 $script:lastStateRefresh=[DateTime]::MinValue
 if($SelfTest) {
@@ -130,14 +130,20 @@ $updates.add_Click({
         $bootstrapId=0;$bootstrapStarted=''
         try {$parentId=(Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId;$parent=Get-Process -Id $parentId -ErrorAction Stop
             if(Test-TandemPathEqual $parent.Path (Join-Path $Root 'ProjectTandem.exe')){$bootstrapId=$parent.Id;$bootstrapStarted=$parent.StartTime.ToUniversalTime().ToString('o')}}catch{}
+        $script:updateHandoff=$true;$timer.Stop();$form.UseWaitCursor=$true
+        foreach($button in $buttons){$button.Enabled=$false}
+        $status.Text='Opening the update progress window...';$form.Refresh()
         if($state.UpdateRecovery) {
             $workerArguments=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',(Join-Path $Root 'local-data/updates/active/Update-Tandem.ps1'),'-Root',$Root,'-Recover',
                 '-WaitId',[string]$PID,'-WaitStarted',(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o'),'-BootstrapId',[string]$bootstrapId,'-BootstrapStarted',$bootstrapStarted)
-            Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList (Join-TandemArguments $workerArguments) -WindowStyle Hidden|Out-Null
+            # An interrupted older updater may not support the UI-ready protocol.
+            $recoveryScript=Join-Path $Root 'local-data/updates/active/Update-Tandem.ps1'
+            $legacyRecovery=-not (Get-Command $recoveryScript).Parameters.ContainsKey('ReadyFile')
+            Start-TandemUpdateProcess -Root $Root -Arguments $workerArguments -WorkingDirectory (Join-Path $Root 'local-data/updates/active') -LegacyUi:$legacyRecovery|Out-Null
         }elseif($script:candidate){New-TandemUpdateWorker $Root $script:candidate.Tag $bootstrapId $bootstrapStarted|Out-Null}
-        else{return}
-        $form.Close()
-    }catch {$output.Text=$_.Exception.Message}
+        else{throw 'Check for updates before installing.'}
+        $script:updateHandoff=$false;$form.Close()
+    }catch {$script:updateHandoff=$false;$form.UseWaitCursor=$false;$output.Text=$_.Exception.Message;Refresh-State;$timer.Start()}
 })
 $help.add_Click({$file=Join-Path $Root 'docs/CONTROLS.md';if(Test-Path -LiteralPath $file){Start-Process -FilePath 'notepad.exe' -ArgumentList (Join-TandemArguments @($file))}else{Start-Process 'https://github.com/badcompany94-rcmp/project-tandem#readme'}})
 $logs.add_Click({$folder=if($script:latestLog){$script:latestLog}else{Join-Path $Root 'local-data'};if(Test-Path -LiteralPath $folder){Start-Process -FilePath 'explorer.exe' -ArgumentList (Join-TandemArguments @($folder))}})
@@ -168,11 +174,11 @@ $timer.add_Tick({
         if($succeeded -and $action -eq 'Setup' -and $script:playAfterSetup){$script:playAfterSetup=$false;Start-Action 'Play' ''}
     }catch {$output.Text=$_.Exception.Message}
 })
-$form.add_FormClosing({param($sender,$e)if($script:job -and -not $script:job.Process.HasExited){$e.Cancel=$true;$status.Text='Please leave the launcher open until the current task finishes.'}})
+$form.add_FormClosing({param($sender,$e)if($script:updateHandoff){$e.Cancel=$true;$status.Text='Opening the update progress window...'}elseif($script:job -and -not $script:job.Process.HasExited){$e.Cancel=$true;$status.Text='Please leave the launcher open until the current task finishes.'}})
 Refresh-State
 if($SelfTest) {
     switch($TestView) {
-        'Available' {$script:candidate=[pscustomobject]@{Name='Public Beta 9 (preview only)';Tag='v0.1.0-beta.9';Cumulative=[pscustomobject]@{size=64MB};Url='https://github.com/badcompany94-rcmp/project-tandem/releases'};Refresh-State}
+        'Available' {$script:candidate=[pscustomobject]@{Name='Public Beta 10 (preview only)';Tag='v0.1.0-beta.10';Cumulative=[pscustomobject]@{size=64MB};Url='https://github.com/badcompany94-rcmp/project-tandem/releases'};Refresh-State}
         'Checking' {$updateStatus.Text='Checking GitHub for a newer Windows release...';$check.Enabled=$false}
         'Offline' {$script:checkError='Could not reach GitHub. You can still play and try again later.';Refresh-State}
     }

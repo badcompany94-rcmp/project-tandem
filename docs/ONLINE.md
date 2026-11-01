@@ -13,7 +13,7 @@ Project Tandem supports rooms for **2–16 people**, with solo and shared karts 
 5. The host chooses the mode, then everyone selects characters and karts.
 6. The host chooses the cup or arena and starts the event.
 
-All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 9 uses **build `000dbce82144c576`**, based on Alpha25 gameplay. Beta 8 and earlier have different IDs and cannot join. Update every player to Beta 9 before playing together. Experimental VSync/interpolation settings may differ between players.
+All players need the same version and build ID. The lobby and F1 settings show both. Public Beta 10 uses **build `000dbce82144c576`**, based on Alpha25 gameplay. Beta 9 uses the same build and can join; Beta 8 and earlier cannot. Experimental VSync/interpolation settings may differ between players.
 
 ## Characters and kart roles
 
@@ -37,6 +37,6 @@ Gameplay uses peer-to-peer input delivery with prediction, rollback, redundant d
 
 The counter defaults OFF on fresh settings. F10 toggles FPS, RTT, and BUF; the same saved option is available in F1 > Display. RTT is the network round trip; BUF is the actual queued input delay. The buffer adapts to connection conditions, prioritizing steady playback while keeping delay as low as conditions allow. A poor connection or a PC that cannot simulate fast enough can still cause delays or frame drops.
 
-Report readings from each PC when diagnosing a problem. This update is covered by local synchronized native peers, actual EOS directory tests and simulated bad network conditions. Prior versions had external friend sessions; separate-device EOS joining, router/Wi-Fi coverage and 16 physical clients remain unverified for Beta 9. See the [release validation and limits](releases/public-beta-9.md). The public beta is intended to gather reports across more PCs and Internet connections.
+Report readings from each PC when diagnosing a problem. This update is covered by local synchronized native peers, actual EOS directory tests and simulated bad network conditions. Prior versions had external friend sessions; separate-device EOS joining, router/Wi-Fi coverage and 16 physical clients remain unverified for Beta 10. See the [release validation and limits](releases/public-beta-10.md). The public beta is intended to gather reports across more PCs and Internet connections.
 
 Close the game normally when finished. Its owned online services stop automatically; a separate Stop-Online command is not needed.

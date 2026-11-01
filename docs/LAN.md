@@ -1,6 +1,6 @@
 # LAN and public lobby browser
 
-Public Beta 9 retains experimental unified LAN/Internet rooms. Everyone needs build `000dbce82144c576`. Beta 8 and earlier builds, including the existing Steam Deck test build, cannot join. See [release validation and remaining limits](releases/public-beta-9.md).
+Public Beta 10 retains experimental unified LAN/Internet rooms. Everyone needs build `000dbce82144c576`; Beta 9 uses the same build. Beta 8 and earlier builds, including the existing Steam Deck test build, cannot join. See [release validation and remaining limits](releases/public-beta-10.md).
 
 ## Host and join
 

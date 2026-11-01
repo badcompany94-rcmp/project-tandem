@@ -1,10 +1,12 @@
 param([Parameter(Mandatory=$true)][string]$Root,[string]$TransactionId,[switch]$Recover,
-      [int]$WaitId=0,[string]$WaitStarted,[int]$BootstrapId=0,[string]$BootstrapStarted,[switch]$Headless)
+      [int]$WaitId=0,[string]$WaitStarted,[int]$BootstrapId=0,[string]$BootstrapStarted,[switch]$Headless,
+      [string]$ReadyFile,[switch]$SelfTest,[string]$Evidence)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'Updater-Core.ps1')
 . (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
 . (Join-Path $PSScriptRoot 'Launcher-Core.ps1')
 $Root=[IO.Path]::GetFullPath($Root)
+if($SelfTest -and ($Headless -or -not $Evidence)){throw 'Updater render tests need a GUI and an evidence directory.'}
 $script:cancel=$false;$script:installing=$false;$script:finished=$false;$script:restart=$false
 if(-not $Headless) {
     Add-Type -AssemblyName System.Windows.Forms,System.Drawing
@@ -12,16 +14,36 @@ if(-not $Headless) {
     $form=New-Object Windows.Forms.Form;$form.Text='Project Tandem - Update';$form.ClientSize=New-Object Drawing.Size(680,330)
     $form.StartPosition='CenterScreen';$form.FormBorderStyle='FixedDialog';$form.MaximizeBox=$false
     $form.BackColor=[Drawing.Color]::FromArgb(8,28,83);$form.ForeColor=[Drawing.Color]::White;$form.Font=New-Object Drawing.Font('Segoe UI',11)
+    $icon=Join-Path $PSScriptRoot 'artwork.ico';$identity=Join-Path $PSScriptRoot 'TaskbarIdentity.cs'
+    if(Test-Path -LiteralPath $icon){$form.Icon=New-Object Drawing.Icon($icon)}
+    if((Test-Path -LiteralPath $identity) -and (Test-Path -LiteralPath $icon)) {
+        Add-Type -Path $identity
+        [TandemTaskbarIdentity]::InitializeProcess()
+        $form.add_HandleCreated({[TandemTaskbarIdentity]::Apply($form.Handle,$Root,$icon,$form.Icon.Handle)})
+    }
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class TandemUpdateWindow {
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+}
+'@
     $heading=New-Object Windows.Forms.Label;$heading.Text='UPDATING PROJECT TANDEM';$heading.SetBounds(25,20,620,45)
     $heading.Font=New-Object Drawing.Font('Segoe UI',22);$heading.ForeColor=[Drawing.Color]::FromArgb(255,220,90);$form.Controls.Add($heading)
-    $stageLabel=New-Object Windows.Forms.Label;$stageLabel.SetBounds(27,84,620,34);$form.Controls.Add($stageLabel)
-    $detailLabel=New-Object Windows.Forms.Label;$detailLabel.SetBounds(27,122,620,85);$form.Controls.Add($detailLabel)
+    $stageLabel=New-Object Windows.Forms.Label;$stageLabel.SetBounds(27,84,620,34);$stageLabel.Text='Preparing update';$form.Controls.Add($stageLabel)
+    $detailLabel=New-Object Windows.Forms.Label;$detailLabel.SetBounds(27,122,620,85);$detailLabel.Text='This window stays open while the update downloads, installs and builds.';$form.Controls.Add($detailLabel)
     $bar=New-Object Windows.Forms.ProgressBar;$bar.SetBounds(28,216,620,15);$bar.Style='Marquee';$form.Controls.Add($bar)
     $button=New-Object Windows.Forms.Button;$button.Text='Cancel download';$button.SetBounds(442,260,205,40)
     $button.FlatStyle='Flat';$button.BackColor=[Drawing.Color]::FromArgb(20,61,135);$form.Controls.Add($button)
     $button.add_Click({if($script:finished){$script:restart=$true;$form.Close()}elseif(-not $script:installing){$script:cancel=$true;$button.Enabled=$false;$detailLabel.Text='Cancelling safely...'}})
     $form.add_FormClosing({param($sender,$e)if(-not $script:finished){$e.Cancel=$true;if(-not $script:installing){$script:cancel=$true}else{$detailLabel.Text='Please wait while installation or recovery finishes.'}}})
-    $form.Show();[Windows.Forms.Application]::DoEvents()
+    if($SelfTest){$form.StartPosition='Manual';$form.Location=New-Object Drawing.Point(-32000,-32000);$form.ShowInTaskbar=$false}
+    $form.WindowState='Normal';$form.Show()
+    if(-not $SelfTest){$form.BringToFront();$form.Activate()}
+    $form.Refresh();[Windows.Forms.Application]::DoEvents()
+    $visible=[TandemUpdateWindow]::IsWindowVisible($form.Handle)
+    if($ReadyFile){$null=Assert-TandemSafePath $Root $ReadyFile;Write-TandemJson $ReadyFile @{ProcessId=$PID;Visible=$visible}}
+    if(-not $visible -and -not $SelfTest){throw 'The update progress window is not visible.'}
 }
 $progress={param($stage,$detail,$percent)
     if($stage -in @('Installing','Building','Final checks','Restoring')){$script:installing=$true}
@@ -31,6 +53,19 @@ $progress={param($stage,$detail,$percent)
         $button.Enabled=(-not $script:installing);[Windows.Forms.Application]::DoEvents()
     }
     if($script:cancel -and -not $script:installing){throw (New-Object OperationCanceledException('Update cancelled. Your installed game is unchanged.'))}
+}
+if($SelfTest) {
+    [IO.Directory]::CreateDirectory($Evidence)|Out-Null
+    $views=@(@('Downloading','24.0 / 60.0 MB',40),@('Verifying files','Checking the package files.',65),@('Installing','Installing verified files.',-1),@('Building','4/5 Build game 50% 222 / 444 build steps',50),@('Final checks','Verifying the installed release.',100))
+    $initial=$form.Handle.ToInt64();$results=@()
+    foreach($view in $views) {
+        & $progress $view[0] $view[1] $view[2]
+        $bitmap=New-Object Drawing.Bitmap($form.Width,$form.Height)
+        try {$form.DrawToBitmap($bitmap,(New-Object Drawing.Rectangle(0,0,$bitmap.Width,$bitmap.Height)));$bitmap.Save((Join-Path $Evidence ($view[0].Replace(' ','-')+'.png')),[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
+        $results+=@{stage=$stageLabel.Text;detail=$detailLabel.Text;visible=[TandemUpdateWindow]::IsWindowVisible($form.Handle);handle=$form.Handle.ToInt64();cancel_enabled=$button.Enabled;percent=$bar.Value}
+    }
+    Write-TandemJson (Join-Path $Evidence 'result.json') @{passed=$visible;initial_handle=$initial;views=$results;no_install=$true}
+    $script:finished=$true;$form.Dispose();exit 0
 }
 function Wait-TandemParent([int]$ProcessId,[string]$Started) {
     if(-not $ProcessId){return}
@@ -43,8 +78,9 @@ function Wait-TandemParent([int]$ProcessId,[string]$Started) {
 }
 $lock=$null;$record=$null;$claimed=$false;$success=$false;$message='';$errorLog=$null
 try {
-    # Recovery bootstraps exit immediately, releasing the authored EXE first.
-    if($Recover){Wait-TandemParent $WaitId $WaitStarted;Wait-TandemParent $BootstrapId $BootstrapStarted}
+    # The visible UI acknowledges startup before the launcher exits and releases
+    # its handoff lock. Wait before acquiring that lock, for normal updates too.
+    Wait-TandemParent $WaitId $WaitStarted;Wait-TandemParent $BootstrapId $BootstrapStarted
     $lock=Get-TandemUpdateLock $Root
     $marker=Join-Path $Root 'local-data/update-transaction.json'
     $record=Read-TandemJson $marker
@@ -54,7 +90,6 @@ try {
         if((Get-TandemUpdateStatus $Root).Active){throw 'An updater is already running. Return to that window.'}
     }elseif($record.Id -ne $TransactionId){throw 'The update handoff does not match this installation.'}
     Set-TandemTransaction $Root $record 'Starting';$claimed=$true
-    if(-not $Recover){Wait-TandemParent $WaitId $WaitStarted;Wait-TandemParent $BootstrapId $BootstrapStarted}
     Assert-TandemClosed $Root
     if($Recover) {
         Restore-TandemUpdate $Root $record $progress
