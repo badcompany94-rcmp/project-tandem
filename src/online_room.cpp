@@ -61,7 +61,7 @@ void validate_reply(const Json& response,const std::string& op) {
     room.at("human_karts").integer(1,8);room.at("cpu_karts").integer(0,7);
     std::string mode=one_of(room.at("mode"),{"grand-prix","balloon","shine","bob-omb"});
     const auto layout=one_of(room.at("layout"),{"solo","coop","mixed"});one_of(room.at("state"),{"forming","mode","characters","course","running"});
-    const auto& members=room.at("members").list();if(members.empty() || members.size()>8)invalid();
+    const auto& members=room.at("members").list();if(members.empty() || members.size()>(layout=="mixed"?16u:8u))invalid();
     unsigned seats=0,you=0;
     for(const Json& member:members) {
         unsigned seat=(unsigned)member.at("seat").integer(0,layout=="mixed"?15:7);if(seats&(1u<<seat))invalid();seats|=1u<<seat;
@@ -136,10 +136,11 @@ Json room_request(const Json& request) {
 std::map<std::string,std::string> launch_environment(const Json& response,const std::string& build) {
     const Json& room=response.at("room"),&launch=room.at("launch"),&connection=response.at("connection");
     if(room.at("state").str()!="running" || launch.at("compatibility").str()!=build)throw std::runtime_error("incompatible-build");
-    const auto& roster=launch.at("roster").list();const unsigned count=(unsigned)roster.size();if(count<2 || count>8)invalid();
+    const auto& roster=launch.at("roster").list();const unsigned count=(unsigned)roster.size();if(count<2 || count>16)invalid();
     const unsigned slot=(unsigned)connection.at("slot").integer(0,count-1);
     const std::string layout=one_of(launch.at("layout"),{"solo","coop","mixed"});
     const unsigned maximum_seat=layout=="mixed"?15:7;
+    if(count>maximum_seat+1)invalid();
     std::string seats;unsigned mask=0;
     for(unsigned i=0;i<count;++i) {
         if(roster[i].at("slot").integer(0,count-1)!=i)invalid();
@@ -147,7 +148,7 @@ std::map<std::string,std::string> launch_environment(const Json& response,const 
         if(mask&(1u<<seat))invalid();mask|=1u<<seat;
     }
     unsigned mapped[16]{},human_karts=0;
-    std::string kart_map(8,'-'),role_map(8,'-');
+    std::string kart_map(16,'-'),role_map(16,'-');
     if(layout=="solo") {
         for(unsigned i=0;i<8;++i)if(mask&(1u<<i))mapped[i]=human_karts++;
     } else if(layout=="mixed") {
@@ -171,10 +172,10 @@ std::map<std::string,std::string> launch_environment(const Json& response,const 
     }
     for(const auto& member:roster) {
         const unsigned seat=(unsigned)member.at("seat").integer(0,maximum_seat);
-        if(member.at("game_seat").integer(0,7)!=mapped[seat])invalid();
+        if(member.at("game_seat").integer(0,maximum_seat)!=mapped[seat])invalid();
         if(layout=="mixed" && (member.at("kart").integer(0,7)!=kart_map[mapped[seat]]-'0' ||
             member.at("role").str()!=(seat>=8?"passenger":(mask&(1u<<(seat+8)))?"driver":"solo")))invalid();
-        seats+=(char)('0'+mapped[seat]);
+        seats+="0123456789abcdef"[mapped[seat]];
     }
     unsigned you=0;
     for(const auto& member:room.at("members").list()) if(member.at("you").boolean()) {

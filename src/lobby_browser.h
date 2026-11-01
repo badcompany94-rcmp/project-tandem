@@ -11,11 +11,11 @@ namespace mkdd::online {
 struct LobbyBrowser {
     struct Row {
         std::string id,name,code,build,network,state;
-        int players=0;int64_t ping_us=-1;
+        int players=0,capacity=16;int64_t ping_us=-1;
         bool locked=false,compatible=false;
         Json target;
-        bool joinable()const{return compatible && !locked && players<8 && state=="forming";}
-        std::string status()const{return !compatible?"DIFFERENT BUILD":locked?"LOCKED":players>=8?"FULL":state!="forming"?"IN PROGRESS":"WAITING FOR PLAYERS";}
+        bool joinable()const{return compatible && !locked && players<capacity && state=="forming";}
+        std::string status()const{return !compatible?"DIFFERENT BUILD":locked?"LOCKED":players>=capacity?"FULL":state!="forming"?"IN PROGRESS":"WAITING FOR PLAYERS";}
         std::string ping()const{return ping_us<0?"MEASURING...":ping_us<1000?"<1 MS":std::to_string((ping_us+500)/1000)+" MS";}
     };
     enum Sort {PingLow,PingHigh,NameAZ,NameZA,PlayersHigh,PlayersLow};
@@ -29,7 +29,9 @@ struct LobbyBrowser {
             Row row;row.id=value.at("id").str();row.name=value.at("name").str();row.code=value.at("code").str();row.build=value.at("build").str();row.network=value.at("network").str();row.state=value.at("state").str();
             if(row.id.size()!=32 || row.id.find_first_not_of("0123456789abcdefABCDEF")!=std::string::npos || row.name.empty() || row.name.size()>24 || row.code.size()!=8 || (row.network!="lan" && row.network!="internet"))continue;
             if(std::any_of(row.name.begin(),row.name.end(),[](unsigned char c){return c<32 || c>126;}))continue;
-            row.players=int(value.at("players").integer(1,8));row.locked=value.at("locked").boolean();row.compatible=row.build==build;
+            row.capacity=value.has("capacity")?int(value.at("capacity").integer(8,16)):16;
+            if(row.capacity!=8 && row.capacity!=16)continue;
+            row.players=int(value.at("players").integer(1,row.capacity));row.locked=value.at("locked").boolean();row.compatible=row.build==build;
             if(value.has("ping_us"))row.ping_us=value.at("ping_us").integer(-1,60000000);
             row.target=value;
             auto old=next.find(row.id);

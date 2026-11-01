@@ -66,7 +66,7 @@ bool UnifiedRuntime::authorized(const std::string& peer,const std::string& socke
         (!control_socket().empty() && socket==control_socket() && members().count(peer));
 }
 void UnifiedRuntime::game_peers(std::string socket,std::set<std::string> peers){
-    peers.erase(self());if(peers.size()>7)throw std::runtime_error("invalid-eos-roster");
+    peers.erase(self());if(peers.size()>15)throw std::runtime_error("invalid-eos-roster");
     if(socket!=game)forwarded.clear();game=socket;game_members=std::move(peers);
     auto nearby=local.members();std::set<std::string> local_game;
     for(const auto& p:game_members)if(nearby.count(p))local_game.insert(p);

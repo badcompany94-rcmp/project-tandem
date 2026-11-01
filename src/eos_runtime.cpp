@@ -148,7 +148,7 @@ std::set<std::string> Runtime::members() const {
     EOS_Lobby_CopyLobbyDetailsHandleOptions copy{};copy.ApiVersion=EOS_LOBBY_COPYLOBBYDETAILSHANDLE_API_LATEST;copy.LocalUserId=user_;copy.LobbyId=lobby_id_.c_str();
     Details details;if(EOS_Lobby_CopyLobbyDetailsHandle(lobby_,&copy,&details.value)!=EOS_EResult::EOS_Success)return result;
     EOS_LobbyDetails_GetMemberCountOptions count{};count.ApiVersion=EOS_LOBBYDETAILS_GETMEMBERCOUNT_API_LATEST;
-    const auto n=EOS_LobbyDetails_GetMemberCount(details.value,&count);if(n>8)return result;
+    const auto n=EOS_LobbyDetails_GetMemberCount(details.value,&count);if(n>16)return result;
     for(unsigned i=0;i<n;++i) {
         EOS_LobbyDetails_GetMemberByIndexOptions index{};index.ApiVersion=EOS_LOBBYDETAILS_GETMEMBERBYINDEX_API_LATEST;index.MemberIndex=i;
         auto member=EOS_LobbyDetails_GetMemberByIndex(details.value,&index);if(member)result.insert(id(member));
@@ -212,13 +212,13 @@ bool Runtime::send(const std::string& peer,const std::string& socket,uint8_t cha
 }
 void Runtime::game_peers(std::string socket,std::set<std::string> peers) {
     if(!socket.empty())socket_id(socket);
-    peers.erase(self_);if(peers.size()>7 || (socket.empty() && !peers.empty()))throw std::runtime_error("invalid-eos-roster");
+    peers.erase(self_);if(peers.size()>15 || (socket.empty() && !peers.empty()))throw std::runtime_error("invalid-eos-roster");
     game_socket_=std::move(socket);game_peers_=std::move(peers);
 }
 void Runtime::create(const std::string& code,const std::string& build) {
     if(!lobby_id_.empty())throw std::runtime_error("already-in-room");
     EOS_Lobby_CreateLobbyOptions options{};options.ApiVersion=EOS_LOBBY_CREATELOBBY_API_LATEST;options.LocalUserId=user_;
-    options.MaxLobbyMembers=8;options.PermissionLevel=EOS_ELobbyPermissionLevel::EOS_LPL_PUBLICADVERTISED;
+    options.MaxLobbyMembers=16;options.PermissionLevel=EOS_ELobbyPermissionLevel::EOS_LPL_PUBLICADVERTISED;
     options.BucketId="ProjectTandemV1";options.bDisableHostMigration=EOS_TRUE;
     // Reserve invitations atomically, including across hosts. Search alone has
     // a race in which two hosts can publish the same short invitation.
@@ -366,7 +366,7 @@ void Runtime::cancel_name(){
 void Runtime::publish(const online::Json& room,const std::string& build){
     using online::Json;if(!hosting())return;if(!build.empty())listing_build_=build;
     listing_=Json::dict({{"id",self_},{"name",room.at("lobby_name")},{"code",room.at("code")},{"build",listing_build_},
-        {"visibility",room.at("visibility")},{"locked",room.at("locked")},{"players",(int)room.at("members").list().size()},{"state",room.at("state")}});
+        {"visibility",room.at("visibility")},{"capacity",room.at("capacity")},{"locked",room.at("locked")},{"players",(int)room.at("members").list().size()},{"state",room.at("state")}});
     const bool visible=room.at("visibility").str()=="public";
     const auto serialized=visible?listing_.dump():std::string("{}");
     const auto signature=std::string(visible?"1":"0")+serialized;if(signature==published_listing_)return;

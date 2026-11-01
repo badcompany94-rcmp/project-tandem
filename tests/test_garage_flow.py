@@ -7,6 +7,38 @@ spec=importlib.util.spec_from_file_location('garage_rooms',Path(__file__).resolv
 service=importlib.util.module_from_spec(spec);sys.modules[spec.name]=service;spec.loader.exec_module(service)
 
 class GarageTests(unittest.TestCase):
+    def test_sixteen_players_eight_teams_all_modes_and_full_guard(self):
+        for mode in service.MODES:
+            with self.subTest(mode=mode):
+                self.create(16)
+                room=self.act(0,'state')['room']
+                self.assertEqual(room['capacity'],16)
+                self.assertEqual({m['seat'] for m in room['members']},set(range(16)))
+                self.assertEqual(sum(m['role']=='driver' for m in room['members']),8)
+                self.assertEqual(sum(m['role']=='passenger' for m in room['members']),8)
+                with self.assertRaisesRegex(service.RoomError,'room-full'):
+                    self.store.request(dict(op='join',name='P17',compatibility='test',code=room['code']))
+                self.assertEqual(self.act(0,'state')['room'],room)
+                self.choose_mode(mode);self.select_all()
+                launch=self.act(0,'start')['room']['launch']
+                self.assertEqual(launch['human_karts'],8);self.assertEqual(launch['cpu_karts'],0)
+                self.assertEqual({m['game_seat'] for m in launch['roster']},set(range(16)))
+                for kart in range(8):self.assertEqual({m['role'] for m in launch['roster'] if m['kart']==kart},{'driver','passenger'})
+                finished=self.act(0,'finish',event=launch['id'],results=list(range(8)))['room']
+                self.assertEqual(len(finished['members']),16)
+                self.assertEqual(sum(m['stars'] for m in finished['members']),12)
+
+    def test_full_room_driver_departure_promotes_and_rejoin_takes_passenger(self):
+        self.create(16)
+        before=next(m for m in self.act(8,'state')['room']['members'] if m['you'])
+        self.act(0,'kick',seat=1)
+        promoted=next(m for m in self.act(9,'state')['room']['members'] if m['you'])
+        self.assertEqual(promoted['seat'],1)
+        joined=self.store.request(dict(op='join',name='REJOIN',initials='REJOIN',compatibility='test',code=self.players[0]['room']['code']))
+        own=next(m for m in joined['room']['members'] if m['you'])
+        self.assertEqual(own['seat'],9);self.assertEqual(own['role'],'passenger')
+        self.assertEqual(len(joined['room']['members']),16)
+
     def create(self,n=8):
         self.store=service.Rooms()
         host=self.store.request(dict(op='create',name='HOST',initials='HOST',compatibility='test',flow='garage',layout='mixed'))

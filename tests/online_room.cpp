@@ -27,6 +27,19 @@ int main(int argc,char** argv) {
             rejects([&]{Json::parse(malformed);});
         rejects([&]{Json::parse(std::string(65537,' '));});
         rejects([&]{Json::parse(std::string(26,'[')+"0"+std::string(26,']'));});
+        if(argc==3 && std::string(argv[1])=="--manifest16") {
+            std::ifstream file(argv[2],std::ios::binary);require(bool(file),"missing sixteen-player fixture");
+            Json response=Json::parse(std::string(std::istreambuf_iterator<char>(file),{}));
+            const auto build=response.at("room").at("launch").at("compatibility").str();
+            auto env=mkdd::online::launch_environment(response,build);
+            require(env.at("MKDD_NET_PLAYERS")=="16","sixteen-player count lost");
+            require(env.at("MKDD_NET_SEATS")=="02468ace13579bdf","hexadecimal sixteen-seat mapping lost");
+            require(env.at("MKDD_NET_KART_MAP")=="0011223344556677","eight shared kart mapping lost");
+            require(env.at("MKDD_NET_ROLE_MAP")=="DPDPDPDPDPDPDPDP","passenger roles lost");
+            auto wrong=response;wrong.object["room"].object["launch"].object["roster"].array[15].object["game_seat"]=16;
+            rejects([&]{mkdd::online::launch_environment(wrong,build);});
+            puts("PASS: sixteen people, eight driver/passenger teams and bounded hexadecimal controller seats");
+        }
         if(argc==3 && std::string(argv[1])=="--manifest") {
             std::ifstream file(argv[2],std::ios::binary);require(bool(file),"missing fixture manifest");
             Json response=Json::parse(std::string(std::istreambuf_iterator<char>(file),{}));

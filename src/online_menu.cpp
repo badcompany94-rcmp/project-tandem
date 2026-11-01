@@ -107,7 +107,7 @@ std::string friendly(const std::string& error) {
     if(error=="event-started")return "THIS EVENT HAS ALREADY STARTED";
     if(error=="incompatible-build")return "PLAYERS NEED THE SAME GAME BUILD";
     if(error=="rollback-not-enabled")return "ONLINE HELPER NEEDS ROLLBACK. RESTART TANDEM";
-    if(error=="players-not-ready")return "NEED 2-8 PLAYERS, ALL READY";
+    if(error=="players-not-ready")return "NEED AT LEAST 2 PLAYERS, ALL READY";
     if(error=="battle-needs-opponents")return "BATTLE NEEDS TWO OPPOSING KARTS";
     if(error=="seat-occupied")return "THAT SEAT IS TAKEN";
     if(error=="stale-room")return "ROOM CHANGED. PLEASE TRY AGAIN";
@@ -669,7 +669,7 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
                     const auto& row=rows[index];browser.selected=row.id;
                     const bool fresh=broker_seen.time_since_epoch().count() && std::chrono::steady_clock::now()-broker_seen<std::chrono::seconds(12);
                     if(!fresh){message="LIST IS OUT OF DATE. REFRESH BEFORE JOINING";next_browser={};}
-                    else if(!row.joinable())message=friendly(!row.compatible?"incompatible-build":row.locked?"room-locked":row.players>=8?"room-full":"event-started");
+                    else if(!row.joinable())message=friendly(!row.compatible?"incompatible-build":row.locked?"room-locked":row.players>=row.capacity?"room-full":"event-started");
                     else {browser_join=true;browser_target=row.target;code=row.code;if(busy())browser_join_queued=true;else create_or_join(false);message="CONNECTING...  B: CANCEL";}
                 }
             }

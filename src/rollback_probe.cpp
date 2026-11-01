@@ -26,7 +26,7 @@ struct Probe {
     CPU caller{};
     Image entry,fork,expected;
     unsigned phase=0,index=0,window=8,players=0,local=0;
-    std::array<unsigned,8> seats{};
+    std::array<unsigned,16> seats{};
     std::array<uint8_t,64> pipe{};
     uint32_t pipe_length=0;
     ReplayGuard guard;

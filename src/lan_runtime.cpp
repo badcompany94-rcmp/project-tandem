@@ -46,7 +46,7 @@ SOCKET listener(unsigned port,bool udp){
     if(s==INVALID_SOCKET)throw std::runtime_error("lan-socket-failed");
     BOOL one=TRUE;setsockopt(s,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,(const char*)&one,sizeof(one));
     sockaddr_in a{};a.sin_family=AF_INET;a.sin_port=htons(u_short(port));a.sin_addr.s_addr=INADDR_ANY;
-    if(bind(s,(sockaddr*)&a,sizeof(a)) || (!udp && listen(s,8))){fprintf(stderr,"[lan-listen] port=%u udp=%d error=%d\n",port,int(udp),WSAGetLastError());closesocket(s);throw std::runtime_error("lan-port-in-use");}
+    if(bind(s,(sockaddr*)&a,sizeof(a)) || (!udp && listen(s,16))){fprintf(stderr,"[lan-listen] port=%u udp=%d error=%d\n",port,int(udp),WSAGetLastError());closesocket(s);throw std::runtime_error("lan-port-in-use");}
     nonblocking(s);return s;
 }
 unsigned port_of(SOCKET s){sockaddr_in a{};int n=sizeof(a);getsockname(s,(sockaddr*)&a,&n);return ntohs(a.sin_port);}
@@ -121,7 +121,7 @@ struct LanRuntime::Impl {
         if(hosting() && c.peer.empty()){
             if(op!="hello" || m.at("protocol").integer(1,1)!=1 || m.at("code").str()!=code)throw std::runtime_error("room-not-found");
             if(m.at("build").str()!=build){queue(c,Json::dict({{"op","error"},{"error","incompatible-build"}}));c.closing=true;return;}
-            if(peers.size()>=8){queue(c,Json::dict({{"op","error"},{"error","room-full"}}));c.closing=true;return;}
+            if(peers.size()>=16){queue(c,Json::dict({{"op","error"},{"error","room-full"}}));c.closing=true;return;}
             do{c.peer=random_id();}while(peers.count(c.peer) || (api.admit_identity && !api.admit_identity(c.peer)));
             Peer peer;peer.endpoint=c.remote;peer.endpoint.sin_port=htons(u_short(m.at("port").integer(1,65535)));peer.cookie=id(m.at("cookie"));peers.emplace(c.peer,peer);
             queue(c,Json::dict({{"op","welcome"},{"self",c.peer},{"owner",self},{"control",control}}));broadcast();return;
@@ -133,7 +133,7 @@ struct LanRuntime::Impl {
         }
         if(!hosting() && op=="roster"){
             if(owner.empty())throw std::runtime_error("invalid-lan-roster");
-            const auto& values=m.at("members").list();if(values.empty() || values.size()>8)throw std::runtime_error("invalid-lan-roster");
+            const auto& values=m.at("members").list();if(values.empty() || values.size()>16)throw std::runtime_error("invalid-lan-roster");
             std::map<std::string,Peer> next;
             for(const auto& value:values){
                 auto who=id(value.at("id"));Peer peer;peer.endpoint=address(value.at("ip").str(),unsigned(value.at("port").integer(1,65535)));peer.cookie=id(value.at("cookie"));
@@ -249,7 +249,7 @@ void LanRuntime::publish(const Json& room,const std::string& build){
     if(!hosting())return;
     if(!build.empty())impl_->build=build;
     impl_->advertisement=Json::dict({{"name",room.at("lobby_name")},{"visibility",room.at("visibility")},
-        {"locked",room.at("locked")},{"players",(int)room.at("members").list().size()},{"state",room.at("state")}});
+        {"capacity",room.at("capacity")},{"locked",room.at("locked")},{"players",(int)room.at("members").list().size()},{"state",room.at("state")}});
 }
 std::string LanRuntime::reserve_name(const std::string& requested){
     auto rows=browse(impl_->build);std::set<std::string> used;
@@ -275,7 +275,7 @@ Json LanRuntime::browse(const std::string& build){
             try{auto row=Json::parse(std::string(bytes,size));
                 if(row.at("service").str()!="tandem-lan-1" || !sent.count(row.at("nonce").str()) || row.at("visibility").str()!="public")continue;
                 auto key=id(row.at("id"));if(row.at("name").str().size()>24 || row.at("code").str().size()!=8)continue;
-                row.at("players").integer(1,8);row.at("port").integer(1,65535);row.at("locked").boolean();
+                row.at("players").integer(1,16);row.at("port").integer(1,65535);row.at("locked").boolean();
                 row.object["network"]="lan";row.object["address"]=ip(from);row.object["compatible"]=row.at("build").str()==build;
                 row.object["ping_us"]=(int64_t)std::chrono::duration_cast<std::chrono::microseconds>(Clock::now()-sent.at(row.at("nonce").str())).count();
                 if(!found.count(key) || row.at("ping_us").number<found.at(key).at("ping_us").number)found[key]=std::move(row);
@@ -334,7 +334,7 @@ bool LanRuntime::send(const std::string& peer,const std::string& socket,uint8_t 
     return false;
 }
 void LanRuntime::game_peers(std::string socket,std::set<std::string> peers){
-    peers.erase(self());if(peers.size()>7 || (socket.empty() && !peers.empty()))throw std::runtime_error("invalid-lan-roster");
+    peers.erase(self());if(peers.size()>15 || (socket.empty() && !peers.empty()))throw std::runtime_error("invalid-lan-roster");
     for(const auto& peer:peers)if(!impl_->peers.count(peer))throw std::runtime_error("invalid-lan-roster");
     impl_->game=std::move(socket);impl_->game_members=std::move(peers);
 }

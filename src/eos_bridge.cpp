@@ -196,7 +196,7 @@ struct Bridge::Impl {
         const std::string id=launch.at("id").str();
         if(id.size()!=32 || id.find_first_not_of("0123456789abcdef")!=std::string::npos)throw std::runtime_error("invalid-eos-session");
         const auto& users=response.at("connection").at("eos_users").list();
-        const auto& roster=launch.at("roster").list();if(users.size()!=roster.size() || users.size()<2 || users.size()>8)throw std::runtime_error("invalid-eos-roster");
+        const auto& roster=launch.at("roster").list();if(users.size()!=roster.size() || users.size()<2 || users.size()>16)throw std::runtime_error("invalid-eos-roster");
         const unsigned slot=(unsigned)response.at("connection").at("slot").integer(0,users.size()-1);
         if(users[slot].str()!=runtime.self() || users[0].str()!=runtime.owner())throw std::runtime_error("invalid-eos-roster");
         std::set<std::string> everyone;

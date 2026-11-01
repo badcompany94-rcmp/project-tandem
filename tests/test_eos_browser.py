@@ -95,10 +95,10 @@ class EosBrowser(unittest.TestCase):
     def test_live_directory_publication_and_atomic_duplicate_names(self):
         host,observer=self.helper(),self.helper()
         name='TEST'+str(time.time_ns())[-10:]
-        created=self.request(host,'create',name=name,visibility='public',compatibility='tandem-private-directory-test')
+        created=self.request(host,'create',name=name,visibility='public',compatibility='tandem-private-directory-test',layout='mixed',flow='garage')
         self.assertNotIn('error',created)
         row=self.listing(observer,created['room']['code'])
-        self.assertEqual(row['name'],name);self.assertEqual(row['players'],1)
+        self.assertEqual(row['name'],name);self.assertEqual(row['players'],1);self.assertEqual(row['capacity'],16)
         self.assertEqual(row['network'],'internet');self.assertFalse(row['locked'])
         duplicate=self.request(observer,'create',name=name,compatibility='tandem-private-directory-test')
         self.assertNotIn('error',duplicate)

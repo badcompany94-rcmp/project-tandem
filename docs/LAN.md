@@ -7,7 +7,7 @@ This Windows preview is private and experimental. It has not been published as a
 1. Open your normal **Launch-Tandem.cmd** or existing Project Tandem shortcut. One launcher combines LAN and Internet rooms. If Internet login is unavailable, LAN remains available.
 2. Choose **Online Play > Host Room**. Rooms start **Private**; share the eight-character code to admit friends. Switch to **Public** to appear in the browser.
 3. Use **Edit Room Name** above the karts to change the lobby name. Type up to 24 characters or use the controller keyboard, then **Save Room Name**. Back cancels. The initial name is your player name; duplicate names receive `(1)`, `(2)`, and so on. Renaming keeps members, seats, ready status and the invitation code.
-4. Other players choose **Join Room** and enter the code, or choose **Browse Public Lobbies**. Nearby LAN rooms appear first, with duplicate Internet entries combined. Search updates as you type; sort by name, player count or measured ping. Counts mean human players, **N/8**, including people sharing a kart. The two seats per kart do not raise the eight-player room limit.
+4. Other players choose **Join Room** and enter the code, or choose **Browse Public Lobbies**. Nearby LAN rooms appear first, with duplicate Internet entries combined. Search updates as you type; sort by name, player count or measured ping. Counts mean human players, **N/16**, including people sharing a kart. Rooms support up to **16 people: eight drivers and eight passengers**. Up to eight people may drive solo; additional players share a driver's kart.
 5. The host can switch Public/Private at any time. Private hides the listing while retaining code joins. **Lock Room** blocks all new joins, including codes; connected players remain. Unlock admits players again. Returning from an event preserves the same room.
 
 The browser refreshes automatically and preserves your search, sorting and selected lobby. Unknown ping displays Measuring; a measured result under one millisecond displays <1 ms. A stale, full, locked, in-progress or incompatible room cannot bypass host admission checks. All players use the same LAN port (default 28122).
@@ -18,7 +18,7 @@ Use a trusted private network. Allow the LAN helper on that Windows private netw
 
 The helper exchanges reliable lobby/handshake messages over local TCP. Racing inputs use direct UDP between participants with the existing redundant-input recovery, checksums, prediction and rollback. The game process continues to use loopback sockets. The host controls room membership; LAN admission and per-room random credentials reject unrelated packets. This local transport is unencrypted and is not an Internet hosting service.
 
-Current coverage includes eight helper processes exchanging matching inputs, discovery, mismatched-build rejection, leave/rejoin and host closure, plus a real native Grand Prix through two LAN helpers. Those are same-PC tests. Two physical PCs, Wi-Fi loss/isolation, different adapters and long sessions still need testing.
+Current coverage includes sixteen helper processes exchanging matching inputs, discovery, mismatched-build rejection, leave/rejoin and host closure, plus a real native Grand Prix through two LAN helpers. Those are same-PC tests. Two physical PCs, Wi-Fi loss/isolation, different adapters and long sessions still need testing.
 
 ## Counter and experimental pacing
 

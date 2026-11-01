@@ -22,7 +22,7 @@ using Image=mkdd::NativeCheckpoint;
 struct Experiment {
     bool active=false;
     unsigned phase=0,index=0,window=8,players=0,local=0,completed=0;
-    std::array<unsigned,8> seats{};
+    std::array<unsigned,16> seats{};
     uint64_t tick=0,began=0,correction_began=0;
     Image entry,fork,expected;
     ReplayGuard guard;

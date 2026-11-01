@@ -78,8 +78,8 @@ uint64_t prediction_start_tick() {
 uint32_t fresh_seed;
 uint64_t fresh_epoch;
 unsigned fresh_level=2, fresh_cup=0, fresh_arena=0x34, fresh_rounds=3, fresh_course=0;
-unsigned seats[8]={0,1,2,3,4,5,6,7};
-unsigned seat_karts[8]={0,1,2,3,4,5,6,7},seat_riders[8]{};
+unsigned seats[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+unsigned seat_karts[16]={0,1,2,3,4,5,6,7},seat_riders[16]{};
 bool mixed_layout() {const char* value=getenv("MKDD_NET_LAYOUT");return value && !strcmp(value,"mixed");}
 unsigned requested_battle();
 bool coop_layout() {
@@ -127,9 +127,10 @@ void configure_boot() {
         fatal("Fresh online development launch needs a live endpoint, virtual time, standard CPU scale and no replay");
     fresh_seed=(uint32_t)number("MKDD_NET_SEED",0,UINT32_MAX);
     fresh_epoch=number("MKDD_NET_EPOCH",946684800ULL,4102444799ULL);
-    const unsigned players=(unsigned)number("MKDD_NET_PLAYERS",2,8);
+    const unsigned players=(unsigned)number("MKDD_NET_PLAYERS",2,16);
     const char* const layouts[]={"solo","coop","mixed"};
     choice("MKDD_NET_LAYOUT",layouts,3,0);
+    if(players>8 && !mixed_layout())fatal("More than eight people require mixed driver/passenger seating");
     const char* const engines[]={"50cc","100cc","150cc","mirror"};
     const char* const cups[]={"mushroom","flower","star","special","all-cup"};
     fresh_level=choice("MKDD_NET_ENGINE",engines,4,2);
@@ -156,14 +157,14 @@ void configure_boot() {
         if (strlen(mapping)!=players) fatal("Invalid room seat count");
         unsigned used=0;
         for (unsigned i=0;i<players;++i) {
-            const unsigned seat=(unsigned)(mapping[i]-'0');
-            if (seat>=8 || (used&(1u<<seat))) fatal("Invalid or duplicate room seat");
+            const unsigned seat=hex_digit(mapping[i]);
+            if (seat>=(mixed_layout()?16u:8u) || (used&(1u<<seat))) fatal("Invalid or duplicate room seat");
             seats[i]=seat; used|=1u<<seat;
         }
     }
     if(mixed_layout()) {
         const char* karts=getenv("MKDD_NET_KART_MAP"),*roles=getenv("MKDD_NET_ROLE_MAP");
-        if(!karts || !roles || strlen(karts)!=8 || strlen(roles)!=8)fatal("Missing mixed-kart mapping");
+        if(!karts || !roles || strlen(karts)!=16 || strlen(roles)!=16)fatal("Missing mixed-kart mapping");
         unsigned occupied[8]{};
         for(unsigned i=0;i<players;++i) {
             const unsigned seat=seats[i],kart=unsigned(karts[seat]-'0');
@@ -207,7 +208,7 @@ uint64_t session_compatibility() {
     // The experiment must reject mismatched rules before accepting any input.
     // Include boot identity, but never local input or local rendering options.
     const char* fields[]={"MKDD_NET_PLAYERS","MKDD_NET_LAYOUT","MKDD_NET_MODE","MKDD_NET_KARTS","MKDD_NET_FRESH","MKDD_NET_SEED","MKDD_NET_EPOCH",
-                          "MKDD_NET_ENGINE","MKDD_NET_CUP","MKDD_NET_COURSE","MKDD_NET_ARENA","MKDD_NET_ROUNDS","MKDD_NET_SEATS","MKDD_NET_ROSTER","MKDD_NET_ROOM_ID","MKDD_NET_INPUT_DELAY","MKDD_NET_MESH","MKDD_PREDICTION_START","MKDD_NET_TAGS","MKDD_NET_SERIES"};
+                          "MKDD_NET_ENGINE","MKDD_NET_CUP","MKDD_NET_COURSE","MKDD_NET_ARENA","MKDD_NET_ROUNDS","MKDD_NET_SEATS","MKDD_NET_ROSTER","MKDD_NET_ROOM_ID","MKDD_NET_INPUT_DELAY","MKDD_NET_MESH","MKDD_PREDICTION_START","MKDD_NET_TAGS","MKDD_NET_SERIES","MKDD_NET_KART_MAP","MKDD_NET_ROLE_MAP"};
     for (const char* name:fields) {
         const char* value=getenv(name);
         for (const unsigned char* p=(const unsigned char*)(value?value:"");*p;++p) { h^=*p; h*=1099511628211ULL; }
@@ -375,8 +376,8 @@ void exchange_tick(CPU* c) {
         const uint64_t compatibility=session_compatibility();
         const char* count=getenv("MKDD_NET_PLAYERS");
         const unsigned players=count?(unsigned)atoi(count):2;
-        if (players<2 || players>8) fatal("Development game sessions support 2..8 people");
-        net::Admission admissions[8]{};
+        if (players<2 || players>16) fatal("Development game sessions support 2..16 people");
+        net::Admission admissions[16]{};
         unsigned slot=net::kMaxPeers;
         const bool room=getenv("MKDD_NET_ROOM_ID")!=nullptr;
         if (room) {
@@ -384,7 +385,7 @@ void exchange_tick(CPU* c) {
             slot=(unsigned)number("MKDD_NET_SLOT",0,players-1);
             if (host) {
                 if (slot!=0) fatal("The room host must occupy transport slot zero");
-                uint8_t packed[128];
+                uint8_t packed[256];
                 hex_bytes(getenv("MKDD_NET_ADMISSIONS"),packed,players*16);
                 for (unsigned i=0;i<players;++i) memcpy(admissions[i].data(),packed+16*i,16);
             } else {
@@ -395,7 +396,7 @@ void exchange_tick(CPU* c) {
         const bool ok=host ? link->host(host,players,compatibility,room?admissions:nullptr)
                            : link->join(join,compatibility,slot,room?&admissions[slot]:nullptr);
         if (!ok) fatal("[net] %s",link->error().c_str());
-        if (link->players()>8) fatal("Unsupported game player count");
+        if (link->players()>16) fatal("Unsupported game player count");
         diagnostic_log("[net] connected slot %u of %u\n",link->slot(),link->players());
     }
     test_item_passing(c);

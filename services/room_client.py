@@ -76,7 +76,7 @@ def native_environment(response,executable):
     roster=launch['roster']
     count=len(roster)
     mixed=launch['layout']=='mixed'
-    if not 2<=count<=8 or [m['slot'] for m in roster]!=list(range(count)) or len({m['seat'] for m in roster})!=count or any(type(m['seat'])!=int or not 0<=m['seat']<(16 if mixed else 8) for m in roster):
+    if not 2<=count<=(16 if mixed else 8) or [m['slot'] for m in roster]!=list(range(count)) or len({m['seat'] for m in roster})!=count or any(type(m['seat'])!=int or not 0<=m['seat']<(16 if mixed else 8) for m in roster):
         raise ValueError('Invalid frozen roster')
     occupied={m['seat'] for m in roster};expected={}
     if launch['layout']=='solo':
@@ -91,7 +91,7 @@ def native_environment(response,executable):
             kart+=1
     elif mixed:
         if launch.get('seating')!='garage':raise ValueError('Invalid mixed seating')
-        kart=0;pad=0;kart_map=['-']*8;role_map=['-']*8
+        kart=0;pad=0;kart_map=['-']*16;role_map=['-']*16
         for front in range(8):
             back=front+8
             if back in occupied and front not in occupied:raise ValueError('Passenger has no driver')
@@ -129,7 +129,7 @@ def native_environment(response,executable):
                MKDD_NET_MODE=launch['mode'],MKDD_NET_LAYOUT=launch['layout'],
                MKDD_NET_SEED=str(launch['seed']),MKDD_NET_EPOCH=str(launch['epoch']),
                MKDD_NET_ROOM_ID=launch['id'],MKDD_NET_SLOT=str(slot),
-               MKDD_NET_SEATS=''.join(str(m['game_seat']) for m in roster),MKDD_NET_ROSTER=kart_bytes.hex(),
+               MKDD_NET_SEATS=''.join(format(m['game_seat'],'x') for m in roster),MKDD_NET_ROSTER=kart_bytes.hex(),
                MKDD_NET_ENGINE=rules.get('engine','150cc'),MKDD_NET_CUP=rules.get('cup','mushroom'),
                MKDD_NET_ARENA=str(rules.get('arena',0x34)),MKDD_NET_ROUNDS=str(rules.get('rounds',3)),
                MKDD_NET_ADMISSION=connection['admission'])

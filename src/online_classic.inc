@@ -11,7 +11,7 @@ void classic_heading(CPU* c,const char* heading,const char* subtitle) {
     if(room_reply.has("room")) {
         const auto& room=room_reply.at("room");rounded(c,388,7,209,31,6,0x062358ff);
         text(c,("ROOM "+room.at("code").str()).c_str(),398,11,12,0xffe95cff);
-        text(c,(std::to_string(room.at("members").list().size())+" / 8 PLAYERS").c_str(),450,25,9,0xe8f2ffff);
+        text(c,(std::to_string(room.at("members").list().size())+" / "+std::to_string(room.at("capacity").integer(8,16))+" PLAYERS").c_str(),450,25,9,0xe8f2ffff);
     }
     box(c,0,53,608,29,0xffefbaff);label(c,subtitle,59,18,0x08266bff);
     for(int i=0;i<5;++i){box(c,i*12,56,8,9,0x93b8dcff);box(c,550+i*12,68,8,9,0x93b8dcff);}

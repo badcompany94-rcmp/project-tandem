@@ -22,17 +22,19 @@ const std::array<std::vector<std::string>,8>& tags() {
         const char* packed=getenv("MKDD_NET_TAGS"),*seats=getenv("MKDD_NET_SEATS"),*layout=getenv("MKDD_NET_LAYOUT");
         if(!packed || !seats)return result;
         const bool shared=layout && !strcmp(layout,"coop");size_t slot=0,begin=0;std::string list=packed;
-        std::array<std::string,8> ordered;
+        std::array<std::string,16> ordered;
         while(begin<list.size() && slot<strlen(seats)) {
             const auto end=list.find(',',begin);const auto tag=list.substr(begin,end==std::string::npos?end:end-begin);
-            const unsigned seat=unsigned(seats[slot]-'0');
-            if(seat>=8 || tag.empty() || tag.size()>7 || tag.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")!=std::string::npos)
+            const char* digits="0123456789abcdef";
+            const char* digit=std::strchr(digits,seats[slot]);
+            const unsigned seat=digit?unsigned(digit-digits):16;
+            if(seat>=16 || tag.empty() || tag.size()>7 || tag.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")!=std::string::npos)
                 fatal("Invalid online initials roster");
             ordered[seat]=tag;++slot;if(end==std::string::npos)break;begin=end+1;
         }
         const char* karts=getenv("MKDD_NET_KART_MAP");
-        for(unsigned seat=0;seat<8;++seat)if(!ordered[seat].empty()) {
-            const unsigned kart=layout && !strcmp(layout,"mixed") && karts && strlen(karts)==8?unsigned(karts[seat]-'0'):shared?seat/2:seat;
+        for(unsigned seat=0;seat<16;++seat)if(!ordered[seat].empty()) {
+            const unsigned kart=layout && !strcmp(layout,"mixed") && karts && strlen(karts)==16?unsigned(karts[seat]-'0'):shared?seat/2:seat;
             if(kart>=8)fatal("Invalid online name kart mapping");
             result[kart].push_back(ordered[seat]);
         }

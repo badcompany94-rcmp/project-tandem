@@ -105,6 +105,17 @@ class LanIntegration(unittest.TestCase):
         self.assertNotIn('error', result)
         return result
 
+    def launch_garage(self,host):
+        self.assertEqual(self.action(host,'start')['room']['state'],'mode')
+        self.action(host,'rules',mode='grand-prix',rules=dict(engine='150cc',cup='flower'))
+        self.assertEqual(self.action(host,'start')['room']['state'],'characters')
+        for index,client in enumerate(self.clients):
+            own=next(m for m in self.request(client,'state')['room']['members'] if m['you'])
+            self.action(client,'character',characters=[index+1])
+            if own['role']!='passenger':self.action(client,'selection-kart',kart=20)
+        for client in self.clients:self.action(client,'selection-done')
+        return self.action(host,'start')
+
     @staticmethod
     def packet(kind, tick=0, checksum=0):
         data = bytearray(64)
@@ -122,11 +133,13 @@ class LanIntegration(unittest.TestCase):
         return data
 
     def test_eight_player_direct_inputs_discovery_and_lifecycle(self):
+        count=getattr(self,'player_count',8)
         host = self.helper()
-        created = self.request(host, 'create', name='HOST', compatibility='0123456789abcdef')
+        metadata=dict(layout='mixed',flow='garage') if count==16 else {}
+        created = self.request(host, 'create', name='HOST', compatibility='0123456789abcdef',**metadata)
         self.assertNotIn('error', created)
         code = created['room']['code']
-        for n in range(1, 8):
+        for n in range(1, count):
             client = self.helper(discover=n == 1)
             extra = {}
             if getattr(self, 'hybrid_fixture', False) and n%2==0:
@@ -155,7 +168,7 @@ class LanIntegration(unittest.TestCase):
                 visible=self.request(self.clients[1],'browse',compatibility='0123456789abcdef')['lobbies']
                 self.assertEqual(len(visible),1 if visibility=='public' else 0)
                 if visible:
-                    self.assertEqual(visible[0]['players'],8)
+                    self.assertEqual(visible[0]['players'],count)
                     self.assertGreaterEqual(visible[0]['ping_us'],0)
             for client in self.clients:
                 state = self.request(client, 'state')['room']
@@ -164,7 +177,8 @@ class LanIntegration(unittest.TestCase):
         guest_revision = self.request(self.clients[1], 'state')['room']['revision']
         denied = self.request(self.clients[1], 'lobby-settings', revision=guest_revision, visibility='public')
         self.assertEqual(denied.get('error'), 'host-only')
-        self.action(host, 'start')
+        if count==16:self.launch_garage(host)
+        else:self.action(host, 'start')
         for client in self.clients:
             response = self.request(client, 'state')
             connection = response['connection']
@@ -183,7 +197,7 @@ class LanIntegration(unittest.TestCase):
         for n, stream in enumerate(self.native):
             welcome = self.read(stream)
             self.assertEqual(welcome[6:8], bytes([0, 2]))
-            self.assertEqual(welcome[32:37], bytes([n, 8, expected_delay, 24, 1]))
+            self.assertEqual(welcome[32:37], bytes([n, count, expected_delay, 24, 1]))
         # Real direct UDP input path, with all 28 peer pairs contributing.
         for tick in range(expected_delay+1, expected_delay+121):
             for n, stream in enumerate(self.native):
@@ -198,7 +212,7 @@ class LanIntegration(unittest.TestCase):
             self.assertTrue(all(bundle == bundles[0] for bundle in bundles))
             self.assertEqual(struct.unpack_from('>Q', bundles[0], 8)[0], tick)
             self.assertEqual(bundles[0][24:26], bytes([3, 0]))
-            for n in range(8):
+            for n in range(count):
                 self.assertEqual(bundles[0][32 + 2*n:34 + 2*n], bytes([n + tick & 255, n*3]))
         # Returning to the same room preserves members, then refreshing the code
         # invalidates the old invitation without changing existing membership.
@@ -206,7 +220,7 @@ class LanIntegration(unittest.TestCase):
         before = self.request(host, 'state')['room']
         after = self.action(host, 'refresh-code')['room']
         self.assertNotEqual(before['code'], after['code'])
-        self.assertEqual(len(after['members']), 8)
+        self.assertEqual(len(after['members']), count)
         for client in self.clients[1:]:
             state = self.request(client, 'state')
             self.assertEqual(state['room']['code'], after['code'])
@@ -228,6 +242,14 @@ class LanIntegration(unittest.TestCase):
 
     def test_unified_mixed_routes_browser_and_continuity(self):
         self.hybrid_fixture=True
+        self.test_eight_player_direct_inputs_discovery_and_lifecycle()
+
+    def test_sixteen_player_direct_inputs_and_lifecycle(self):
+        self.player_count=16
+        self.test_eight_player_direct_inputs_discovery_and_lifecycle()
+
+    def test_sixteen_player_mixed_routes_and_lifecycle(self):
+        self.player_count=16;self.hybrid_fixture=True
         self.test_eight_player_direct_inputs_discovery_and_lifecycle()
 
     def test_browser_lock_stale_entries_and_same_room_after_event(self):
@@ -292,9 +314,10 @@ class LanIntegration(unittest.TestCase):
         executable = Path(os.environ['TANDEM_LAN_NATIVE'])
         build = native_client.fingerprint(executable)
         host=self.helper()
-        created = self.request(host, 'create', name='HOST', visibility='public', compatibility=build)
-        self.assertNotIn('error', created)
         players=int(os.environ.get('TANDEM_LAN_NATIVE_PLAYERS','2'))
+        metadata=dict(layout='mixed',flow='garage') if players==16 else {}
+        created = self.request(host, 'create', name='HOST', visibility='public', compatibility=build,**metadata)
+        self.assertNotIn('error', created)
         for number in range(1,players):
             client=self.helper(discover=number==1);extra={}
             if self.hybrid_fixture and number%2==0:
@@ -302,10 +325,11 @@ class LanIntegration(unittest.TestCase):
                 extra['target']=dict(listing,network='internet',address='127.0.0.1',port=self.lan_port+2)
             self.assertNotIn('error', self.request(client, 'join', name=f'P{number+1}', code=created['room']['code'], compatibility=build,**extra))
         self.action(host,'lobby-settings',locked=True)
-        self.action(host, 'rules', mode='grand-prix', layout='solo', rules=dict(engine='150cc', cup='flower'))
+        if players!=16:self.action(host, 'rules', mode='grand-prix', layout='solo', rules=dict(engine='150cc', cup='flower'))
         for player in self.clients:
             self.action(player, 'ready', ready=True)
-        self.action(host, 'start')
+        if players==16:self.launch_garage(host)
+        else:self.action(host, 'start')
         evidence = Path(os.environ['TANDEM_LAN_EVIDENCE'])
         evidence.mkdir(exist_ok=False)
         jobs = []
@@ -319,6 +343,9 @@ class LanIntegration(unittest.TestCase):
             environment.update(MKDD_NET_TICKS='1440', MKDD_NET_LOCAL_INPUT='0001' if slot == 0 else '0000',
                                MKDD_PREDICTION_START='1080', MKDD_PREDICTION_TRACE=str(run / 'confirmed.csv'),
                                GCN_REFRESH_TRACE=str(run / 'refresh.csv'), SDL_AUDIODRIVER='dummy')
+            if players==16:
+                environment['MKDD_NET_TEST_PATTERN']='1'
+                environment.pop('MKDD_NET_LOCAL_INPUT',None)
             # All configuration and saves stay in the isolated fixture folder.
             for variable, filename in [('GCN_INPUT_CONFIG', 'controllers.cfg'), ('GCN_DISPLAY_CONFIG', 'display.cfg'),
                                        ('GCN_SOUND_CONFIG', 'sound.cfg'), ('GCN_PRESENTATION_CONFIG', 'presentation.cfg'),
@@ -326,12 +353,12 @@ class LanIntegration(unittest.TestCase):
                 environment[variable] = str(run / filename)
             output, errors = (run / 'stdout.log').open('w'), (run / 'stderr.log').open('w')
             self.files.extend([output, errors])
-            process = subprocess.Popen([str(executable), '--hidden', '--widescreen', '--resolution=1920x1080',
-                                        '--scale=4', '--no-input-log'], cwd=run, env=environment, stdout=output,
+            process = subprocess.Popen([str(executable), '--hidden', '--widescreen', '--resolution=640x360' if players==16 else '--resolution=1920x1080',
+                                        '--scale=1' if players==16 else '--scale=4', '--no-input-log'], cwd=run, env=environment, stdout=output,
                                        stderr=errors, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             self.processes.append(process)
             jobs.append(process)
-        codes = [process.wait(timeout=150) for process in jobs]
+        codes = [process.wait(timeout=300 if players==16 else 150) for process in jobs]
         traces = []
         for slot in range(players):
             with (evidence / str(slot) / 'confirmed.csv').open() as file:

@@ -16,6 +16,31 @@ service=module('client_room_service',root/'services/rooms.py')
 client=module('native_room_client',root/'services/room_client.py')
 
 class ClientTests(unittest.TestCase):
+    def test_sixteen_driver_passenger_native_controller_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            exe=Path(directory)/'fixture.bin';exe.write_bytes(b'sixteen-player mapping fixture')
+            store=service.Rooms();build=client.fingerprint(exe)
+            host=store.request(dict(op='create',name='HOST',compatibility=build,layout='mixed',flow='garage'))
+            members=[host]+[store.request(dict(op='join',name=f'P{i}',compatibility=build,code=host['room']['code'])) for i in range(1,16)]
+            def action(member,op,**values):
+                revision=store.request(dict(op='state',token=member['token']))['room']['revision']
+                return store.request(dict(op=op,token=member['token'],revision=revision,**values))
+            for member in members:action(member,'ready',ready=True)
+            action(host,'start');action(host,'rules',mode='grand-prix',rules={});action(host,'start')
+            for index,member in enumerate(members):
+                action(member,'character',characters=[index+1])
+                if index<8:action(member,'selection-kart',kart=20)
+            for member in members:action(member,'selection-done')
+            response=action(host,'start')
+            for member in members:
+                env=client.native_environment(store.request(dict(op='state',token=member['token'])),exe)
+                self.assertEqual(env['MKDD_NET_PLAYERS'],'16')
+                self.assertEqual(env['MKDD_NET_SEATS'],'02468ace13579bdf')
+                self.assertEqual(env['MKDD_NET_KART_MAP'],'0011223344556677')
+                self.assertEqual(env['MKDD_NET_ROLE_MAP'],'DPDPDPDPDPDPDPDP')
+            wrong=copy.deepcopy(response);wrong['room']['launch']['roster'][15]['game_seat']=16
+            with self.assertRaises(ValueError):client.native_environment(wrong,exe)
+
     def test_staged_eight_player_roster_with_host_in_backseat(self):
         validation=root.parent/'validation'
         with tempfile.TemporaryDirectory(prefix='staged-roster-',dir=validation) as directory:

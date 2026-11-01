@@ -193,7 +193,7 @@ class Rooms:
         return dict(code=room.code, revision=room.revision, state=room.state,
                     lobby_name=room.lobby_name,visibility=room.visibility,locked=room.locked,
                     flow=room.flow,seating='garage' if room.layout=='mixed' else 'drivers-first' if room.flow=='staged' and room.layout=='coop' else 'individual' if room.layout=='solo' else 'adjacent',
-                    mode=room.mode, layout=room.layout, rules=room.rules.copy(), capacity=8,
+                    mode=room.mode, layout=room.layout, rules=room.rules.copy(), capacity=16 if room.layout=='mixed' else 8,
                     minimum_players=2,human_karts=humans,cpu_karts=8-humans if room.mode=='grand-prix' else 0,
                     host=token==room.host, launch=copy.deepcopy(room.launch),preview=room.preview.copy(),
                     members=[dict(id=m.uid,hover=m.hover,name=m.name, initials=m.initials or f'P{m.seat+1}',stars=m.stars,seat=m.seat, ready=m.ready,
@@ -329,10 +329,12 @@ class Rooms:
                     raise RoomError('incompatible-build')
                 if room.state!='forming':
                     raise RoomError('event-started')
-                if len(room.members)>=8:
+                if len(room.members)>=(16 if room.layout=='mixed' else 8):
                     raise RoomError('room-full')
                 name=self.text(data.get('name'),16)
-                seat=next(i for i in range(8) if all(m.seat!=i for m in room.members.values()))
+                occupied={m.seat for m in room.members.values()}
+                available=range(16) if room.layout=='mixed' else range(8)
+                seat=next(i for i in available if i not in occupied and (i<8 or i-8 in occupied))
                 token=secrets.token_urlsafe(32)
                 room.members[token]=Member(token,name,seat,initials=self.initials(data.get('initials',f'P{seat+1}')))
                 for member in room.members.values(): member.ready=False

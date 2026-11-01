@@ -134,7 +134,7 @@ void classic_room_info(CPU* c) {
     const float x=lobby?411:page==Page::Battle?549:540;
     if(lobby)shine_panel(c,352,9,150,29);
     racing_text(c,"ROOM "+room.at("code").str(),x,lobby?16:24,lobby?13:12,0xffee83ff,true,true);
-    if(page!=Page::RoomName)racing_text(c,std::to_string(room.at("members").list().size())+"/8 PLAYERS",lobby?556:x,lobby?20:43,lobby?17:12,0xe3f2ffff,true,true);
+    if(page!=Page::RoomName)racing_text(c,std::to_string(room.at("members").list().size())+"/"+std::to_string(room.at("capacity").integer(8,16))+" PLAYERS",lobby?556:x,lobby?20:43,lobby?14:12,0xe3f2ffff,true,true);
     if(lobby && room.has("lobby_name")){
         const auto name="ROOM: "+room.at("lobby_name").str();
         racing_text(c,name,12,76,std::min(10.f,265/std::max(1.f,classic_text_width(name,1))),0xffed9aff,false,true);
@@ -251,7 +251,7 @@ bool classic_draw(CPU* c) {
             if(classic_focused(1100+(int)i))classic_outline(c,18,y,572,32);
             racing_text(c,row.name,26,y+1,std::min(15.f,300/std::max(1.f,classic_text_width(row.name,1))),0xfff1bdff);
             racing_text(c,(row.network=="lan"?"LAN / ":"INTERNET / ")+row.status(),26,y+21,8,0xcce2ffff);
-            racing_text(c,std::to_string(row.players)+"/8",378,y+8,16,0xffffffff,true);
+            racing_text(c,std::to_string(row.players)+"/"+std::to_string(row.capacity),378,y+8,16,0xffffffff,true);
             racing_text(c,row.ping(),462,y+10,row.ping_us<0?8:12,0xe0f5caff,true);
             racing_text(c,stale?"STALE":row.joinable()?"JOIN >":"VIEW",551,y+10,11,0xffed9aff,true);
             hit(18,y,572,32,1100+(int)i);
