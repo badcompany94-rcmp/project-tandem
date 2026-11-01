@@ -7,7 +7,7 @@ Download the Windows full package from Releases. Extract the entire ZIP before r
 Setup verifies the packaged files and the disc's `main.dol` SHA-1, caches a private copy of your ISO under `local-data`, and compiles the native game. The progress display covers verification, disc checking, configuration, compilation, and final checks. First setup can take several minutes and substantial disk space.
 
 After setup, open **Project Tandem.lnk** or **ProjectTandem.exe** for the
-[graphical launcher preview](LAUNCHER.md). Its Play button starts the same
+[Windows launcher with automatic updates](LAUNCHER.md). Its Play button starts the same
 unified LAN/Internet game. `Launch-Tandem.cmd` also launches directly.
 To play without starting online services, use:
 

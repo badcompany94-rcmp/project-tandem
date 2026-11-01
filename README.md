@@ -7,13 +7,13 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**[Download Public Beta 8 for Windows (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.8)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+**[Download Public Beta 9 for Windows (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.9)** · [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
 **Bring your own compatible disc image.** Project Tandem verifies your USA `GM4E01` ISO/CISO and recompiles the game on your PC. Downloads contain the recompiler, runtime, project features, and installation tools. They do not include a disc image or a compiled copy of the game.
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 8 adds automatic Windows launcher updates.** Check at startup or manually, then click **Install update** to download, verify, install and rebuild from your cached disc when needed. Failed updates restore the previous version, and interrupted updates recover when reopened. [Launcher guide](docs/LAUNCHER.md) · [Changes and validation](docs/releases/public-beta-8.md) · [Previous Beta 7](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.7)
+**Beta 9 fixes Linux source compilation in the online menu**, thanks to [malespiaut](https://github.com/malespiaut). Windows menu machine code is unchanged by the fix. This release retains automatic Windows updates and experimental networking/display features; it does not add a packaged Linux/Steam Deck installer. [Changes, compatibility and validation](docs/releases/public-beta-9.md) · [Launcher guide](docs/LAUNCHER.md) · [Previous Beta 8](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.8)
 
 ## Features
 
@@ -28,7 +28,7 @@ Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem 
 - **GameCube USB adapters on Windows.** Experimental native support for Nintendo-compatible Wii U/Switch-mode adapters, with four separately assignable ports, analog triggers and rumble. Requires an existing compatible WinUSB driver. [Supported hardware and testing limits](docs/GAMECUBE-ADAPTERS.md).
 - **Windows launcher with automatic updates.** Play, set up/repair, check for releases and install updates from one window. Downloads are verified, failed updates roll back, and interrupted updates recover on reopening. [Launcher guide](docs/LAUNCHER.md).
 - **Online prediction and adaptive buffering.** Peer-to-peer gameplay uses EOS connection setup and relay fallback. The optional F10 overlay shows FPS, RTT, and the current input buffer; it defaults off on fresh settings. Performance depends on the PCs and connection.
-- **Portable setup and updates.** Compiler tools are bundled. Update by copying the full patch ZIP over your existing folder while preserving `local-data`.
+- **Portable setup and updates.** Compiler tools are bundled. Beta 8 and later can install updates in the launcher; cumulative ZIPs remain available for manual updates. Saves and settings stay in `local-data`.
 
 ![Shared character choices on the original grid, with named reservations and a local kart preview](docs/images/character-selection.png)
 
@@ -88,7 +88,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 8 - `a0cfea16f09d7018`**, based on Alpha25 gameplay. Beta 7 uses the same build and remains online-compatible. Beta 6 and earlier cannot join. Every player must match the build ID. Display option choices may differ between players.
+Current compatibility: **Public Beta 9 - `000dbce82144c576`**, based on Alpha25 gameplay. The source portability change produces a new build ID, so Beta 8 and earlier cannot join. Update every player to Beta 9 before playing together. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 
