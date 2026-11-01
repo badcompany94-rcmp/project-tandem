@@ -63,6 +63,12 @@ gcn_add_game(
 
 if(TARGET mkdd)
   target_include_directories(mkdd PRIVATE "${CMAKE_BINARY_DIR}/identity")
+  if(WIN32)
+    enable_language(RC)
+    configure_file(src/project_tandem.rc.in "${CMAKE_BINARY_DIR}/project_tandem.rc" @ONLY)
+    target_sources(mkdd PRIVATE "${CMAKE_BINARY_DIR}/project_tandem.rc")
+    target_compile_definitions(mkdd PRIVATE GCN_APP_ICON_RESOURCE=1)
+  endif()
 endif()
 if(TARGET mkdd_bench)
   target_include_directories(mkdd_bench PRIVATE "${CMAKE_BINARY_DIR}/identity")

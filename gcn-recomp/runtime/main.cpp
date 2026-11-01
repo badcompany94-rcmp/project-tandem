@@ -30,6 +30,9 @@
 #define SDL_MAIN_HANDLED
 #endif
 #include <SDL.h>
+#if defined(_WIN32) && defined(GCN_APP_ICON_RESOURCE)
+#include <SDL_syswm.h>
+#endif
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -366,6 +369,14 @@ int main(int argc, char** argv) {
                                        (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) |
                                        (hidden ? SDL_WINDOW_HIDDEN : 0));
     if (!win) fatal("SDL_CreateWindow: %s", SDL_GetError());
+#if defined(_WIN32) && defined(GCN_APP_ICON_RESOURCE)
+    SDL_SysWMinfo window_info{};SDL_VERSION(&window_info.version);
+    if(SDL_GetWindowWMInfo(win,&window_info)) {
+        const auto instance=GetModuleHandleW(nullptr);
+        for(const auto size:{16,48})if(auto icon=LoadImageW(instance,MAKEINTRESOURCEW(GCN_APP_ICON_RESOURCE),IMAGE_ICON,size,size,LR_SHARED))
+            SendMessageW(window_info.info.win.window,WM_SETICON,size==16?ICON_SMALL:ICON_BIG,reinterpret_cast<LPARAM>(icon));
+    }
+#endif
     // Ask for the newest core profile first: the renderer needs only GCN_GL_MAJOR.MINOR, but an
     // OpenXR runtime may want more of the context it shares (Meta's wants 4.0), and drivers
     // hand back exactly the version asked for.

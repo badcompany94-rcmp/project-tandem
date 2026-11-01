@@ -68,5 +68,7 @@ if($identity.id -ne $manifest.compatibility){throw 'This compiler or build confi
 Save-TandemSettings $root $savedSettings $GameImage
 $pending=Join-Path $data 'update-pending.json'
 if(Test-Path -LiteralPath $pending){Remove-Item -LiteralPath $pending}
+try { & (Join-Path $source 'distribution\Create-Shortcut.ps1') -Root $root }
+catch { Write-Warning 'The game is ready, but the optional artwork shortcut could not be created. Launch-Tandem.cmd still works.' }
 Show-TandemProgress '5/5 Final checks' 100 'Ready to play' -Complete
 Write-Host 'Project Tandem is ready. Use Launch-Tandem.cmd. If your ISO moves, the launcher will help locate it.'
