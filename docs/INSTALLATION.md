@@ -2,7 +2,7 @@
 
 ## Linux community build
 
-For Linux, see **[Slex’s Project Tandem Linux](https://github.com/slex2jf/Project-Tandem-Linux)**. This is a separately maintained community adaptation; follow the instructions in that repository. Windows/Linux online compatibility has not yet been verified.
+For Linux, see **[slex2jf’s Project Tandem Linux](https://github.com/slex2jf/Project-Tandem-Linux)**. This is a separately maintained community adaptation; follow the instructions in that repository. Windows/Linux online compatibility has not yet been verified.
 
 ## First installation on Windows
 

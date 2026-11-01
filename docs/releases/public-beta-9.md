@@ -31,7 +31,7 @@ This is a **source portability fix**, not a packaged native Linux/Steam Deck
 release. Linux launcher/updater packaging and cross-platform online compatibility
 remain work in progress. The older personal Linux/Deck test build is unchanged.
 
-**Linux users:** [Slex’s community Linux build](https://github.com/slex2jf/Project-Tandem-Linux) is maintained separately. Follow its own installation instructions. Windows/Linux online compatibility has not yet been verified.
+**Linux users:** [slex2jf’s community Linux build](https://github.com/slex2jf/Project-Tandem-Linux) is maintained separately. Follow its own installation instructions. Windows/Linux online compatibility has not yet been verified.
 
 ## Validation and remaining limits
 
