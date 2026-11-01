@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="distribution/assets/project-tandem.png" width="360" alt="Project Tandem community artwork by POOTERMAN">
+  <br><sub>Artwork by <a href="https://www.deviantart.com/pooterman">POOTERMAN</a> · <a href="https://github.com/badcompany94-rcmp/project-tandem/issues/11">Original contribution</a>. Thank you for this awesome artwork!</sub>
+</p>
+
 # Project Tandem — Mario Kart: Double Dash!! Online on PC
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–8 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
