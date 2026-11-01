@@ -23,6 +23,12 @@ is still needed; include your adapter make/model and switch mode in a report.
 complete installed folder. See [Batocera paths and offline launch configuration](BATOCERA.md).
 Direct mkdd.exe launches bypass Windows settings.json and online services.
 
+**Update fails or was interrupted:** reopen ProjectTandem.exe to recover the
+previous version. Download/check failures leave normal play available. Keep the
+update window open once installation begins. Private logs and backups are under
+local-data/updates; share reviewed excerpts rather than that whole folder.
+[Automatic updates and recovery](LAUNCHER.md).
+
 **Graphical launcher fails:** use Launch-Tandem.cmd as the direct fallback.
 Setup/repair and Play jobs retain errors under local-data/launcher-logs.
 [Launcher preview and current limits](LAUNCHER.md).

@@ -100,6 +100,16 @@ function Test-TandemBuildMoved([string]$Root) {
                  (Test-TandemPathEqual (Get-TandemCacheValue $build 'CMAKE_CACHEFILE_DIR') $build))
 }
 function Assert-TandemClosed([string]$Root) {
+    $transaction=Join-Path $Root 'local-data/update-transaction.json'
+    if(Test-Path -LiteralPath $transaction) {
+        try {$owner=Get-Content -LiteralPath $transaction -Raw|ConvertFrom-Json}
+        catch {throw 'An interrupted update needs recovery. Open ProjectTandem.exe.'}
+        $started=(Get-Process -Id $PID).StartTime.ToUniversalTime().ToString('o')
+        if(-not (($owner.OwnerId -eq $PID -and $owner.OwnerStarted -eq $started) -or
+                 ($owner.BuildOwnerId -eq $PID -and $owner.BuildOwnerStarted -eq $started))) {
+            throw 'An update is running or needs recovery. Open ProjectTandem.exe and finish it before playing or repairing.'
+        }
+    }
     $prefix=[IO.Path]::GetFullPath($Root).TrimEnd('\')+'\'
     if(Get-Process -Name mkdd -ErrorAction SilentlyContinue | Where-Object {$_.Path -and $_.Path.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)}) {
         throw 'Close this Project Tandem game before repairing or updating it.'

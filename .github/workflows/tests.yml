@@ -33,3 +33,6 @@ jobs:
       - name: Test launcher state, jobs, paths and errors
         shell: powershell
         run: ./tests/launcher_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-launcher-check"
+      - name: Test verified updates, rollback and interrupted-build recovery
+        shell: powershell
+        run: ./tests/updater_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-updater-check"

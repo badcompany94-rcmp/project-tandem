@@ -22,9 +22,15 @@ function Get-TandemLauncherState([string]$Root) {
             -not (Test-Path -LiteralPath (Join-Path $rootPath 'local-data/update-pending.json'))
         $result.Detail=if($result.Ready){'Ready to play. LAN and Internet use the same game.'}else{'Setup or a local rebuild is needed. Your saves and controls are kept.'}
     }catch {$result.Detail='Package information is missing or unreadable. Extract the complete download again.'}
+    $result.Running=$false;$result.UpdatePending=$false;$result.UpdateRecovery=$false
+    try {$prefix=$rootPath.TrimEnd('\')+'\';$result.Running=@(Get-Process -Name mkdd -ErrorAction SilentlyContinue|Where-Object {$_.Path -and $_.Path.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)}).Count -gt 0}catch{}
+    if(Get-Command Get-TandemUpdateStatus -ErrorAction SilentlyContinue) {
+        $update=Get-TandemUpdateStatus $rootPath;$result.UpdatePending=$update.Pending;$result.UpdateRecovery=$update.Recovery
+        if($update.Pending){$result.Ready=$false;$result.Detail=if($update.Recovery){'An interrupted update needs recovery.'}else{'An update is in progress. Return to its window.'}}
+    }
     return [pscustomobject]$result
 }
-function New-TandemLauncherJob([string]$Root,[ValidateSet('Play','Setup','Repair')][string]$Action,[string]$GameImage,[string]$Worker) {
+function New-TandemLauncherJob([string]$Root,[ValidateSet('Play','Setup','Repair','CheckUpdate')][string]$Action,[string]$GameImage,[string]$Worker) {
     $rootPath=[IO.Path]::GetFullPath($Root)
     $folder=Join-Path $rootPath ('local-data/launcher-logs/'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
     New-Item -ItemType Directory -Path $folder -Force | Out-Null

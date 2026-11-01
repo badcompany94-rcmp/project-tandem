@@ -28,12 +28,20 @@ The full player package contains Python, CMake, Ninja, LLVM-MinGW, SDL sources, 
 
 The hash identifies the executable extracted from the disc, not the whole ISO. Use a compatible image dumped from your own disc. No disc image, extracted game executable, generated game source, or compiled game is included in the download.
 
-## Updating an existing installation
+## Updating in the launcher (Beta 8 onward)
+
+Open ProjectTandem.exe or Project Tandem.lnk. The launcher checks automatically;
+you can also choose **Check for updates**. When offered a newer release, close
+the game and click **Install update**. Download, verification, installation and
+any needed cached-disc rebuild happen automatically. The launcher then reopens.
+See [automatic updates and recovery](LAUNCHER.md). Saves and settings are kept.
+
+## Manual update / getting the updater for the first time
 
 1. Close Tandem and allow automatic online cleanup to finish.
 2. Open the cumulative update ZIP and copy **all** contents into the existing folder containing `Launch-Tandem.cmd`.
 3. Accept file replacement and keep `local-data` intact.
-4. Run `Launch-Tandem.cmd` once. It rebuilds the local game if the version changed and creates the graphical launcher. You can then use Project Tandem.lnk or ProjectTandem.exe. The launcher's Update downloads button opens GitHub; it does not install updates automatically.
+4. Run `Launch-Tandem.cmd` once. It rebuilds the local game if the version changed and creates the graphical launcher. You can then use Project Tandem.lnk or ProjectTandem.exe. Beta 8 adds automatic updates for subsequent supported releases.
 
 **Update everyone before playing online.** Every member of a room must run the same build ID; different builds cannot join or play together. Controller settings, trigger click points and display choices do not need to match.
 

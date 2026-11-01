@@ -1,5 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$Root,
-      [Parameter(Mandatory=$true)][ValidateSet('Play','Setup','Repair')][string]$Action,
+      [Parameter(Mandatory=$true)][ValidateSet('Play','Setup','Repair','CheckUpdate')][string]$Action,
       [Parameter(Mandatory=$true)][string]$Result,[string]$GameImage)
 $ErrorActionPreference='Stop'
 $rootPath=[IO.Path]::GetFullPath($Root)
@@ -8,7 +8,12 @@ try {
     . (Join-Path $PSScriptRoot 'Launcher-Core.ps1')
     $state=Get-TandemLauncherState $rootPath
     if(-not $state.PackageValid){throw $state.Detail}
-    if($Action -eq 'Play') {
+    if($Action -eq 'CheckUpdate') {
+        . (Join-Path $PSScriptRoot 'Updater-Core.ps1')
+        $record.update=Get-TandemUpdate $rootPath
+        Write-TandemJson (Join-Path $rootPath 'local-data/update-check.json') $record.update
+        $record.message=if($record.update.Available){'An update is available.'}else{'You have the latest published Windows release.'}
+    }elseif($Action -eq 'Play') {
         $started=Get-Date
         & (Join-Path $rootPath 'Launch-Tandem.ps1')
         $latest=Join-Path $rootPath 'local-data/latest-game.json'
