@@ -11,6 +11,7 @@ if($TestView -ne 'Current' -and -not $SelfTest){throw 'TestView is only availabl
 $Root=[IO.Path]::GetFullPath($Root)
 $script:job=$null;$script:latestLog=$null;$script:checkJob=$null;$script:candidate=$null
 $script:lastCheck=$null;$script:checkError='';$script:lastCheckAttempt=[DateTime]::MinValue
+$script:lastStateRefresh=[DateTime]::MinValue
 if($SelfTest) {
     Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition @'
 public class TandemRenderForm : System.Windows.Forms.Form {
@@ -74,6 +75,7 @@ $output.BackColor=[Drawing.Color]::FromArgb(5,18,52);$output.ForeColor=[Drawing.
 $output.Font=New-Object Drawing.Font('Consolas',9);$form.Controls.Add($output)
 $footer=Label 'Updates download, verify and install here. Your disc, saves and controls stay on your PC.' 31 672 900 35 10
 function Refresh-State {
+    $script:lastStateRefresh=[DateTime]::UtcNow
     $state=Get-TandemLauncherState $Root
     if(-not $script:job){$status.Text=if($state.Running){'Game running. Updates can be checked while you play.'}else{$state.Detail}}
     $version.Text=$state.Release;$build.Text='Build: '+$state.Compatibility
@@ -149,7 +151,7 @@ $timer.add_Tick({
             }
         }catch {$script:checkError='Could not check for updates. Try again later.';$script:checkJob=$null}
     }
-    Refresh-State
+    if([DateTime]::UtcNow.Subtract($script:lastStateRefresh).TotalSeconds -ge 1){Refresh-State}
     if($auto.Checked -and -not $script:job -and -not $script:checkJob -and [DateTime]::UtcNow.Subtract($script:lastCheckAttempt).TotalMinutes -ge 15){Start-UpdateCheck}
     if(-not $script:job){return}
     try {

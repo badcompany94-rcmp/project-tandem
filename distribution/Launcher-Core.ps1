@@ -1,4 +1,5 @@
 # Shared launcher state and child-process arguments. Windows PowerShell 5.1.
+$script:TandemManifestCache=@{}
 function Join-TandemArguments([string[]]$Values) {
     # CommandLineToArgvW quoting, including embedded quotes and trailing slashes.
     return (($Values | ForEach-Object {
@@ -10,8 +11,16 @@ function Get-TandemLauncherState([string]$Root) {
     $rootPath=[IO.Path]::GetFullPath($Root)
     $result=[ordered]@{Root=$rootPath;Release='Project Tandem';Compatibility='Unknown';Installed='Not built';Ready=$false;PackageValid=$false;Detail='Extract the complete Tandem download into this folder.'}
     try {
-        $manifest=Get-Content -LiteralPath (Join-Path $rootPath 'package-manifest.json') -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
-        if(-not $manifest.compatibility -or -not $manifest.files){throw 'Invalid package manifest.'}
+        $manifestFile=Get-Item -LiteralPath (Join-Path $rootPath 'package-manifest.json') -ErrorAction Stop
+        $stamp=$manifestFile.LastWriteTimeUtc.Ticks.ToString()+':'+$manifestFile.Length
+        $cached=$script:TandemManifestCache[$rootPath]
+        if($cached -and $cached.Stamp -eq $stamp){$manifest=$cached.Summary}
+        else {
+            $parsed=Get-Content -LiteralPath $manifestFile.FullName -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop
+            if(-not $parsed.compatibility -or -not $parsed.files){throw 'Invalid package manifest.'}
+            $manifest=[pscustomobject]@{release=[string]$parsed.release;compatibility=[string]$parsed.compatibility}
+            $script:TandemManifestCache[$rootPath]=[pscustomobject]@{Stamp=$stamp;Summary=$manifest}
+        }
         $result.Release=[string]$manifest.release;$result.Compatibility=[string]$manifest.compatibility
         $result.PackageValid=$true
         $identityFile=Join-Path $rootPath 'local-data/build-portable/identity/build-identity.json'
