@@ -26,6 +26,13 @@ extern "C" {
 
 namespace {
 bool enabled() { return getenv("MKDD_ONLINE_MENU")!=nullptr; }
+void env_set(const char* key,const char* value) {
+#ifdef _WIN32
+    _putenv_s(key,value);
+#else
+    if(*value) setenv(key,value,1); else unsetenv(key);
+#endif
+}
 enum class Page { Title, Type, HostJoin, Code, Lobby, Rules, Kart, Initials, Native, Battle, LeaveConfirm, Engine, KickConfirm, Browser, Search, RoomName };
 bool mode_advance=false;
 unsigned kick_seat=0;
@@ -478,9 +485,9 @@ void network_updates(CPU* c) {
                 if(completed==Work::Change){if(page!=Page::LeaveConfirm && page!=Page::Lobby)open(c,Page::Lobby);message.clear();}
                 if(completed==Work::Poll)message.clear();
                 const bool returning=getenv("MKDD_ROOM_RESUME")!=nullptr;
-                if(returning && room_reply.at("room").at("state").str()=="forming")_putenv_s("MKDD_ROOM_RESUME","");
+                if(returning && room_reply.at("room").at("state").str()=="forming")env_set("MKDD_ROOM_RESUME","");
                 if(room_reply.at("room").at("state").str()=="running" && !returning) {
-                    _putenv_s("MKDD_ROOM_TOKEN",token.c_str());
+                    env_set("MKDD_ROOM_TOKEN",token.c_str());
                     message="STARTING EVENT...";mkdd::online::enter_race(room_reply);
                 }
                 native_room_state(c);
