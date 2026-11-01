@@ -13,7 +13,7 @@ Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem 
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 9 fixes Linux source compilation in the online menu**, thanks to [malespiaut](https://github.com/malespiaut). Windows menu machine code is unchanged by the fix. This release retains automatic Windows updates and experimental networking/display features; it does not add a packaged Linux/Steam Deck installer. [Changes, compatibility and validation](docs/releases/public-beta-9.md) · [Launcher guide](docs/LAUNCHER.md) · [Previous Beta 8](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.8)
+**Beta 9 fixes Linux source compilation in the online menu**, thanks to [malespiaut](https://github.com/malespiaut). Windows menu machine code is unchanged by the fix. The launcher also uses POOTERMAN's fan-art icon in the Windows taskbar. This release retains automatic Windows updates and experimental networking/display features; it does not add a packaged Linux/Steam Deck installer. [Changes, compatibility and validation](docs/releases/public-beta-9.md) · [Launcher guide](docs/LAUNCHER.md) · [Previous Beta 8](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.8)
 
 ## Features
 

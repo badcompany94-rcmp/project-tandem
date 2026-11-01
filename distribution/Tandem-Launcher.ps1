@@ -9,6 +9,8 @@ Add-Type -AssemblyName System.Drawing
 if($TestView -ne 'Current' -and -not $SelfTest){throw 'TestView is only available for hidden self-tests.'}
 [Windows.Forms.Application]::EnableVisualStyles()
 $Root=[IO.Path]::GetFullPath($Root)
+Add-Type -Path (Join-Path $Root 'source/distribution/launcher/TaskbarIdentity.cs')
+[TandemTaskbarIdentity]::InitializeProcess()
 $script:job=$null;$script:latestLog=$null;$script:checkJob=$null;$script:candidate=$null
 $script:lastCheck=$null;$script:checkError='';$script:lastCheckAttempt=[DateTime]::MinValue
 $script:lastStateRefresh=[DateTime]::MinValue
@@ -28,6 +30,7 @@ $form.Font=New-Object Drawing.Font('Segoe UI',11)
 $form.AutoScaleMode=[Windows.Forms.AutoScaleMode]::Dpi
 $icon=Join-Path $Root 'source/distribution/assets/project-tandem.ico'
 if(Test-Path -LiteralPath $icon){$form.Icon=New-Object Drawing.Icon($icon)}
+$form.add_HandleCreated({[TandemTaskbarIdentity]::Apply($form.Handle,$Root,$icon,$form.Icon.Handle)})
 function Label([string]$Text,[int]$X,[int]$Y,[int]$W,[int]$H,[int]$Size=11) {
     $l=New-Object Windows.Forms.Label;$l.Text=$Text;$l.Location=New-Object Drawing.Point($X,$Y);$l.Size=New-Object Drawing.Size($W,$H)
     $l.Font=New-Object Drawing.Font('Segoe UI',$Size);$form.Controls.Add($l);return $l
@@ -169,7 +172,7 @@ $form.add_FormClosing({param($sender,$e)if($script:job -and -not $script:job.Pro
 Refresh-State
 if($SelfTest) {
     switch($TestView) {
-        'Available' {$script:candidate=[pscustomobject]@{Name='Public Beta 8 (preview only)';Tag='v0.1.0-beta.8';Cumulative=[pscustomobject]@{size=64MB};Url='https://github.com/badcompany94-rcmp/project-tandem/releases'};Refresh-State}
+        'Available' {$script:candidate=[pscustomobject]@{Name='Public Beta 9 (preview only)';Tag='v0.1.0-beta.9';Cumulative=[pscustomobject]@{size=64MB};Url='https://github.com/badcompany94-rcmp/project-tandem/releases'};Refresh-State}
         'Checking' {$updateStatus.Text='Checking GitHub for a newer Windows release...';$check.Enabled=$false}
         'Offline' {$script:checkError='Could not reach GitHub. You can still play and try again later.';Refresh-State}
     }
@@ -177,8 +180,11 @@ if($SelfTest) {
     New-Item -ItemType Directory -Path $Evidence -Force|Out-Null
     $form.StartPosition='Manual';$form.Location=New-Object Drawing.Point(-32000,-32000);$form.Show()
     $form.CreateControl();foreach($control in $form.Controls){$control.CreateControl();if($control.Right -gt $form.ClientSize.Width -or $control.Bottom -gt $form.ClientSize.Height){throw 'A launcher control is clipped.'}}
+    $taskbar=[TandemTaskbarIdentity]::Inspect($form.Handle)
+    $taskbar|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $Evidence 'taskbar.json') -Encoding UTF8
+    if($taskbar['window_app_id'] -ne [TandemTaskbarIdentity]::AppId -or $taskbar['process_app_id'] -ne [TandemTaskbarIdentity]::AppId -or $taskbar['icon_resource'] -ne ($icon+',0') -or $taskbar['large_icon_handle'] -ne $form.Icon.Handle.ToInt64().ToString() -or $taskbar['small_icon_handle'] -eq '0'){throw 'Launcher taskbar identity or artwork was not applied.'}
     $bitmap=New-Object Drawing.Bitmap($form.Width,$form.Height)
     try {$form.DrawToBitmap($bitmap,(New-Object Drawing.Rectangle(0,0,$bitmap.Width,$bitmap.Height)));$bitmap.Save((Join-Path $Evidence 'launcher.png'),[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
-    @{passed=$true;buttons=@($buttons|ForEach-Object {$_.Text});state=(Get-TandemLauncherState $Root);no_game_launched=$true;view=$TestView;update_enabled=$updates.Enabled;play_enabled=$play.Enabled;startup_check=$auto.Checked;update_text=$updateStatus.Text}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $Evidence 'result.json') -Encoding UTF8
+    @{passed=$true;taskbar_identity=$taskbar;buttons=@($buttons|ForEach-Object {$_.Text});state=(Get-TandemLauncherState $Root);no_game_launched=$true;view=$TestView;update_enabled=$updates.Enabled;play_enabled=$play.Enabled;startup_check=$auto.Checked;update_text=$updateStatus.Text}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $Evidence 'result.json') -Encoding UTF8
 }else {$form.add_Shown({if($auto.Checked){Start-UpdateCheck}});$timer.Start();[void]$form.ShowDialog()}
 $timer.Stop();$timer.Dispose();if($picture.Image){$picture.Image.Dispose()};$form.Dispose()

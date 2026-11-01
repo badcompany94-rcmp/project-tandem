@@ -3,7 +3,9 @@
 On Windows, open **Project Tandem.lnk** or **ProjectTandem.exe** after setup.
 Play starts the same unified LAN/Internet game; game settings remain in F1.
 The launcher shows the installed release and online build ID and credits
-POOTERMAN's artwork.
+POOTERMAN's artwork. Beta 9 assigns the launcher window its own Windows taskbar
+identity and the fan-art icon, so it is represented as Tandem rather than its
+PowerShell host. Taskbar relaunches open ProjectTandem.exe.
 
 ## Updating
 

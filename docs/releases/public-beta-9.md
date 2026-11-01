@@ -1,10 +1,14 @@
-# Project Tandem Public Beta 9 - Linux Source Portability Fix
+# Project Tandem Public Beta 9 - Linux Portability and Taskbar Icon
 
 Thanks to **[malespiaut](https://github.com/malespiaut)** for [PR #16](https://github.com/badcompany94-rcmp/project-tandem/pull/16)!
 The online menu now uses a Windows/POSIX environment-variable wrapper, fixing two
 Linux compilation errors from Windows-only calls. The Windows implementation
 continues to use the same calls; compiled menu instructions and relocation targets
 match the previous version.
+
+The Windows launcher now explicitly uses **POOTERMAN's fan-art icon in the taskbar**.
+It identifies its window as Project Tandem, and taskbar relaunches open the Tandem
+launcher rather than its PowerShell host. The launcher layout is retained.
 
 ## Compatibility and updating
 
@@ -35,6 +39,8 @@ remain work in progress. The older personal Linux/Deck test build is unchanged.
   patched menu translation-unit syntax check. This is not full Linux runtime testing.
 - Public source-boundary checks and the Python suite pass (54 passed, 10 optional
   tests skipped). Linux services and Windows launcher/updater GitHub CI pass.
+- Current, update-available, checking and offline launcher views are rendered; actual
+  Windows taskbar identity, icon handles and relaunch properties are checked.
 - The locally rebuilt Windows game completes a hidden 1,200-frame launch, with exact
   save/settings hashes preserved. Release archives are hash-audited, and the Beta 8
   updater's package verification, cached-disc build and hidden launch are tested in
