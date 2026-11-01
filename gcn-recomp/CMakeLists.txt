@@ -290,7 +290,7 @@ function(gcn_add_game)
   # front end, including the batch queue in gx/xf.cpp -- is free of both GL and SDL.
   set(CORE_SOURCES ${RUNTIME_SOURCES})
   list(REMOVE_ITEM CORE_SOURCES
-    ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
+    ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
     ${RT}/gx/render_gl.cpp ${RT}/gx/gl_load.cpp ${RT}/gx/shadergen.cpp)
   list(APPEND CORE_SOURCES ${RT}/audio_stub.cpp)
   # The benchmark compiles the game's SOURCES too (gcn_add_game), and a game's eye hook
@@ -336,6 +336,7 @@ function(gcn_add_game)
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     FetchContent_MakeAvailable(SDL2)
     set(GCN_SDL_TARGET SDL2::SDL2-static)
+    target_link_libraries(SDL2-static INTERFACE winusb setupapi)
   else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
@@ -485,17 +486,24 @@ function(gcn_add_game)
     endif()
   endif()
   if(GCN_INPUT_TESTS AND NOT GCN_BENCH_ONLY AND NOT ANDROID)
-    add_executable(gamepad_test ${GCN_RECOMP_DIR}/tests/desktop_gamepad.cpp ${RT}/desktop_gamepad.cpp ${RT}/input_defaults.cpp)
+    add_executable(gamepad_test ${GCN_RECOMP_DIR}/tests/desktop_gamepad.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/input_defaults.cpp)
     _gcn_set_standards(gamepad_test)
     target_include_directories(gamepad_test PRIVATE ${RT})
     target_link_libraries(gamepad_test PRIVATE ${GCN_SDL_TARGET})
-    add_executable(desktop_controls_test ${GCN_RECOMP_DIR}/tests/desktop_controls.cpp ${GCN_RECOMP_DIR}/tests/desktop_triggers.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/input_defaults.cpp)
+    add_executable(desktop_controls_test ${GCN_RECOMP_DIR}/tests/desktop_controls.cpp ${GCN_RECOMP_DIR}/tests/desktop_triggers.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/input_defaults.cpp)
+    add_executable(gc_adapter_test ${GCN_RECOMP_DIR}/tests/gc_adapter.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_controls.cpp ${RT}/input_defaults.cpp)
+    _gcn_set_standards(gc_adapter_test)
+    target_include_directories(gc_adapter_test PRIVATE ${RT})
+    target_link_libraries(gc_adapter_test PRIVATE ${GCN_SDL_TARGET})
+    add_executable(game_image_test ${GCN_RECOMP_DIR}/tests/game_image.cpp)
+    _gcn_set_standards(game_image_test)
+    target_include_directories(game_image_test PRIVATE ${RT})
     _gcn_set_standards(desktop_controls_test)
     target_include_directories(desktop_controls_test PRIVATE ${RT})
     target_link_libraries(desktop_controls_test PRIVATE ${GCN_SDL_TARGET})
     add_executable(desktop_settings_test ${GCN_RECOMP_DIR}/tests/desktop_settings.cpp ${GCN_RECOMP_DIR}/tests/desktop_cursor.cpp
       ${GCN_IMGUI}/backends/imgui_impl_sdl2.cpp
-      ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
+      ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
       ${RT}/gx/gl_load.cpp ${RT}/png.cpp ${GLAD_SOURCE})
     _gcn_set_standards(desktop_settings_test)
     target_include_directories(desktop_settings_test PRIVATE ${RT} ${GLAD_INCLUDE_DIR})

@@ -1,3 +1,7 @@
+#ifdef _WIN32
+// This must precede every header that can include SDL.h.
+#define SDL_MAIN_HANDLED
+#endif
 #include "diagnostic_log.h"
 // Entry point and SDL frontend: window, input, audio. The main thread executes GX
 // batches produced by the guest thread.
@@ -7,6 +11,8 @@
 #include "input_log.h"
 #include "input_map.h"
 #include "desktop_gamepad.h"
+#include "desktop_gc_adapter.h"
+#include "game_image.h"
 #include "desktop_controls.h"
 #include "desktop_pointer.h"
 #include "desktop_settings.h"
@@ -24,10 +30,6 @@
 #include "record.h"
 #ifdef GCN_OPENXR
 #include "xr_desktop.h"
-#endif
-#ifdef _WIN32
-// Console app: keep our own main() rather than SDL2main's WinMain shim.
-#define SDL_MAIN_HANDLED
 #endif
 #include <SDL.h>
 #if defined(_WIN32) && defined(GCN_APP_ICON_RESOURCE)
@@ -184,6 +186,7 @@ static void update_pad() {
 // The window's events. False once the user has asked to quit.
 static bool pump_events(SDL_Window* window) {
     desktop_pointer::script(window,gx::g_frames_submitted.load());
+    desktop_gc_adapter_update();
     SDL_Event e;
     bool running = true;
     while (SDL_PollEvent(&e)) {
@@ -231,11 +234,9 @@ int main(int argc, char** argv) {
         if (input_replay_active()) return;
         plat_relaunch(s_argv);
     });
-    // Default: the image the build was configured with, else the first image in ./rom
-    std::string iso_default = GCN_DEFAULT_ISO;
-    if (!plat_readable(iso_default.c_str())) iso_default = plat_find_file("rom", ".iso");
-    if (iso_default.empty()) iso_default = plat_find_file("rom", ".ciso");
-    const char* iso = iso_default.c_str();
+    const char* image_env=getenv("GCN_GAME_IMAGE");
+    std::string requested_image=image_env?image_env:"";
+    bool print_image=false;
     bool headless = false, hidden = false, input_log = true, first_person = false, fast = false, vr = false;
     uint32_t frame_limit = 0;
     bool fullscreen = false, dump_output = false;
@@ -290,7 +291,9 @@ int main(int argc, char** argv) {
         else if (!strncmp(argv[i], "--scale=", 8)) scale = atoi(argv[i] + 8);
         else if (!strncmp(argv[i], "--dump-dir=", 11)) gx::g_dump_dir = argv[i] + 11;
         else if (!strncmp(argv[i], "--dump-every=", 13)) gx::g_dump_every = atoi(argv[i] + 13);
-        else if (argv[i][0] != '-') iso = argv[i];
+        else if (!strncmp(argv[i],"--image=",8)) requested_image=argv[i]+8;
+        else if (!strcmp(argv[i],"--print-game-image")) print_image=true;
+        else if (argv[i][0] != '-') requested_image=argv[i];
     }
     if (test_ffb) return input_map_test_ffb(controls);
     plat_install_crash_handlers(on_interrupt, on_fault);
@@ -306,10 +309,15 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    if (!plat_readable(iso)) {
-        diagnostic_log( "No game image found. Put your " GCN_GAME_TITLE " .iso or .ciso in rom/ or pass its path.\n");
+    std::error_code image_error;
+    const auto image_search=game_image::resolve(GCN_DEFAULT_ISO,plat_executable_path(),std::filesystem::current_path(image_error),requested_image);
+    const char* iso=image_search.image.c_str();
+    if (image_search.image.empty()) {
+        diagnostic_log("No game image found. Select your supported " GCN_GAME_TITLE " ISO/CISO in setup, or pass --image=PATH.\n");
+        for(const auto& path:image_search.checked)diagnostic_log("[image] checked: %s\n",path.c_str());
         return 1;
     }
+    if(print_image){printf("%s\n",iso);return 0;}
     mem_init();
     timing_init();
     if (fast) clock_set_scale(0);  // run as fast as the host allows; the game sees 60 Hz regardless

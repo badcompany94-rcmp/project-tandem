@@ -9,6 +9,9 @@
 #include <filesystem>
 #include <thread>
 #include <vector>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 // ===========================================================================
 #ifdef _WIN32
@@ -355,6 +358,19 @@ bool plat_read_at(PlatFile* f, uint64_t offset, void* dst, uint32_t len) {
 // ===========================================================================
 // Shared
 // ===========================================================================
+std::string plat_executable_path() {
+#ifdef _WIN32
+    std::vector<char> path(32768);const auto count=GetModuleFileNameA(nullptr,path.data(),DWORD(path.size()));
+    return count && count<path.size()?std::string(path.data(),count):std::string{};
+#elif defined(__APPLE__)
+    uint32_t size=0;_NSGetExecutablePath(nullptr,&size);std::vector<char> path(size);
+    return _NSGetExecutablePath(path.data(),&size)==0?std::string(path.data()):std::string{};
+#else
+    std::vector<char> path(32768);const auto count=readlink("/proc/self/exe",path.data(),path.size());
+    return count>0 && size_t(count)<path.size()?std::string(path.data(),size_t(count)):std::string{};
+#endif
+}
+
 void plat_make_dirs(const std::string& path) {
     if (path.empty()) return;
     std::error_code ec;

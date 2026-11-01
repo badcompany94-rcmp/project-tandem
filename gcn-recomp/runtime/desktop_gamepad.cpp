@@ -1,4 +1,5 @@
 #include "desktop_gamepad.h"
+#include "desktop_gc_adapter.h"
 #include "input_defaults.h"
 #include <algorithm>
 #include <cstdio>
@@ -41,6 +42,7 @@ void desktop_gamepad_configure() {
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_COMBINE_JOY_CONS,"1");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4,"1");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5,"1");
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_GAMECUBE,"1");
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS,"1");
 }
 
@@ -48,6 +50,7 @@ void desktop_gamepad_shutdown() {
     select(nullptr);
     for(auto* pad:available)SDL_GameControllerClose(pad);
     available.clear();quit_key_pending=false;quit_holding=false;
+    desktop_gc_adapter_shutdown();
 }
 
 const char* desktop_gamepad_name() {

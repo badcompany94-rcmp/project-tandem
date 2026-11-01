@@ -106,7 +106,7 @@ $run=Join-Path $data 'game';New-Item -ItemType Directory -Force -Path $run | Out
 $env:GCN_CURSOR_ASSET=Join-Path $root 'assets\menu-cursor.png'
 $env:MKDD_MENU_KART_ASSET=Join-Path $root 'assets\menu-kart.gctex'
 $env:MKDD_MENU_ART=Join-Path $root 'assets\classic'
-$arguments=@('--no-input-log','--widescreen','--resolution=1920x1080','--fullscreen','--scale=4')
+$arguments=@((Quote $settings.game_image),'--no-input-log','--widescreen','--resolution=1920x1080','--fullscreen','--scale=4')
 if($Frames){$arguments+="--frames=$Frames"}
 $game=$null;$watcher=$null
 try {

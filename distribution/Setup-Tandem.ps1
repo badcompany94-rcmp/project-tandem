@@ -68,6 +68,8 @@ if($identity.id -ne $manifest.compatibility){throw 'This compiler or build confi
 Save-TandemSettings $root $savedSettings $GameImage
 $pending=Join-Path $data 'update-pending.json'
 if(Test-Path -LiteralPath $pending){Remove-Item -LiteralPath $pending}
+try { & (Join-Path $source 'distribution\Build-Launcher.ps1') -Root $root }
+catch { Write-Warning 'The game is ready, but the graphical launcher preview could not be built. Launch-Tandem.cmd still works.' }
 try { & (Join-Path $source 'distribution\Create-Shortcut.ps1') -Root $root }
 catch { Write-Warning 'The game is ready, but the optional artwork shortcut could not be created. Launch-Tandem.cmd still works.' }
 Show-TandemProgress '5/5 Final checks' 100 'Ready to play' -Complete

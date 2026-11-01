@@ -49,6 +49,8 @@ void plat_make_dirs(const std::string& path);
 bool plat_replace_file(const char* from, const char* to);
 // First entry in `dir` whose name ends with `suffix` (case-insensitive), or "".
 std::string plat_find_file(const char* dir, const char* suffix);
+// Actual process executable, independent of a frontend's working directory.
+std::string plat_executable_path();
 
 // A read-only file supporting concurrent positional reads.
 struct PlatFile;

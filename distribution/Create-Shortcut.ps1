@@ -4,6 +4,7 @@ $ErrorActionPreference='Stop'
 $rootPath=[IO.Path]::GetFullPath($Root)
 if(-not $ShortcutPath){$ShortcutPath=Join-Path $rootPath 'Project Tandem.lnk'}
 $launcher=Join-Path $rootPath 'Launch-Tandem.cmd'
+if(Test-Path -LiteralPath (Join-Path $rootPath 'ProjectTandem.exe') -PathType Leaf){$launcher=Join-Path $rootPath 'ProjectTandem.exe'}
 $icon=Join-Path $rootPath 'source\distribution\assets\project-tandem.ico'
 if(-not (Test-Path -LiteralPath $launcher -PathType Leaf) -or -not (Test-Path -LiteralPath $icon -PathType Leaf)){throw 'The Tandem launcher or community icon is missing.'}
 $shell=New-Object -ComObject WScript.Shell
