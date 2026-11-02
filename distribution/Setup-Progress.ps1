@@ -55,7 +55,7 @@ function Invoke-TandemSetupTool([string]$Program,[string[]]$Arguments,[string]$L
         if(-not $process.Start()){throw 'Could not start setup tool.'};$started=$true
         $pending=@($process.StandardOutput.ReadLineAsync(),$process.StandardError.ReadLineAsync())
         $readers=@($process.StandardOutput,$process.StandardError)
-        $percent=-1;$detail='Working; details saved in local-data\setup.log'
+        $percent=-1;$detail=('Working; details saved in '+$Log)
         while($null -ne $pending[0] -or $null -ne $pending[1]) {
             for($i=0;$i -lt 2;$i++) {
                 # Drain available lines without waiting on a silent stream.
@@ -79,7 +79,7 @@ function Invoke-TandemSetupTool([string]$Program,[string[]]$Arguments,[string]$L
         if($process.ExitCode -ne 0){
             Stop-TandemProgress
             foreach($line in $recent){Write-Host $line}
-            throw "Setup failed (exit $($process.ExitCode)). See local-data\setup.log."
+            throw "Setup failed (exit $($process.ExitCode)). See $Log."
         }
         Show-TandemProgress $Stage 100 'Complete' -Complete
         $success=$true
