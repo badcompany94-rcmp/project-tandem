@@ -20,6 +20,7 @@
 #include "presentation_stats.h"
 #include "display_config.h"
 #include "desktop_presentation.h"
+#include "desktop_graphics.h"
 #include "refresh_clock.h"
 #include "presentation_wait.h"
 #include "gx/render_gl.h"
@@ -416,6 +417,10 @@ int main(int argc, char** argv) {
               glGetString(GL_RENDERER) ? (const char*)glGetString(GL_RENDERER) : "?", kGLHelp);
     }
     LOG(LOG_GX, "GL: %s / %s", glGetString(GL_RENDERER), glGetString(GL_VERSION));
+    SDL_version sdl_version;SDL_GetVersion(&sdl_version);
+    const auto sdl_text=std::to_string(sdl_version.major)+"."+std::to_string(sdl_version.minor)+"."+std::to_string(sdl_version.patch);
+    desktop_graphics::initialize((const char*)glGetString(GL_VENDOR),(const char*)glGetString(GL_RENDERER),
+        (const char*)glGetString(GL_VERSION),(const char*)glGetString(GL_SHADING_LANGUAGE_VERSION),SDL_GetPlatform(),sdl_text.c_str());
     if (gl_debug) gl_debug_enable(SDL_GL_GetProcAddress);
     if(!desktop_settings_init(win,ctx))fatal("Cannot initialize desktop settings");
     if(stats_override>=0)desktop_stats_enable(stats_override!=0);
@@ -434,7 +439,7 @@ int main(int argc, char** argv) {
         plat_exit_now(rc);
     }
 #endif
-    gx::render_init(scale);
+    gx::render_init(desktop_presentation::effective_scale(scale,scale));
     if (g_eye_mode) eye_init();
     if (first_person) gx::render_set_first_person(true);
     if (gx::g_dump_dir) plat_make_dirs(gx::g_dump_dir);
@@ -515,7 +520,10 @@ int main(int argc, char** argv) {
         if(!g_eye_mode && theater_stereo_m<=0.0f) {
             const unsigned ui_width=display_ui_render_width();
             const int ui_scale=ui_width && dw>0 ? int((unsigned(dw)+ui_width-1)/ui_width) : scale;
-            gx::render_set_internal_scale(std::max(scale,ui_scale));
+            const int active_scale=desktop_presentation::effective_scale(scale,ui_scale);
+            gx::render_set_internal_scale(active_scale);
+            int window_width=0,window_height=0;SDL_GetWindowSize(win,&window_width,&window_height);
+            desktop_graphics::update({window_width,window_height,dw,dh,std::clamp(active_scale,1,gx::kMaxInternalScale),SDL_GL_GetSwapInterval(),presentation.refresh_hz});
         }
         // GCN_STEREOLOG=1: what the game's stereo hook (vr_game.h) would have a headset
         // show, whenever the answer changes, numbered as the frame dumps are.

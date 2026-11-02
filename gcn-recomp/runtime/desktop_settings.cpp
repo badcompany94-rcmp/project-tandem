@@ -4,6 +4,7 @@
 #include "desktop_display.h"
 #include "desktop_sound.h"
 #include "desktop_presentation.h"
+#include "desktop_graphics.h"
 #include "desktop_overlay.h"
 #include "desktop_online_ui.h"
 #include "desktop_pointer.h"
@@ -259,6 +260,12 @@ void display_tab() {
     }
     ImGui::TextWrapped("Experimental. Smooths 3D motion above 60 FPS. Gameplay stays at its original speed. Adds up to one game frame of visual delay.");
     ImGui::TextWrapped("Choose a rate supported by your monitor. With VSync on, your desktop refresh rate also limits output. Extra rendering requires GPU headroom.");
+    const char* const scales[]={"Default (existing behavior)","1x (lowest GPU load)","2x","3x","4x"};
+    ImGui::SetNextItemWidth(300);
+    if(ImGui::Combo("Internal resolution",&presentation.internal_scale,scales,5)) {
+        if(desktop_presentation::preview(presentation,status))changed();
+    }
+    ImGui::TextWrapped("Lower this to improve performance on slower GPUs. This controls rendering detail independently of your display resolution. Changes preview immediately; Discard restores your previous choice.");
     ImGui::Spacing();ImGui::SetNextItemWidth(420);
     const auto monitors=desktop_display::monitors();
     std::string monitor_label="Unavailable monitor";
@@ -306,6 +313,13 @@ void display_tab() {
     ImGui::Spacing();ImGui::TextDisabled("Keep the new display mode within 15 seconds, or it will revert automatically.");
     ImGui::TextDisabled("The game keeps its proportions; extra screen space is letterboxed when needed.");
     ImGui::TextDisabled("F11 switches between windowed and borderless fullscreen.");
+    if(ImGui::CollapsingHeader("Graphics diagnostics")) {
+        ImGui::TextWrapped("GPU: %s",desktop_graphics::device.renderer.c_str());
+        ImGui::TextWrapped("OpenGL / driver: %s",desktop_graphics::device.version.c_str());
+        if(desktop_graphics::software_renderer())ImGui::TextWrapped("A software renderer was detected. Check that your graphics driver is installed and the game is using your GPU.");
+        if(ImGui::Button("Copy graphics diagnostics"))ImGui::SetClipboardText(desktop_graphics::report().c_str());
+        ImGui::TextWrapped("Paste these details into a performance report. The same graphics details are recorded in the session log.");
+    }
 }
 void sound_tab() {
     ImGui::TextWrapped("Adjust all game audio for this PC.");ImGui::Spacing();

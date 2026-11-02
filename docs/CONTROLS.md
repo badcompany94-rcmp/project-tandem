@@ -53,6 +53,8 @@ Existing controller settings load with 50% defaults. New trigger settings are st
 - F1 opens controller/port assignments, racing bindings, display, sound, and online settings.
 - Display settings offer common 16:9 resolutions and windowed, fullscreen, or borderless modes. Borderless uses the desktop resolution.
 - Display also includes independent experimental VSync and high-refresh interpolation options, both OFF by default and switchable back off. See [display options and limits](DISPLAY-REFRESH.md).
+- **F1 → Display → Internal resolution** selects Default or 1×–4× rendering. Default retains the previous launch behavior; lower explicit values reduce GPU workload independently of display resolution, including in menus. Changes preview live, save when settings close, and revert with Discard.
+- **F1 → Display → Graphics diagnostics → Copy graphics diagnostics** copies the GPU, OpenGL/driver version, active internal scale, window/drawable dimensions and presentation settings for performance reports. These details also appear in the session log. A known software-renderer warning suggests checking graphics drivers; absence of that warning does not establish that a driver is working correctly.
 - New installations start at 25% master volume; updates preserve existing volume.
 - F10 toggles the performance overlay.
 - Use F1 → Exit to desktop, Alt+F4, or the window close button. Select + Menu held together is the controller exit shortcut.

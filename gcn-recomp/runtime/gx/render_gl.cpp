@@ -926,6 +926,8 @@ void render_set_internal_scale(int scale) {
     if (scale < 1) scale = 1;
     if (scale > kMaxInternalScale) scale = kMaxInternalScale;
     if (scale == g_scale) return;
+    // Cached interpolation frames refer to the previous framebuffer/resources.
+    render_interpolation_reset();
     const int old_scale = g_scale;
     g_scale = scale;
     gl_state_invalidate();

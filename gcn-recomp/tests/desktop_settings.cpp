@@ -4,6 +4,7 @@
 #include "desktop_gamepad.h"
 #include "desktop_display.h"
 #include "desktop_presentation.h"
+#include "desktop_graphics.h"
 #include "desktop_overlay.h"
 #include "desktop_sound.h"
 #include "desktop_pointer.h"
@@ -51,6 +52,33 @@ int main(int argc,char** argv) {
         SDL_Event e{};e.type=SDL_MOUSEMOTION;e.motion.windowID=SDL_GetWindowID(win);e.motion.x=x;e.motion.y=y;desktop_settings_event(e);frame();
         e.type=SDL_MOUSEBUTTONDOWN;e.button.windowID=SDL_GetWindowID(win);e.button.button=SDL_BUTTON_LEFT;e.button.x=x;e.button.y=y;desktop_settings_event(e);frame();
         e.type=SDL_MOUSEBUTTONUP;desktop_settings_event(e);frame();frame();capture(out/"mapping.png");
+    }
+    if(argc>4 && std::string(argv[4])=="graphics") {
+        click(570,95);frame();
+        require(desktop_presentation::current().internal_scale==0,"existing rendering scale stays the default");
+        click(460,333);ImGui::GetIO().AddFocusEvent(true);frame();key(SDL_SCANCODE_DOWN);frame();key(SDL_SCANCODE_RETURN);frame();
+        require(desktop_presentation::current().internal_scale==1,"F1 internal resolution selects 1x");
+        capture(out/"graphics-1x.png");
+        click(420,640);require(!desktop_settings_open() && desktop_presentation::current().internal_scale==0,"Discard restores original scale");
+        key(SDL_SCANCODE_F1);frame();frame();
+        click(460,333);frame();frame();click(260,422);frame();
+        capture(out/"graphics-2x.png");
+        require(desktop_presentation::current().internal_scale==2,"F1 supports 2x independently");
+        key(SDL_SCANCODE_ESCAPE);std::string error;
+        require(desktop_presentation::load((out/"presentation.cfg").string(),error) && desktop_presentation::current().internal_scale==2,"F1 scale persists across reload");
+        desktop_graphics::initialize("Test vendor","Test GPU","test OpenGL driver","3.30","Windows","test");
+        desktop_graphics::update({1280,720,1280,720,2,0,0});
+        key(SDL_SCANCODE_F1);frame();frame();
+        SDL_Event motion{};motion.type=SDL_MOUSEMOTION;motion.motion.windowID=window_id;motion.motion.x=1000;motion.motion.y=500;desktop_settings_event(motion);frame();
+        SDL_Event wheel{};wheel.type=SDL_MOUSEWHEEL;wheel.wheel.windowID=window_id;wheel.wheel.y=-15;wheel.wheel.preciseY=-15;desktop_settings_event(wheel);frame();frame();
+        capture(out/"graphics-diagnostics-collapsed.png");
+        click(300,596);frame();desktop_settings_event(wheel);frame();frame();
+        capture(out/"graphics-diagnostics-expanded.png");
+        char* old_clipboard=SDL_GetClipboardText();const std::string previous_clipboard=old_clipboard?old_clipboard:"";SDL_free(old_clipboard);
+        click(300,555);frame();
+        char* copied=SDL_GetClipboardText();const std::string copied_text=copied?copied:"";SDL_free(copied);
+        SDL_SetClipboardText(previous_clipboard.c_str());
+        require(copied_text.find("GPU renderer: Test GPU")!=std::string::npos && copied_text.find("Active internal scale: 2x")!=std::string::npos && copied_text.find(out.string())==std::string::npos,"real Copy diagnostics button copies useful graphics state without save/install paths");
     }
     if(argc>4 && std::string(argv[4])=="overlay") {
         require(!desktop_overlay::current(),"FPS counter starts off in fresh settings");

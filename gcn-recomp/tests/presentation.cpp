@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include "desktop_presentation.h"
+#include "desktop_graphics.h"
 #include "refresh_clock.h"
 #include <SDL.h>
 #include <filesystem>
@@ -19,6 +20,17 @@ int main(int argc,char** argv) {
     using namespace desktop_presentation;
     require(load(config,error) && current()==Settings{} && interval==0,"fresh install defaults off");
     require(!std::filesystem::exists(config),"loading defaults does not overwrite user files");
+    require(effective_scale(4,2)==4 && effective_scale(2,4)==4,"default preserves launch/menu supersampling");
+    {std::ofstream out(config);out<<"GCN_PRESENTATION 1\n1 144\n";}
+    require(load(config,error) && current()==Settings{true,144,0},"legacy settings retain VSync/interpolation and default scaling");
+    require(preview({false,0,1},error) && effective_scale(4,6)==1 && save(error),"explicit 1x overrides launch and menu supersampling");
+    require(load(config,error) && current()==Settings{false,0,1},"new internal scale persists through reload");
+    require(!preview({false,0,5},error) && current().internal_scale==1,"invalid scale cannot replace active settings");
+    for(int scale=0;scale<=4;++scale)require(preview({false,0,scale},error) && save(error) && load(config,error) && current().internal_scale==scale,"all scale options persist");
+    {std::ofstream out(config);out<<"GCN_PRESENTATION 2\n1 144 99\n";}
+    require(!load(config,error) && current()==Settings{},"out-of-range saved scale uses safe defaults");
+    {std::ofstream out(config);out<<"GCN_PRESENTATION 2\n1 144\n";}
+    require(!load(config,error) && current()==Settings{},"truncated new settings cannot change rendering");
     require(preview({true,144},error) && interval==1 && save(error),"enable VSync and persist 144 Hz");
     require(preview({},error) && load(config,error) && current()==Settings{true,144} && interval==1,"load saved settings");
     fail=true;require(!preview({},error) && !error.empty() && current()==Settings{true,144},"driver failure keeps active settings");fail=false;
@@ -27,6 +39,13 @@ int main(int argc,char** argv) {
     require(!load(config,error) && current()==Settings{} && interval==0,"malformed config falls back off");
     {std::ofstream out(config);out<<"GCN_PRESENTATION 999\n1 144\n";}
     require(!load(config,error) && current()==Settings{},"unsupported version keeps safe defaults");
+    desktop_graphics::initialize("Vendor\nLine","llvmpipe (LLVM)","4.5 test driver","4.50","Windows","2.32");
+    desktop_graphics::update({1280,720,2560,1440,1,0,0});
+    const auto report=desktop_graphics::report();
+    require(desktop_graphics::software_renderer() && report.find("Active internal scale: 1x")!=std::string::npos && report.find("Drawable: 2560x1440")!=std::string::npos,"diagnostics distinguish drawable size and active scale and detect known software rendering");
+    require(report.find("Vendor\nLine")==std::string::npos,"driver text cannot insert extra diagnostic fields");
+    desktop_graphics::initialize("AMD","AMD Radeon","test driver","3.30","Windows","2.32");
+    require(!desktop_graphics::software_renderer(),"hardware renderer is not mislabeled as known software");
     for(const int hz:{120,144,165,240}) {
         RefreshClock clock;const uint64_t start=123456789;
         require(clock.due(start,hz),"first refresh immediate");

@@ -1,5 +1,6 @@
 #include "desktop_presentation.h"
 #include "diagnostic_log.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <SDL.h>
@@ -14,11 +15,15 @@ namespace {
 Settings active;
 std::string path;
 bool valid(Settings s) {
-    return s.refresh_hz == 0 || s.refresh_hz == 120 || s.refresh_hz == 144 ||
-           s.refresh_hz == 165 || s.refresh_hz == 240;
+    return s.internal_scale >= 0 && s.internal_scale <= 4 &&
+           (s.refresh_hz == 0 || s.refresh_hz == 120 || s.refresh_hz == 144 ||
+            s.refresh_hz == 165 || s.refresh_hz == 240);
 }
 }
 Settings current() { return active; }
+int effective_scale(int launch_scale, int menu_scale) {
+    return active.internal_scale ? active.internal_scale : std::max(launch_scale,menu_scale);
+}
 bool preview(Settings next, std::string& error) {
     error.clear();
     if (!valid(next)) { error = "Choose a supported interpolation rate."; return false; }
@@ -29,7 +34,7 @@ bool preview(Settings next, std::string& error) {
         return false;
     }
     active = next;
-    diagnostic_log("[presentation-settings] vsync=%d interpolation_hz=%d\n", active.vsync, active.refresh_hz);
+    diagnostic_log("[presentation-settings] vsync=%d interpolation_hz=%d internal_scale=%d\n", active.vsync, active.refresh_hz,active.internal_scale);
     return true;
 }
 bool load(const std::string& file, std::string& error) {
@@ -41,8 +46,10 @@ bool load(const std::string& file, std::string& error) {
             error = "Presentation settings are unreadable. Using defaults.";
         } else {
             std::ifstream in(path); std::string tag, extra; int version = 0, vsync = 0;
-            if (!(in >> tag >> version >> vsync >> next.refresh_hz) || (in >> extra) ||
-                tag != "GCN_PRESENTATION" || version != 1 || vsync < 0 || vsync > 1 || !valid(next))
+            bool parsed=bool(in >> tag >> version >> vsync >> next.refresh_hz);
+            if(parsed && version==2)parsed=bool(in >> next.internal_scale);
+            if (!parsed || (in >> extra) || tag != "GCN_PRESENTATION" ||
+                (version != 1 && version != 2) || vsync < 0 || vsync > 1 || !valid(next))
                 error = "Invalid presentation settings. Using defaults.";
             else next.vsync = vsync != 0;
         }
@@ -61,7 +68,7 @@ bool save(std::string& error) {
     if (!target.parent_path().empty()) std::filesystem::create_directories(target.parent_path(), ec);
     if (ec) { error = "Cannot create the presentation settings folder."; return false; }
     std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-    out << "GCN_PRESENTATION 1\n" << (active.vsync ? 1 : 0) << ' ' << active.refresh_hz << '\n';
+    out << "GCN_PRESENTATION 2\n" << (active.vsync ? 1 : 0) << ' ' << active.refresh_hz << ' ' << active.internal_scale << '\n';
     out.flush(); bool ok = bool(out); out.close(); ok = ok && !out.fail();
     if (!ok) { error = "Cannot save presentation settings. Check the folder is writable."; return false; }
 #ifdef _WIN32
