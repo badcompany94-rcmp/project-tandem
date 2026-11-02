@@ -13,12 +13,19 @@ $build=Join-Path $data 'build-portable'
 $package=Get-Content -LiteralPath (Join-Path $root 'package-manifest.json') -Raw|ConvertFrom-Json
 $installedIdentity=Join-Path $build 'identity\build-identity.json';$installedBuild=$null
 if(Test-Path -LiteralPath $installedIdentity){try{$installedBuild=(Get-Content -LiteralPath $installedIdentity -Raw|ConvertFrom-Json).id}catch{}}
-if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-Path $data 'update-pending.json')) -or (Test-TandemBuildMoved $root) -or -not (Test-Path -LiteralPath (Join-Path $build 'mkdd.exe')) -or
-   -not (Test-TandemPathEqual (Get-TandemCacheValue $build 'GAME_ISO') $image)) {
-    Write-Host 'Updating the local build for the current game and ISO locations...'
+if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-Path $data 'update-pending.json')) -or -not (Test-Path -LiteralPath (Join-Path $build 'mkdd.exe'))) {
+    Write-Host 'Updating the local build for the current game version...'
     & (Join-Path $root 'Setup-Tandem.ps1') -GameImage $image
     $settings=Get-TandemSettings $root
 } else {
+    # A native runtime does not depend on the compiler cache's absolute paths.
+    # Verify a relocated/reselected image without recompiling the same game;
+    # Setup/Repair will replace a moved CMake cache when a build is needed.
+    if(-not (Test-TandemPathEqual $settings.game_image $image)) {
+        Write-Host 'Checking your disc at its new location...'
+        & (Join-Path $root 'tools/python/python.exe') -B (Join-Path $root 'source/gcn-recomp/recomp/extract_dol.py') $image (Join-Path $data 'verified-main.dol') 'GM4E01' 'e389e50357d4a5076ab3d38672204658f411123d'
+        if($LASTEXITCODE -ne 0){throw 'The selected image does not match the supported USA Double Dash revision.'}
+    }
     Save-TandemSettings $root $settings $image
 }
 # A launcher-only release can share the previous gameplay ID. Finish its local
