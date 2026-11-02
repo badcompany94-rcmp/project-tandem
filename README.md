@@ -109,3 +109,7 @@ Project Tandem builds on Ethan Nicholas's [mariokartdd-recomp](https://github.co
 Project source uses the [MIT License](LICENSE). Third-party libraries, fonts, artwork, and distributed runtime components have separate notices; see [credits](CREDITS.md), [third-party notices](THIRD-PARTY-NOTICES.md), [end-user terms](EULA.txt), and [privacy information](PRIVACY.md). The MIT license does not license Nintendo's game content or trademarks.
 
 *Mario Kart: Double Dash!!*, GameCube, characters, and related marks belong to their respective owners. Project Tandem is an independent project and is not affiliated with or endorsed by Nintendo or Epic Games.
+
+## Portable installation and user data
+
+Current builds can be moved or renamed without recompiling. Existing user-data locations stay unchanged. Optional `portable.txt` / `paths.json` preferences can place saves, settings and the cached disc elsewhere; compiled game/tools remain in the installation. See [locations and migration](docs/USER-DATA.md).

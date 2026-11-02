@@ -36,6 +36,9 @@ jobs:
       - name: Test verified updates, rollback and interrupted-build recovery
         shell: powershell
         run: ./tests/updater_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-updater-check"
+      - name: Test opt-in user-data locations and portable precedence
+        shell: powershell
+        run: ./tests/data_paths_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-data-path-check"
       - name: Test visible updater handoff and progress window
         shell: powershell
         run: ./tests/updater_progress_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-update-progress-check"

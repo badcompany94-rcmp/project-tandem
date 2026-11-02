@@ -1,6 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Session)
 $ErrorActionPreference='Stop'
-$sessions=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'local-data\sessions')).TrimEnd('\')+'\'
+. (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
+$sessions=[IO.Path]::GetFullPath((Join-Path (Get-TandemDataRoot $PSScriptRoot) 'sessions')).TrimEnd('\')+'\'
 $Session=[IO.Path]::GetFullPath($Session).TrimEnd('\')
 if(-not $Session.StartsWith($sessions,[StringComparison]::OrdinalIgnoreCase)){throw 'The online session is outside this installation.'}
 $log=Join-Path $Session 'watch-online.log'
@@ -9,7 +10,7 @@ $owned=$false
 try {
     $game=Get-Content -LiteralPath (Join-Path $Session 'game-session.json') -Raw|ConvertFrom-Json
     $service=Get-Content -LiteralPath (Join-Path $Session 'online-service.json') -Raw|ConvertFrom-Json
-    $expected=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'local-data\build-portable\mkdd.exe'))
+    $expected=[IO.Path]::GetFullPath((Join-Path (Get-TandemBuildRoot $PSScriptRoot) 'mkdd.exe'))
     if(-not $game.online -or -not $expected.Equals([IO.Path]::GetFullPath($game.game_path),[StringComparison]::OrdinalIgnoreCase)) {throw 'The recorded game is outside this installation.'}
     if(-not $Session.Equals([IO.Path]::GetFullPath($service.session).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) {throw 'The online service belongs to a different session.'}
     $owned=$true
@@ -25,7 +26,7 @@ try {
         if($running.Count){$absentSince=$null}
         elseif($null -eq $absentSince){$absentSince=$clock.ElapsedMilliseconds}
         elseif($clock.ElapsedMilliseconds-$absentSince -ge 2000){Note 'Game closed; stopping this session online services.';break}
-        $latestFile=Join-Path $PSScriptRoot 'local-data\online-service.json'
+        $latestFile=Join-Path (Get-TandemDataRoot $PSScriptRoot) 'online-service.json'
         try {
             $latest=Get-Content -LiteralPath $latestFile -Raw|ConvertFrom-Json
             if($latest.session -and -not $Session.Equals([IO.Path]::GetFullPath($latest.session).TrimEnd('\'),[StringComparison]::OrdinalIgnoreCase)) {

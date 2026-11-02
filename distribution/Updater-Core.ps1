@@ -1,3 +1,4 @@
+. (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
 # Automatic Windows updates. Public GitHub releases only; PowerShell 5.1/.NET 4.
 $script:TandemRepository='badcompany94-rcmp/project-tandem'
 function Read-TandemJson([string]$Path) {
@@ -133,8 +134,9 @@ function Get-TandemPackagePath([string]$Name,[switch]$Generated) {
     $parts=$name.Split('/')
     foreach($part in $parts) {
         if(-not $part -or $part -in @('.','..') -or $part -match '[. ]$|^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)'){throw 'An update contains an unsafe Windows file path.'}
-        if($part -in @('local-data','saves','.git','gen','disc','eos-cache','private-auth','__pycache__')){throw 'An update attempts to replace private data.'}
+        if($part -in @('local-data','saves','mods','.git','gen','disc','eos-cache','private-auth','__pycache__')){throw 'An update attempts to replace private data.'}
     }
+    if($name -in @('paths.json','portable.txt')){throw 'Updates cannot replace local data-location preferences.'}
     if([IO.Path]::GetExtension($name) -in @('.iso','.ciso','.rvz','.gcz','.gcm','.dol','.raw','.pem','.key') -or [IO.Path]::GetFileName($name) -ieq 'mkdd.exe'){throw 'An update contains game data or a private file.'}
     if($parts.Count -gt 1) {
         if($parts[0] -notin @('source','docs','licenses','assets','config','runtime','tools')){throw 'An update contains an unsupported folder.'}
@@ -397,7 +399,7 @@ function Restore-TandemUpdate([string]$Root,$Record,[scriptblock]$Progress) {
             foreach($name in @('settings.json','game-image.json','update-pending.json')) {
                 $entry=@($journal.PrivateFiles|Where-Object {$_.Path -eq $name})|Select-Object -First 1
                 if(-not $entry){throw 'The private update backup record is incomplete.'}
-                $dest=Assert-TandemSafePath $Root (Join-Path $Root ('local-data/'+$name))
+                $dest=Get-TandemPrivateStatePath $Root $name $journal.UserDataRoot
                 if($entry.Existed) {
                     $from=Assert-TandemSafePath $where.Folder (Join-Path $where.Folder ('backup/'+$name))
                     if((Get-TandemHash $from) -ne $entry.Hash){throw 'The settings backup failed verification.'};Copy-TandemAtomic $from $dest
@@ -415,7 +417,7 @@ function Install-TandemUpdate([string]$Root,[string]$Stage,$Manifest,$Record,[sc
     [IO.Directory]::CreateDirectory($backup)|Out-Null
     $old=Get-Content -LiteralPath (Join-Path $Root 'package-manifest.json') -Raw|ConvertFrom-Json
     $installed='';try{$installed=[string](Get-Content -LiteralPath (Join-Path $Root 'local-data/build-portable/identity/build-identity.json') -Raw|ConvertFrom-Json).id}catch{}
-    $rebuild=($installed -ne $Manifest.compatibility) -or -not [IO.File]::Exists((Join-Path $Root 'local-data/build-portable/mkdd.exe')) -or (Test-TandemBuildMoved $Root)
+    $rebuild=($installed -ne $Manifest.compatibility) -or -not [IO.File]::Exists((Join-Path $Root 'local-data/build-portable/mkdd.exe'))
     $paths=@{};foreach($e in $Manifest.files) {if([IO.File]::Exists((Join-Path $Stage $e.path))){$paths[(Get-TandemPackagePath $e.path)]='Replace'}}
     $paths['package-manifest.json']='Replace'
     $newPaths=@{};foreach($e in $Manifest.files){$newPaths[[string]$e.path]=$true}
@@ -433,12 +435,12 @@ function Install-TandemUpdate([string]$Root,[string]$Stage,$Manifest,$Record,[sc
     }
     $private=New-Object Collections.Generic.List[object]
     foreach($name in @('settings.json','game-image.json','update-pending.json')) {
-        $path=Assert-TandemSafePath $Root (Join-Path $Root ('local-data/'+$name));$exists=[IO.File]::Exists($path)
+        $path=Get-TandemPrivateStatePath $Root $name (Get-TandemDataRoot $Root);$exists=[IO.File]::Exists($path)
         $hash=if($exists){Get-TandemHash $path}else{''};if($exists){[IO.File]::Copy($path,(Join-Path $backup $name),$true)}
         $private.Add([pscustomobject]@{Path=$name;Existed=$exists;Hash=$hash})
     }
     $journal=[pscustomobject]@{Format=1;Phase='Prepared';Prepared=$true;Files=@($files.ToArray());PrivateFiles=@($private.ToArray());
-        HadBuild=[IO.Directory]::Exists((Join-Path $Root 'local-data/build-portable'));BuildStarted=$false;Rebuild=$rebuild}
+        UserDataRoot=(Get-TandemDataRoot $Root);HadBuild=[IO.Directory]::Exists((Join-Path $Root 'local-data/build-portable'));BuildStarted=$false;Rebuild=$rebuild}
     Write-TandemJson $where.File $journal
     # There are no package writes until the entire backup/journal is durable.
     Set-TandemTransaction $Root $Record 'Installing'
@@ -455,7 +457,10 @@ function Install-TandemUpdate([string]$Root,[string]$Stage,$Manifest,$Record,[sc
         $image=Get-TandemCachedImage $Root;if(-not $image){throw 'A cached disc is required. Run setup/repair first.'}
         $build=Assert-TandemSafePath $Root (Join-Path $Root 'local-data/build-portable')
         $previous=Assert-TandemSafePath $where.Folder (Join-Path $backup 'build-portable')
-        if([IO.Directory]::Exists($build)){[IO.Directory]::Move($build,$previous)}
+        if([IO.Directory]::Exists($build)){
+            if(Test-TandemBuildMoved $Root){[IO.Directory]::Move($build,$previous)}
+            else{Backup-TandemBuildCache $Root $build $previous $Progress}
+        }
         $journal.BuildStarted=$true;$journal.Phase='Building';Write-TandemJson $where.File $journal
         Set-TandemTransaction $Root $Record 'Building';Send-TandemProgress $Progress 'Building' 'Rebuilding locally from your cached disc. This can take several minutes.'
         Invoke-TandemUpdateBuild $Root $image $Record $where.Folder $Progress
@@ -473,4 +478,41 @@ function Install-TandemUpdate([string]$Root,[string]$Stage,$Manifest,$Record,[sc
     Write-TandemJson (Join-Path $where.Folder 'result.json') ([pscustomobject]@{Succeeded=$true;Tag=$Record.Tag;Compatibility=$Manifest.compatibility;Rebuilt=$rebuild;Finished=[DateTime]::UtcNow.ToString('o')})
     [IO.File]::Delete((Join-Path $Root 'local-data/update-transaction.json'))
     Send-TandemProgress $Progress 'Ready' 'Update installed. Ready to play.' 100
+}
+
+function Backup-TandemBuildCache([string]$Root,[string]$Build,[string]$Backup,[scriptblock]$Progress){
+    $Build=Assert-TandemSafePath $Root $Build;$Backup=Assert-TandemSafePath $Root $Backup
+    $partial=Assert-TandemSafePath $Root ($Backup+'.partial-'+[guid]::NewGuid().ToString('N'))
+    $files=New-Object 'Collections.Generic.List[object]';$pending=New-Object 'Collections.Generic.Stack[string]';$pending.Push($Build);$bytes=[long]0
+    while($pending.Count){
+        foreach($item in Get-ChildItem -LiteralPath $pending.Pop() -Force){
+            if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'The compiler cache contains a linked path. Run repair before updating.'}
+            if($item.PSIsContainer){$pending.Push($item.FullName)}else{
+                if($files.Count -ge 200000){throw 'The compiler cache has too many files to back up safely.'}
+                $files.Add([pscustomobject]@{Path=$item.FullName;Length=$item.Length});$bytes+=$item.Length
+            }
+        }
+    }
+    $drive=New-Object IO.DriveInfo([IO.Path]::GetPathRoot($Backup))
+    if($drive.AvailableFreeSpace -lt $bytes+512MB){throw 'Not enough space to preserve the compiler cache for rollback. Free space and retry; the previous game is unchanged.'}
+    Send-TandemProgress $Progress 'Building' 'Preserving the compiler cache for rollback before an incremental build.'
+    foreach($file in $files){
+        $relative=$file.Path.Substring($Build.TrimEnd('\').Length+1);$target=Assert-TandemSafePath $Root (Join-Path $partial $relative)
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))|Out-Null
+        [IO.File]::Copy($file.Path,$target,$false)
+        if((Get-Item -LiteralPath $target).Length -ne $file.Length){throw 'The compiler-cache backup did not finish. The original build was not changed.'}
+    }
+    $exe=Join-Path $Build 'mkdd.exe'
+    if([IO.File]::Exists($exe) -and (Get-TandemHash $exe) -ne (Get-TandemHash (Join-Path $partial 'mkdd.exe'))){throw 'The native-game backup failed verification.'}
+    if(-not [IO.Directory]::Exists($partial)){[IO.Directory]::CreateDirectory($partial)|Out-Null}
+    [IO.Directory]::Move($partial,$Backup)
+}
+
+function Get-TandemPrivateStatePath([string]$Root,[string]$Name,[string]$UserDataRoot){
+    if($Name -ceq 'update-pending.json'){return Assert-TandemSafePath $Root (Join-Path (Get-TandemControlRoot $Root) $Name)}
+    if($Name -cnotin @('settings.json','game-image.json')){throw 'Unknown private update-state file.'}
+    # Old journals used install/local-data. New journals bind the configured root.
+    $data=if($UserDataRoot){$UserDataRoot}else{Get-TandemControlRoot $Root}
+    if($UserDataRoot -and -not (Test-TandemPathEqual $data (Get-TandemDataRoot $Root))){throw 'The configured data location changed during the update. Restore paths.json before recovery.'}
+    return Assert-TandemUserPath $data (Join-Path $data $Name)
 }

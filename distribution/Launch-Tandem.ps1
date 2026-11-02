@@ -1,19 +1,20 @@
 param([switch]$Offline,
       [ValidateSet('Stable','Responsive')][string]$NetworkProfile='Stable',[uint32]$Frames=0)
 $ErrorActionPreference='Stop'
-$root=$PSScriptRoot;$data=Join-Path $root 'local-data'
-$settingsFile=Join-Path $data 'settings.json'
-if(-not (Test-Path -LiteralPath $settingsFile)){throw 'Run Setup-Tandem.cmd first and select your own compatible disc image.'}
+$root=$PSScriptRoot
 . (Join-Path $root 'Tandem-Paths.ps1')
+$data=Initialize-TandemDataRoot $root
+$settingsFile=Join-Path $data 'settings.json'
+if(-not (Test-Path -LiteralPath (Join-Path $data 'settings.json'))){throw 'Run Setup-Tandem.cmd first for this data location.'}
 $settings=Get-TandemSettings $root
 Assert-TandemClosed $root
 $image=Resolve-TandemImage $root $settings $null
 if(-not $image){Write-Host 'Launch cancelled.';return}
-$build=Join-Path $data 'build-portable'
+$build=Get-TandemBuildRoot $root
 $package=Get-Content -LiteralPath (Join-Path $root 'package-manifest.json') -Raw|ConvertFrom-Json
 $installedIdentity=Join-Path $build 'identity\build-identity.json';$installedBuild=$null
 if(Test-Path -LiteralPath $installedIdentity){try{$installedBuild=(Get-Content -LiteralPath $installedIdentity -Raw|ConvertFrom-Json).id}catch{}}
-if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-Path $data 'update-pending.json')) -or -not (Test-Path -LiteralPath (Join-Path $build 'mkdd.exe'))) {
+if($installedBuild -ne $package.compatibility -or (Test-Path -LiteralPath (Join-Path (Get-TandemControlRoot $root) 'update-pending.json')) -or -not (Test-Path -LiteralPath (Join-Path $build 'mkdd.exe'))) {
     Write-Host 'Updating the local build for the current game version...'
     & (Join-Path $root 'Setup-Tandem.ps1') -GameImage $image
     $settings=Get-TandemSettings $root

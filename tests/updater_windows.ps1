@@ -206,5 +206,41 @@ $deadline=[DateTime]::UtcNow.AddSeconds(35)
 while((Get-TandemUpdateStatus $handoff.Root).Pending){if([DateTime]::UtcNow -gt $deadline){throw 'handoff worker did not finish'};Start-Sleep -Milliseconds 100}
 Require (Test-Path -LiteralPath (Join-Path $handoff.Root 'local-data/updates/active/Update-Build.ps1')) 'immutable recovery runtime copied'
 IsRestored $handoff
+# Custom saves stay outside the installation, but journals/builds remain local.
+foreach($fail in @($false,$true)) {
+    $custom=Fixture ('external-data-'+$fail)
+    $external=Join-Path $Evidence ('user data '+$fail)
+    Text (Join-Path $external 'game/saves/progress.sav') 'external progress'
+    foreach($name in @('settings.json','game-image.json','game-image.iso')) {
+        Copy-Item -LiteralPath (Join-Path $custom.Root ('local-data/'+$name)) -Destination (Join-Path $external $name)
+    }
+    Write-TandemJson (Join-Path $custom.Root 'paths.json') @{data=$external}
+    Initialize-TandemDataRoot $custom.Root|Out-Null
+    $metadataHash=Get-TandemHash (Join-Path $external 'settings.json')
+    if($fail) {
+        Text (Join-Path $custom.Stage 'Setup-Tandem.ps1') @'
+param([string]$GameImage)
+. (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
+[IO.File]::WriteAllText((Join-Path (Get-TandemDataRoot $PSScriptRoot) 'settings.json'),'changed during failing build')
+throw 'custom-data simulated failure'
+'@
+        Copy-Item -LiteralPath (Join-Path $source 'distribution/Tandem-Paths.ps1') -Destination (Join-Path $custom.Root 'Tandem-Paths.ps1')
+        Reject {Install-TandemUpdate $custom.Root $custom.Stage $custom.Manifest $custom.Record $null} 'external-data build failure reported'
+        Restore-TandemUpdate $custom.Root $custom.Record $null
+        IsRestored $custom
+    }else{
+        Install-TandemUpdate $custom.Root $custom.Stage $custom.Manifest $custom.Record $null
+        Require ((Get-TandemInstalledTag $custom.Root) -eq 'v0.1.0-beta.8') 'external-data update committed'
+    }
+    Require ((Get-TandemHash (Join-Path $external 'settings.json')) -eq $metadataHash) 'external settings preserved/restored byte for byte'
+    Require (([IO.File]::ReadAllText((Join-Path $external 'game/saves/progress.sav'))) -eq 'external progress') 'external save preserved'
+    Require (-not (Test-Path -LiteralPath (Join-Path $external 'updates'))) 'update journals never redirected into user data'
+}
+$moved=Fixture 'moved-matching-build';$moved.Manifest.compatibility='1111111111111111'
+Text (Join-Path $moved.Root 'local-data/build-portable/CMakeCache.txt') 'CMAKE_HOME_DIRECTORY:INTERNAL=Z:/old/source'
+Text (Join-Path $moved.Root 'fail-build.flag') 'must not rebuild matching moved game'
+Install-TandemUpdate $moved.Root $moved.Stage $moved.Manifest $moved.Record $null
+Require (([IO.File]::ReadAllText((Join-Path $moved.Root 'local-data/build-portable/mkdd.exe'))) -eq 'old native game') 'moved matching game reused during update'
+foreach($reserved in @('paths.json','portable.txt')){Reject {Get-TandemPackagePath $reserved} ('archive cannot redirect user data with '+$reserved)}
 Write-TandemJson (Join-Path $Evidence 'result.json') @{passed=$true;checks=$script:checks;fixture_game_only=$true;real_game_launched=$false}
 Write-Output "PASS $script:checks updater version, verification, install, preservation, rollback and interruption checks"

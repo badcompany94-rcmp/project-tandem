@@ -4,7 +4,7 @@ $root=$PSScriptRoot
 . (Join-Path $root 'Setup-Progress.ps1')
 . (Join-Path $root 'Tandem-Paths.ps1')
 $savedSettings=Get-TandemSettings $root
-$data=Join-Path $root 'local-data'
+$data=Initialize-TandemDataRoot $root
 New-Item -ItemType Directory -Force -Path $data | Out-Null
 $manifest=Get-Content -LiteralPath (Join-Path $root 'package-manifest.json') -Raw | ConvertFrom-Json
 Write-Host 'Verifying the Project Tandem package...'
@@ -33,7 +33,7 @@ $llvm=Join-Path $root 'tools\llvm-mingw\bin'
 $ninja=Join-Path $root 'tools\ninja\ninja.exe'
 $env:PATH="$llvm;$env:SystemRoot\System32;$env:SystemRoot"
 $source=Join-Path $root 'source'
-$build=Join-Path $data 'build-portable'
+$build=Get-TandemBuildRoot $root
 New-Item -ItemType Directory -Force -Path $build | Out-Null
 $log=Join-Path $data 'setup.log'
 function Run-Tool([string]$Program,[string[]]$Arguments) {
@@ -46,9 +46,9 @@ $GameImage=Save-TandemImageCache $root $GameImage
 if(Test-TandemBuildMoved $root) {
     # CMake/generated code records absolute paths. Preserve the old generated
     # build and make a fresh one; saves/settings live outside this directory.
-    $dataFull=[IO.Path]::GetFullPath($data).TrimEnd('\')+'\'
+    $dataFull=[IO.Path]::GetFullPath((Get-TandemControlRoot $root)).TrimEnd('\')+'\'
     $oldBuild=[IO.Path]::GetFullPath($build)
-    $archive=[IO.Path]::GetFullPath((Join-Path $data ('build-backups\'+[guid]::NewGuid().ToString('N'))))
+    $archive=[IO.Path]::GetFullPath((Join-Path (Get-TandemControlRoot $root) ('build-backups\'+[guid]::NewGuid().ToString('N'))))
     if(-not $oldBuild.StartsWith($dataFull,[StringComparison]::OrdinalIgnoreCase) -or
        -not $archive.StartsWith($dataFull,[StringComparison]::OrdinalIgnoreCase) -or
        ((Get-Item -LiteralPath $oldBuild).Attributes -band [IO.FileAttributes]::ReparsePoint)){throw 'Unsafe build-cache location; repair cancelled.'}
@@ -59,14 +59,14 @@ if(Test-TandemBuildMoved $root) {
 }
 Write-Host 'Compiling locally from your disc. This may take several minutes.'
 $script:SetupStage='3/5 Configure'
-Run-Tool $cmake @('-S',$source,'-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',"-DCMAKE_MAKE_PROGRAM=$ninja","-DCMAKE_C_COMPILER=$llvm\x86_64-w64-mingw32-clang.exe","-DCMAKE_CXX_COMPILER=$llvm\x86_64-w64-mingw32-clang++.exe",'-DCMAKE_EXE_LINKER_FLAGS=-static',"-DPython3_EXECUTABLE=$python","-DGAME_ISO=$GameImage",'-DGCN_OPENXR=OFF','-DMKDD_EOS=OFF','-DGCN_INPUT_TESTS=OFF','-DGCN_NET_TESTS=OFF','-DMKDD_ONLINE_TESTS=OFF',"-DFETCHCONTENT_SOURCE_DIR_SDL2=$(Join-Path $root 'tools\SDL2')")
+Run-Tool $cmake @('-S',$source,'-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',"-DCMAKE_MAKE_PROGRAM=$ninja","-DCMAKE_C_COMPILER=$llvm\x86_64-w64-mingw32-clang.exe","-DCMAKE_CXX_COMPILER=$llvm\x86_64-w64-mingw32-clang++.exe","-DCMAKE_RC_COMPILER=$llvm\x86_64-w64-mingw32-windres.exe",'-DCMAKE_EXE_LINKER_FLAGS=-static',"-DPython3_EXECUTABLE=$python","-DGAME_ISO=$GameImage",'-DGCN_OPENXR=OFF','-DMKDD_EOS=OFF','-DGCN_INPUT_TESTS=OFF','-DGCN_NET_TESTS=OFF','-DMKDD_ONLINE_TESTS=OFF',"-DFETCHCONTENT_SOURCE_DIR_SDL2=$(Join-Path $root 'tools\SDL2')")
 $script:SetupStage='4/5 Build game'
 Run-Tool $cmake @('--build',$build,'--target','mkdd','--parallel',([Math]::Max(1,[Math]::Min($Jobs,16))))
 Show-TandemProgress '5/5 Final checks' -1 'Checking multiplayer compatibility'
 $identity=Get-Content -LiteralPath (Join-Path $build 'identity\build-identity.json') -Raw | ConvertFrom-Json
 if($identity.id -ne $manifest.compatibility){throw 'This compiler or build configuration differs from the playtest package. See START-HERE.txt; multiplayer requires matching builds.'}
 Save-TandemSettings $root $savedSettings $GameImage
-$pending=Join-Path $data 'update-pending.json'
+$pending=Join-Path (Get-TandemControlRoot $root) 'update-pending.json'
 if(Test-Path -LiteralPath $pending){Remove-Item -LiteralPath $pending}
 try { & (Join-Path $source 'distribution\Build-Launcher.ps1') -Root $root }
 catch { Write-Warning 'The game is ready, but the graphical launcher could not be built. Launch-Tandem.cmd still works.' }

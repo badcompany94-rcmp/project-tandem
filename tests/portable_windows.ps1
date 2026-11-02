@@ -2,7 +2,9 @@ param([Parameter(Mandatory=$true)][string]$Evidence,
       [Parameter(Mandatory=$true)][string]$Runtime,
       [Parameter(Mandatory=$true)][string]$GameImage,
       [Parameter(Mandatory=$true)][string]$Python,
-      [Parameter(Mandatory=$true)][string]$Compatibility)
+      [Parameter(Mandatory=$true)][string]$Compatibility,
+      [ValidateSet('Default','Relative','External')][string]$DataMode='Default',
+      [string]$LanHelper)
 $ErrorActionPreference='Stop'
 $source=Split-Path -Parent $PSScriptRoot
 $base=[IO.Path]::GetFullPath($Evidence)
@@ -12,7 +14,7 @@ if(Test-Path -LiteralPath $root){throw 'Use a fresh evidence directory.'}
 foreach($dir in @('local-data/build-portable/identity','tools/python','source/gcn-recomp/recomp')) {
     New-Item -ItemType Directory -Force -Path (Join-Path $root $dir)|Out-Null
 }
-foreach($name in @('Launch-Tandem.ps1','Tandem-Paths.ps1','Mods-Core.ps1')) {
+foreach($name in @('Launch-Tandem.ps1','Tandem-Paths.ps1')) {
     Copy-Item -LiteralPath (Join-Path $source ('distribution/'+$name)) -Destination (Join-Path $root $name)
 }
 foreach($name in @('extract_dol.py','dol.py')) {
@@ -25,6 +27,19 @@ New-Item -ItemType HardLink -Path (Join-Path $root 'local-data/game-image.iso') 
 @{compatibility=$Compatibility;files=@(@{path='fixture';sha256='0'})}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $root 'package-manifest.json')
 @{id=$Compatibility}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $root 'local-data/build-portable/identity/build-identity.json')
 @{player_name='PORTABLE';game_image=(Join-Path $root 'local-data/game-image.iso');source=(Join-Path $root 'source')}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $root 'local-data/settings.json')
+if($DataMode -ne 'Default') {
+    $dataPath=if($DataMode -eq 'Relative'){'user data'}else{Join-Path $base 'external user data'}
+    $initialData=if([IO.Path]::IsPathRooted($dataPath)){$dataPath}else{Join-Path $root $dataPath}
+    New-Item -ItemType Directory -Force -Path $initialData|Out-Null
+    foreach($file in @('settings.json','game-image.json','game-image.iso')){Move-Item -LiteralPath (Join-Path $root ('local-data/'+$file)) -Destination (Join-Path $initialData $file)}
+    @{data=$dataPath}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $root 'paths.json')
+}
+if($LanHelper) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $root 'runtime'),(Join-Path $root 'source/services')|Out-Null
+    Copy-Item -LiteralPath $LanHelper -Destination (Join-Path $root 'runtime/mkdd_lan.exe')
+    Copy-Item -LiteralPath (Join-Path $source 'services/rooms.py') -Destination (Join-Path $root 'source/services/rooms.py')
+    foreach($file in @('Watch-Online.ps1','Stop-Online.ps1')){Copy-Item -LiteralPath (Join-Path $source ('distribution/'+$file)) -Destination (Join-Path $root $file)}
+}
 "throw 'Unexpected native rebuild'"|Set-Content -LiteralPath (Join-Path $root 'Setup-Tandem.ps1')
 @("CMAKE_HOME_DIRECTORY:INTERNAL=$root/source","CMAKE_CACHEFILE_DIR:INTERNAL=$root/local-data/build-portable","GAME_ISO:FILEPATH=$root/local-data/game-image.iso")|Set-Content -LiteralPath (Join-Path $root 'local-data/build-portable/CMakeCache.txt')
 $cacheHash=(Get-FileHash -LiteralPath (Join-Path $root 'local-data/build-portable/CMakeCache.txt')).Hash
@@ -32,7 +47,10 @@ $exeHash=(Get-FileHash -LiteralPath $Runtime).Hash
 $global:TandemPortableTestProcess=$null
 function Start-Process {
     param($FilePath,$ArgumentList,$WorkingDirectory,$WindowStyle,[switch]$PassThru,$RedirectStandardOutput,$RedirectStandardError)
-    if(-not $FilePath.EndsWith('\mkdd.exe')){throw 'Unexpected helper in offline relocation test'}
+    if(-not $FilePath.EndsWith('\mkdd.exe')) {
+        if(-not $LanHelper){throw 'Unexpected helper in offline relocation test'}
+        return Microsoft.PowerShell.Management\Start-Process @PSBoundParameters
+    }
     foreach($key in @('INPUT','DISPLAY','SOUND','PRESENTATION','OVERLAY')){[Environment]::SetEnvironmentVariable('GCN_'+$key+'_CONFIG',(Join-Path $WorkingDirectory ($key+'.cfg')),'Process')}
     $args=@($ArgumentList|ForEach-Object {switch -Wildcard ($_){'--fullscreen'{'--hidden'} '--scale=*'{'--scale=1'} '--resolution=*'{'--resolution=640x480'} default{$_}}})
     $args+='--fast'
@@ -44,15 +62,25 @@ foreach($name in @('original install',"renamed spaces % and ' quote",'moved/port
     $next=[IO.Path]::GetFullPath((Join-Path $base $name))
     if(-not $next.StartsWith($base.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Fixture move escapes evidence directory'}
     if($root -ne $next){New-Item -ItemType Directory -Force -Path (Split-Path -Parent $next)|Out-Null;Move-Item -LiteralPath $root -Destination $next;$root=$next}
-    & (Join-Path $root 'Launch-Tandem.ps1') -Offline -Frames 900
+    & (Join-Path $root 'Launch-Tandem.ps1') -Offline:(!$LanHelper) -Frames 900
     if(-not $global:TandemPortableTestProcess.WaitForExit(60000)){throw 'Native relocation launch timed out'}
-    $state=Get-Content -LiteralPath (Join-Path $root 'local-data/latest-game.json') -Raw|ConvertFrom-Json
+    . (Join-Path $root 'Tandem-Paths.ps1')
+    $data=Get-TandemDataRoot $root
+    $state=Get-Content -LiteralPath (Join-Path $data 'latest-game.json') -Raw|ConvertFrom-Json
     $log=Get-Content -LiteralPath (Join-Path $state.session 'game-stderr.log') -Raw
     if(-not $log.Contains('[exit] frame limit 900 reached') -or $log.Contains('FATAL:')){throw 'Moved runtime failed to boot'}
     if((Get-FileHash -LiteralPath (Join-Path $root 'local-data/build-portable/mkdd.exe')).Hash -ne $exeHash){throw 'Native binary changed'}
     if((Get-FileHash -LiteralPath (Join-Path $root 'local-data/build-portable/CMakeCache.txt')).Hash -ne $cacheHash){throw 'Launch altered compiler cache'}
-    $settings=Get-Content -LiteralPath (Join-Path $root 'local-data/settings.json') -Raw|ConvertFrom-Json
-    if($settings.source -ne (Join-Path $root 'source') -or $settings.game_image -ne (Join-Path $root 'local-data/game-image.iso')){throw 'Settings did not follow moved install'}
+    $settings=Get-Content -LiteralPath (Join-Path $data 'settings.json') -Raw|ConvertFrom-Json
+    if($settings.source -ne (Join-Path $root 'source') -or $settings.game_image -ne (Join-Path $data 'game-image.iso')){throw 'Settings did not follow moved install'}
+    if($LanHelper) {
+        $service=Get-Content -LiteralPath (Join-Path $state.session 'online-service.json') -Raw|ConvertFrom-Json
+        $deadline=[DateTime]::UtcNow.AddSeconds(15)
+        while(Get-Process -Id $service.helper_id,$service.upstream_id -ErrorAction SilentlyContinue) {
+            if([DateTime]::UtcNow -gt $deadline){& (Join-Path $root 'Stop-Online.ps1') -Session $state.session;throw 'LAN helpers did not stop after game exit'}
+            Start-Sleep -Milliseconds 100
+        }
+    }
     $reports+=@{path=$root;native_boot=$true;binary_unchanged=$true;compiler_not_called=$true}
 }
 # Relocation must not bypass a new version, pending update, or missing runtime.

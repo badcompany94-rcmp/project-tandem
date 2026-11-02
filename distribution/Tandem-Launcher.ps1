@@ -67,7 +67,7 @@ $updateStatus=Label 'Check for updates to keep your game ready for online play.'
 $releaseNotes=New-Object Windows.Forms.LinkLabel;$releaseNotes.Text="What's new";$releaseNotes.LinkColor=[Drawing.Color]::FromArgb(255,220,90)
 $releaseNotes.SetBounds(300,368,150,28);$releaseNotes.Visible=$false;$form.Controls.Add($releaseNotes)
 $auto=New-Object Windows.Forms.CheckBox;$auto.Text='Check automatically at startup and while open';$auto.SetBounds(300,402,620,30);$auto.Checked=$true;$form.Controls.Add($auto)
-$preferences=Join-Path $Root 'local-data/launcher-settings.json'
+$preferences=Join-Path (Get-TandemDataRoot $Root) 'launcher-settings.json'
 try {if(Test-Path -LiteralPath $preferences){$auto.Checked=[bool](Get-Content -LiteralPath $preferences -Raw|ConvertFrom-Json).check_at_startup}}catch{}
 $auto.add_CheckedChanged({if(-not $SelfTest){try{Write-TandemJson $preferences @{check_at_startup=$auto.Checked}}catch{$output.Text='Could not save launcher preferences: '+$_.Exception.Message}}})
 $matching=Label 'Online players need the same build. Game settings are in F1.' 297 440 630 28 10
@@ -146,7 +146,7 @@ $updates.add_Click({
     }catch {$script:updateHandoff=$false;$form.UseWaitCursor=$false;$output.Text=$_.Exception.Message;Refresh-State;$timer.Start()}
 })
 $help.add_Click({$file=Join-Path $Root 'docs/CONTROLS.md';if(Test-Path -LiteralPath $file){Start-Process -FilePath 'notepad.exe' -ArgumentList (Join-TandemArguments @($file))}else{Start-Process 'https://github.com/badcompany94-rcmp/project-tandem#readme'}})
-$logs.add_Click({$folder=if($script:latestLog){$script:latestLog}else{Join-Path $Root 'local-data'};if(Test-Path -LiteralPath $folder){Start-Process -FilePath 'explorer.exe' -ArgumentList (Join-TandemArguments @($folder))}})
+$logs.add_Click({$folder=if($script:latestLog){$script:latestLog}else{Get-TandemDataRoot $Root};if(Test-Path -LiteralPath $folder){Start-Process -FilePath 'explorer.exe' -ArgumentList (Join-TandemArguments @($folder))}})
 $timer=New-Object Windows.Forms.Timer;$timer.Interval=400
 $timer.add_Tick({
     if($script:checkJob) {

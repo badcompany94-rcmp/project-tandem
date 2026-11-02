@@ -1,8 +1,9 @@
 param([string]$Session)
 $ErrorActionPreference='Stop'
-$file=Join-Path $PSScriptRoot 'local-data\online-service.json'
+. (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
+$file=Join-Path (Get-TandemDataRoot $PSScriptRoot) 'online-service.json'
 if($Session) {
-    $sessions=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'local-data\sessions')).TrimEnd('\')+'\'
+    $sessions=[IO.Path]::GetFullPath((Join-Path (Get-TandemDataRoot $PSScriptRoot) 'sessions')).TrimEnd('\')+'\'
     $folder=[IO.Path]::GetFullPath($Session).TrimEnd('\')
     if(-not $folder.StartsWith($sessions,[StringComparison]::OrdinalIgnoreCase)){throw 'The online session is outside this installation.'}
     # A closing session must never stop a helper started by a later launch.

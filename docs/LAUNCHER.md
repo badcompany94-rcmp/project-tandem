@@ -1,5 +1,13 @@
 # Project Tandem launcher and automatic updates
 
+Optional `paths.json` / `portable.txt` preferences control user-data locations;
+existing installations keep today's layout. See [user data](USER-DATA.md).
+Moving or renaming a current installation no longer triggers a native rebuild.
+Matching gameplay builds are reused. When a native update is needed, a stationary
+compiler cache is backed up for rollback and reused for incremental compilation;
+unchanged generated game sources keep their timestamps. A moved compiler cache
+still needs replacement when an actual code update or Repair requires a build.
+
 On Windows, open **Project Tandem.lnk** or **ProjectTandem.exe** after setup.
 Play starts the same unified LAN/Internet game; game settings remain in F1.
 The launcher shows the installed release and online build ID and credits

@@ -1,3 +1,4 @@
+. (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
 # Shared launcher state and child-process arguments. Windows PowerShell 5.1.
 $script:TandemManifestCache=@{}
 function Join-TandemArguments([string[]]$Values) {
@@ -27,10 +28,10 @@ function Get-TandemLauncherState([string]$Root) {
         if(Test-Path -LiteralPath $identityFile -PathType Leaf){$result.Installed=[string](Get-Content -LiteralPath $identityFile -Raw -ErrorAction Stop|ConvertFrom-Json -ErrorAction Stop).id}
         $exe=Join-Path $rootPath 'local-data/build-portable/mkdd.exe'
         $result.Ready=($result.Installed -eq $result.Compatibility) -and (Test-Path -LiteralPath $exe -PathType Leaf) -and
-            (Test-Path -LiteralPath (Join-Path $rootPath 'local-data/settings.json') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path (Get-TandemDataRoot $rootPath) 'settings.json') -PathType Leaf) -and
             -not (Test-Path -LiteralPath (Join-Path $rootPath 'local-data/update-pending.json'))
         $result.Detail=if($result.Ready){'Ready to play. LAN and Internet use the same game.'}else{'Setup or a local rebuild is needed. Your saves and controls are kept.'}
-    }catch {$result.Detail='Package information is missing or unreadable. Extract the complete download again.'}
+    }catch {$result.Ready=$false;$result.Detail=if($result.PackageValid){$_.Exception.Message}else{'Package information is missing or unreadable. Extract the complete download again.'}}
     $result.Running=$false;$result.UpdatePending=$false;$result.UpdateRecovery=$false
     try {$prefix=$rootPath.TrimEnd('\')+'\';$result.Running=@(Get-Process -Name mkdd -ErrorAction SilentlyContinue|Where-Object {$_.Path -and $_.Path.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase)}).Count -gt 0}catch{}
     if(Get-Command Get-TandemUpdateStatus -ErrorAction SilentlyContinue) {
@@ -41,7 +42,7 @@ function Get-TandemLauncherState([string]$Root) {
 }
 function New-TandemLauncherJob([string]$Root,[ValidateSet('Play','Setup','Repair','CheckUpdate')][string]$Action,[string]$GameImage,[string]$Worker) {
     $rootPath=[IO.Path]::GetFullPath($Root)
-    $folder=Join-Path $rootPath ('local-data/launcher-logs/'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
+    $folder=Join-Path (Initialize-TandemDataRoot $rootPath) ('launcher-logs/'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
     New-Item -ItemType Directory -Path $folder -Force | Out-Null
     $arguments=@('-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',$Worker,'-Root',$rootPath,'-Action',$Action,'-Result',(Join-Path $folder 'result.json'))
     if($GameImage){$arguments+=@('-GameImage',$GameImage)}
