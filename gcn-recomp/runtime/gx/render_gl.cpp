@@ -29,10 +29,7 @@ bool write_png(const char* path, const uint8_t* rgba, int w, int h);
 namespace gx {
 #if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
 static D3D11Renderer* native_backend(){return desktop_renderer::renderer();}
-static bool native_texture_replacement(const TexData& texture,D3D11Renderer::Replacement& result){
-    TextureReplacement replacement;if(!texture_mods_load(texture.replacement_name,texture.width,texture.height,replacement))return false;
-    result.width=unsigned(replacement.width);result.height=unsigned(replacement.height);result.rgba=std::move(replacement.pixels);return true;
-}
+
 #endif
 
 static bool g_interpolating = false;
@@ -697,7 +694,6 @@ void render_init(int internal_scale) {
 #if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
     if(auto* renderer=native_backend()){
         if(renderer->width()!=unsigned(EFB_W*g_scale)){std::string error;if(!renderer->initialize(*desktop_renderer::device(),g_scale,error))fatal("Direct3D initialization: %s",error.c_str());}
-        renderer->set_texture_loader(native_texture_replacement);
         if(!g_shader_cache_path.empty())renderer->open_shader_cache(g_shader_cache_path+".d3d11",g_shader_cache_path);
         g_renderer_writes_back=true;return;
     }
@@ -3733,7 +3729,7 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
 bool render_execute(Batch& b) {
 #if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
     if(auto* renderer=native_backend()){
-        frame_observe(b,nullptr);texture_mods_sync();g_render_frame++;std::string error;
+        frame_observe(b,nullptr);g_render_frame++;std::string error;
         if(!renderer->prepare(b,error))fatal("Direct3D batch preparation: %s",error.c_str());
         std::vector<uint8_t> offscreen;if(g_flat_overlay_scale!=1.f)mark_offscreen_passes(b,offscreen);
         EfbCopyCmd screen{};screen.src_w=EFB_W;screen.src_h=EFB_H;float center=0,halfwidth=1;

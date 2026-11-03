@@ -7,7 +7,7 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**Downloads:** [Windows — official Public Beta 10 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.10) · **[Linux — community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
+**Downloads:** [Windows — official Public Beta 13 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.13) · **[Linux — community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
 
 [Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
 
@@ -17,7 +17,7 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 10 keeps update progress visible.** The launcher waits for the update window to appear before closing; that window reports downloading, verification, installation and any needed build. Failed window startup leaves the launcher open. The taskbar fan-art icon and Linux source compilation fix from Beta 9 are retained. [Changes and compatibility](docs/releases/public-beta-10.md) · [Launcher guide](docs/LAUNCHER.md)
+**Beta 13 adds experimental Direct3D 11.** Choose OpenGL (default) or Direct3D 11 in F1 > Display, save and restart. The Very Low preset selects 1x internal resolution with interpolation off. Both renderers use the same online build identity. Performance on older hardware still needs feedback. [Changes and limitations](docs/releases/public-beta-13.md)
 
 ## Features
 
@@ -45,7 +45,7 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 The player package includes its build tools. You do not need Visual Studio, a separate Windows SDK, or Python installation. Online players do not need an Epic player account or developer setup. Ordinary home connections use automatic connection setup and relay fallback without a VPN or manual port forwarding; restrictive networks can still prevent a connection.
 
-Requirements: 64-bit Windows 10 or 11, graphics supporting desktop OpenGL 3.3, a writable installation folder, and space for the toolchain, build output, and a private cached copy of your ISO. This beta targets Windows x64.
+Requirements: 64-bit Windows 10 or 11, graphics supporting desktop OpenGL 3.3 (default) or Direct3D feature level 11_0 (experimental), a writable installation folder, and space for the toolchain, build output, and a private cached copy of your ISO. This beta targets Windows x64.
 
 The supported disc is **USA `GM4E01`**, with `main.dol` SHA-1 `e389e50357d4a5076ab3d38672204658f411123d`. Setup rejects an incompatible revision. Other regions and RVZ/GCZ input are not supported by this installer.
 
