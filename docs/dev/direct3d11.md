@@ -45,3 +45,24 @@ and then Direct3D bytecode. This is shader compilation, not a replacement of the
 native device/rendering API with an OpenGL runtime layer. Any integrated compiler
 dependencies must be pinned, licensed, packaged and credited before release.
 Compiler success alone does not establish coordinate, point or readback parity.
+
+The shader generator has an opt-in interface for backend-managed point expansion.
+It exports point size and coordinates explicitly and fixes varying locations,
+including optional fog/depth inputs. OpenGL callers use the unchanged default
+source. Native pixel shaders require actual interpolated point coordinates, not
+the shader compiler's constant-coordinate compatibility substitution. A native
+geometry expansion stage is still required.
+
+For developer compiler validation, set `TANDEM_D3D11_SHADER_TESTS=ON`,
+`TANDEM_GLSLANG_SOURCE_DIR` and `TANDEM_SPIRV_CROSS_SOURCE_DIR`, then build
+`d3d11_shader_corpus_test`. Reference dependency commits are glslang 16.6.0
+`e1b562a8bed273a02f30b59b66a5d499793cede5` and SPIRV-Cross
+`vulkan-sdk-1.4.363.0`, `f11ba9f0b21ba8fc15153d50a2a1ae31ab1cf8f7`.
+These optional developer tests do not download or package dependencies.
+
+Pass a local `saves/shaders.bin` path followed by `points` to compile the native
+variants and check the live Direct3D stage signatures through shader reflection.
+Use `hash` to record the default OpenGL source hashes. The fixture never edits
+the input cache. Do not redistribute local shader caches as test assets. Compiler
+and signature checks do not prove pixel equivalence, rollback, or mixed-renderer
+online behavior.

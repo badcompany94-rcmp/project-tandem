@@ -57,9 +57,11 @@ extern bool g_dual_source;
 // blend does read it, which then comes from a second output (dual-source blending). Where
 // the GL has no dual-source blending, case 2 is left as 0 and the TEV's alpha is stored.
 uint32_t dst_alpha_mode(const uint32_t* bp);
-std::string gen_vertex_shader();
+// Explicit point varyings support native backends whose rasterizer does not
+// provide programmable point size/coordinates. The default GL source is stable.
+std::string gen_vertex_shader(bool explicit_point_varyings=false);
 // GCN_GLSL_VERSION, plus what writing gl_ClipDistance needs; defines GCN_CLIP where it can.
 std::string glsl_header_with_clip();
-std::string gen_pixel_shader(const ShaderKey& k);
+std::string gen_pixel_shader(const ShaderKey& k,bool explicit_point_varyings=false);
 
 }  // namespace gx

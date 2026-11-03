@@ -5,8 +5,23 @@
 #include <cstring>
 #include <string>
 #include <cstdlib>
+#include <utility>
 
 namespace gx {
+
+// Native backend linking cannot rely on a driver matching varyings by name.
+// Optional fog/depth inputs must not shift point coordinates to another slot.
+static std::string explicit_interfaces(std::string source) {
+    for(const auto& entry:{std::pair{"vec4 v_col0;",0}, {"vec4 v_col1;",1},
+        {"vec3 v_tex[8];",2}, {"vec2 v_fogz;",10}, {"vec2 v_gdepth;",11},
+        {"vec2 v_point_coord;",12}, {"float v_point_size;",13}}) {
+        for(const char* direction:{"in ","out "}) {
+            const auto at=source.find(std::string(direction)+entry.first);
+            if(at!=std::string::npos)source.insert(at,"layout(location = "+std::to_string(entry.second)+") ");
+        }
+    }
+    return source;
+}
 
 bool g_dual_source = false;
 
@@ -132,7 +147,7 @@ std::string glsl_header_with_clip() {
     return s;
 }
 
-std::string gen_vertex_shader() {
+std::string gen_vertex_shader(bool explicit_point_varyings) {
     std::string s = glsl_header_with_clip();
     s += R"(
 layout(location = 0) in vec3 a_pos;
@@ -181,8 +196,9 @@ out vec2 v_fogz;
 // The game's clip z and w at the vertex, for a foreground layer's depth (u_vr 4), which is
 // worked out from their ratio per fragment for the same reason.
 out vec2 v_gdepth;
-void main() {
 )";
+    if(explicit_point_varyings)s+="out vec2 v_point_coord;\nout float v_point_size;\n";
+    s+="void main() {\n";
     // Fog is a curve over the 24-bit depth GX writes, and in an eye gl_FragCoord.z is
     // not that: it comes from the headset's own frustum, whose near and far are nothing
     // like the game's. Fed to the curve it saturates a few metres out, so everything
@@ -290,15 +306,17 @@ void main() {
     v_col0 = a_col0;
     v_col1 = a_col1;
 )";
+    if(explicit_point_varyings)s+="    v_point_coord = vec2(0.5);\n    v_point_size = gl_PointSize;\n";
     for (int i = 0; i < 8; i++) {
         snprintf(buf, sizeof(buf), "    v_tex[%d] = a_tex%d;\n", i, i);
         s += buf;
     }
     s += "}\n";
+    if(explicit_point_varyings)return explicit_interfaces(std::move(s));
     return s;
 }
 
-std::string gen_pixel_shader(const ShaderKey& k) {
+std::string gen_pixel_shader(const ShaderKey& k,bool explicit_point_varyings) {
     static const int tev_stop = getenv("GCN_TEV_STOP") ? atoi(getenv("GCN_TEV_STOP")) : -1;
     // GCN_TEV_STOP_STAGES=<n> confines the stop to programs of exactly n stages, so a
     // draw can be probed without every later draw of at least as many stages painting
@@ -331,9 +349,10 @@ std::string gen_pixel_shader(const ShaderKey& k) {
 
     s += GCN_GLSL_VERSION;
     s += "in vec4 v_col0;\nin vec4 v_col1;\nin vec3 v_tex[8];\n";
+    if(explicit_point_varyings)s+="in vec2 v_point_coord;\nin float v_point_size;\n";
     // Only the shaders that fog read it, so every other one is generated exactly as before.
-    if ((k.fog & 7) >= 2) s += "in vec2 v_fogz;\n";
-    if (k.fg_depth) s += "in vec2 v_gdepth;\nuniform int u_vr;\nuniform vec4 u_vp_b;\n";
+    if ((k.fog & 7) >= 2 || explicit_point_varyings) s += "in vec2 v_fogz;\n";
+    if (k.fg_depth || explicit_point_varyings) s += "in vec2 v_gdepth;\nuniform int u_vr;\nuniform vec4 u_vp_b;\n";
     s += "uniform sampler2D u_tex[8];\n";
     // The palettes EFB copies are read through (efb_pal_mask), on units 8-15.
     if (k.efb_pal_mask) s += "uniform sampler2D u_pal[8];\n";
@@ -389,8 +408,8 @@ std::string gen_pixel_shader(const ShaderKey& k) {
     // texcoords (projective divide)
     for (uint32_t i = 0; i < 8; i++) {
         if (i < k.num_texgens)
-            W("  vec2 uv%u = (v_tex[%u].xy + (u_points != 0 ? u_point_off[%u] * (gl_PointCoord - 0.5) * v_tex[%u].z : vec2(0.0)))"
-              " / (v_tex[%u].z == 0.0 ? 1.0 : v_tex[%u].z);\n", i, i, i, i, i, i);
+            W("  vec2 uv%u = (v_tex[%u].xy + (u_points != 0 ? u_point_off[%u] * (%s - 0.5) * v_tex[%u].z : vec2(0.0)))"
+              " / (v_tex[%u].z == 0.0 ? 1.0 : v_tex[%u].z);\n", i, i, i, explicit_point_varyings?"v_point_coord":"gl_PointCoord", i, i, i);
         else W("  vec2 uv%u = vec2(0.0);\n", i);
         // A texgen that addresses a copy of the whole frame, or one of the spray's
         // grabs, is a screen-space lookup, and in an eye the screen is this eye's.
@@ -762,6 +781,7 @@ std::string gen_pixel_shader(const ShaderKey& k) {
     // of GCN_GLSL_VERSION among them, so it goes straight after the #version line.
     if (k.dst_alpha == 2) s.insert(s.find('\n') + 1, "#extension GL_EXT_blend_func_extended : require\n");
 #endif
+    if(explicit_point_varyings)return explicit_interfaces(std::move(s));
     return s;
 }
 
