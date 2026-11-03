@@ -6,7 +6,13 @@ For Linux, see **[slex2jf’s Project Tandem Linux](https://github.com/slex2jf/P
 
 ## First installation on Windows
 
-Download the Windows full package from Releases. Extract the entire ZIP before running anything, into a folder where your Windows user can write files. Run `Setup-Tandem.cmd`, select your own supported USA `GM4E01` ISO/CISO, and wait for the five setup stages to finish.
+Download **ProjectTandem.exe** from Releases. This single file opens the installer without a ZIP or separate setup script. Choose a writable installation folder (use **Browse** to select another drive), then click **Install**. It downloads the latest official Windows release, checks the archive and file hashes, and asks for your own supported USA `GM4E01` ISO/CISO. Keep the progress window open while it builds the game.
+
+At completion, choose **Create a desktop shortcut** if wanted. **Add to Steam (finish in Steam)** copies the installed launcher path and opens Steam's **Add a Non-Steam Game** picker. Click Browse, paste that path into File name, then Open and **Add Selected Programs**. Steam shortcuts launch Tandem; updates still come through the Tandem launcher. This step does not edit Steam's database or restart Steam.
+
+Click **Open Launcher** to reach the normal Play/update window. The original downloaded EXE also remembers the installed location. If you move or delete that folder, open the launcher inside its new location or use a fresh installation folder.
+
+For manual installation, the full Windows ZIP remains available. Extract it completely into a writable folder and run `Setup-Tandem.cmd`.
 
 Setup verifies the packaged files and the disc's `main.dol` SHA-1, caches a private copy of your ISO under `local-data`, and compiles the native game. The progress display covers verification, disc checking, configuration, compilation, and final checks. First setup can take several minutes and substantial disk space.
 
@@ -55,4 +61,4 @@ Saves, controller mappings, display/sound settings, and the cached disc stay und
 
 ## What to share
 
-Share the official full package or cumulative update ZIP. Your own installed folder contains private game data and session files; it is not a redistributable installer. Keep `local-data` and your disc image private.
+Share the official standalone **ProjectTandem.exe**, full package or cumulative update ZIP. Your own installed folder contains private game data and session files; it is not a redistributable installer. Keep `local-data` and your disc image private.

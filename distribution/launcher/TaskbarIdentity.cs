@@ -61,11 +61,14 @@ public static class TandemTaskbarIdentity {
         Marshal.ThrowExceptionForHR(SetCurrentProcessExplicitAppUserModelID(AppId));
     }
     public static void Apply(IntPtr window, string root, string iconPath, IntPtr icon) {
+        ApplyExecutable(window,Path.Combine(root,"ProjectTandem.exe"),iconPath,icon);
+    }
+    public static void ApplyExecutable(IntPtr window, string executable, string iconPath, IntPtr icon) {
         var store=Store(window);
         try {
             // Relaunch properties precede the explicit window identity. Pinned
             // shortcuts must reopen Tandem rather than its PowerShell host.
-            Set(store, 2, "\""+Path.Combine(root,"ProjectTandem.exe")+"\"");
+            Set(store, 2, "\""+executable+"\"");
             Set(store, 4, "Project Tandem");
             Set(store, 3, iconPath+",0");
             Set(store, 5, AppId);

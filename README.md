@@ -38,10 +38,12 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 ## Install on Windows
 
-1. Open **[Releases](https://github.com/badcompany94-rcmp/project-tandem/releases)** and download the Windows full package. GitHub's automatic **Source code** archives are for development, not the player installer.
-2. Extract the ZIP completely into a writable folder.
-3. Run `Setup-Tandem.cmd` and select your own supported USA ISO/CISO.
-4. Allow setup to verify the disc and compile locally, then open **Project Tandem.lnk** or **ProjectTandem.exe**. The existing `Launch-Tandem.cmd` remains available.
+1. Download **ProjectTandem.exe** from **[Releases](https://github.com/badcompany94-rcmp/project-tandem/releases)** and open it.
+2. Choose your installation folder and click **Install**. The launcher downloads and verifies the latest Windows package.
+3. Select your own supported USA ISO/CISO when prompted. Setup builds the game locally and shows progress throughout.
+4. Choose whether to create a desktop shortcut or open Steam's non-Steam game picker, then click **Open Launcher**. Use the launcher for Play and future updates.
+
+The full ZIP remains available for manual installation: extract it completely and run `Setup-Tandem.cmd`. GitHub's automatic **Source code** archives are for development, not player installation.
 
 The player package includes its build tools. You do not need Visual Studio, a separate Windows SDK, or Python installation. Online players do not need an Epic player account or developer setup. Ordinary home connections use automatic connection setup and relay fallback without a VPN or manual port forwarding; restrictive networks can still prevent a connection.
 
@@ -92,7 +94,7 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
-Current compatibility: **Public Beta 10 - `000dbce82144c576`**, based on Alpha25 gameplay. Beta 9 has the same gameplay build and remains online-compatible. Beta 8 and earlier cannot join. Display option choices may differ between players.
+Current compatibility: **Public Beta 13 - `8434831f693c998f`**. Everyone needs the same build; OpenGL and Direct3D 11 players can play together. Display option choices may differ between players.
 
 Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 

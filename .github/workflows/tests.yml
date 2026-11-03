@@ -33,6 +33,9 @@ jobs:
       - name: Test launcher state, jobs, paths and errors
         shell: powershell
         run: ./tests/launcher_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-launcher-check"
+      - name: Test standalone first installation and optional shortcuts
+        shell: powershell
+        run: ./tests/installer_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-installer-check"
       - name: Test verified updates, rollback and interrupted-build recovery
         shell: powershell
         run: ./tests/updater_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-updater-check"

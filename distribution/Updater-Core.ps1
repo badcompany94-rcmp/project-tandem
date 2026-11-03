@@ -315,7 +315,7 @@ function Get-TandemJournal([string]$Root,$Record) {
     $workspace=Assert-TandemSafePath $Root (Join-Path $Root ('local-data/updates/'+$Record.Id))
     return [pscustomobject]@{Folder=$workspace;File=(Join-Path $workspace 'journal.json')}
 }
-function Invoke-TandemUpdateBuild([string]$Root,[string]$Image,$Record,[string]$Folder,[scriptblock]$Progress) {
+function Initialize-TandemBuildJob {
     if(-not ('TandemBuildJob' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
@@ -346,6 +346,9 @@ public sealed class TandemBuildJob : IDisposable {
 }
 '@
     }
+}
+function Invoke-TandemUpdateBuild([string]$Root,[string]$Image,$Record,[string]$Folder,[scriptblock]$Progress) {
+    Initialize-TandemBuildJob
     $job=New-Object TandemBuildJob;$child=$null
     try {
         $buildArguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',(Join-Path $PSScriptRoot 'Update-Build.ps1'),'-Root',$Root,'-GameImage',$Image)

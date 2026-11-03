@@ -1,5 +1,26 @@
 # Project Tandem launcher and automatic updates
 
+## One-file installation
+
+The standalone **ProjectTandem.exe** release download includes the first-install
+window. Choose an installation folder, click **Install**, and select your own
+supported USA ISO/CISO after the package downloads. Progress stays visible while
+the game builds. No ZIP extraction or separate setup script is needed.
+
+The completion screen offers a desktop shortcut and an optional Steam game-picker
+step. The desktop shortcut points to the installed launcher and preserves another
+Tandem installation's existing shortcut. Steam requires its own final confirmation;
+the installer copies the launcher path for Browse and opens
+`steam://open/addnonsteamgame`. It does not write Steam's shortcut database.
+
+**Open Launcher** finishes setup. The downloaded EXE remembers the installation
+using `%LOCALAPPDATA%/ProjectTandem/installed-root.txt`; the launcher inside the
+installation always prefers its own folder. This marker contains only the path.
+Installer logs remain in `local-data/installer/logs`. An interrupted download can
+be retried in the same chosen folder. A failed disc check or build can be retried
+with another image. A Windows job contains the install worker and its compiler
+children so they stop if the installer process is terminated.
+
 Optional `paths.json` / `portable.txt` preferences control user-data locations;
 existing installations keep today's layout. See [user data](USER-DATA.md).
 Moving or renaming a current installation no longer triggers a native rebuild.
@@ -72,8 +93,9 @@ cumulative ZIP updates remain available on GitHub for manual installation.
 Beta 7 and earlier launchers need one manual update/setup to receive this updater;
 subsequent supported Windows releases can be installed inside the launcher.
 
-The authored ProjectTandem.exe bootstrap is compiled locally with Windows'
-.NET Framework compiler and contains no recompiled game code. Compilation
+The authored ProjectTandem.exe bootstrap is downloadable on its own and is also
+compiled locally with Windows' .NET Framework compiler. It contains the small
+installer scripts and artwork, with no disc assets or recompiled game code. Compilation
 replaces the launcher atomically and reuses an unchanged bootstrap during repair.
 This launcher/updater is Windows-only. Native Deck/Linux updating, a mod manager
 and a course editor are not implemented by this release.

@@ -6,7 +6,17 @@ $source=Join-Path $Root 'source/distribution/launcher/ProjectTandem.cs'
 $icon=Join-Path $Root 'source/distribution/assets/project-tandem.ico'
 $standard=(-not $Output)
 if($standard){$Output=Join-Path $Root 'ProjectTandem.exe'}
-$fingerprint=(Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash+':'+(Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash
+$resourceNames=@('Install-Tandem.ps1','Installer-Core.ps1','Installer-Worker.ps1','Updater-Core.ps1','Tandem-Paths.ps1','Launcher-Core.ps1')
+$resources=@();$fingerprint=(Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash+':'+(Get-FileHash -LiteralPath $icon -Algorithm SHA256).Hash
+foreach($name in $resourceNames){
+    $file=Join-Path $Root ('source/distribution/'+$name)
+    $fingerprint+=':'+(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
+    $resources+=('/resource:'+ $file+',TandemInstaller.'+$name)
+}
+$resources+=('/resource:'+$icon+',TandemInstaller.project-tandem.ico')
+$identitySource=Join-Path $Root 'source/distribution/launcher/TaskbarIdentity.cs'
+$fingerprint+=':'+(Get-FileHash -LiteralPath $identitySource -Algorithm SHA256).Hash
+$resources+=('/resource:'+$identitySource+',TandemInstaller.TaskbarIdentity.cs')
 $metadata=Join-Path $Root 'local-data/launcher-build.json'
 if($standard -and (Test-Path -LiteralPath $Output) -and (Test-Path -LiteralPath $metadata)) {
     try {$built=Get-Content -LiteralPath $metadata -Raw|ConvertFrom-Json
@@ -17,7 +27,7 @@ if($standard -and (Test-Path -LiteralPath $Output) -and (Test-Path -LiteralPath 
 # must never leave a partial ProjectTandem.exe as the recovery entry point.
 $temporary=Join-Path (Split-Path -Parent $Output) ('launcher-'+[guid]::NewGuid().ToString('N')+'.exe')
 try {
-    & $compiler /nologo /target:winexe /optimize+ /reference:System.Windows.Forms.dll ("/win32icon:"+$icon) ("/out:"+$temporary) $source
+    & $compiler /nologo /target:winexe /optimize+ /reference:System.Windows.Forms.dll ("/win32icon:"+$icon) @resources ("/out:"+$temporary) $source
     if($LASTEXITCODE -ne 0){throw 'Could not build the graphical launcher.'}
     if(Test-Path -LiteralPath $Output){[IO.File]::Replace($temporary,$Output,[System.Management.Automation.Language.NullString]::Value)}else{[IO.File]::Move($temporary,$Output)}
     if($standard){New-Item -ItemType Directory -Path (Split-Path -Parent $metadata) -Force|Out-Null
