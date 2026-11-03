@@ -861,7 +861,11 @@ static void gl_state_invalidate();
 static void uniforms_invalidate();
 void render_set_internal_scale(int scale) {
 #if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
-    if(native_backend()){const int next=std::clamp(scale,1,kMaxInternalScale);if(next!=g_scale)render_init(next);return;}
+    if(auto* renderer=native_backend()){
+        const int next=std::clamp(scale,1,kMaxInternalScale);
+        if(next!=g_scale){std::string error;if(!renderer->initialize(*desktop_renderer::device(),next,error))fatal("Direct3D resolution change: %s",error.c_str());g_scale=next;render_interpolation_reset();}
+        return;
+    }
 #endif
     if (scale < 1) scale = 1;
     if (scale > kMaxInternalScale) scale = kMaxInternalScale;

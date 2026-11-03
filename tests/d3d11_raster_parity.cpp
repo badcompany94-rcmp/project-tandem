@@ -54,7 +54,7 @@ class Reference {
     Window window;HDC dc=nullptr;HGLRC context=nullptr;GLuint program=0,copy_program=0,vao=0,vbo=0,fbo=0,color=0,depth=0;
     unsigned rw,rh;
 public:
-    Reference(unsigned w=side,unsigned h=side):rw(w),rh(h){
+    Reference(unsigned w=side,unsigned h=side,gx::ShaderKey shader=color_key()):rw(w),rh(h){
         dc=GetDC(window.handle);PIXELFORMATDESCRIPTOR p{};p.nSize=sizeof(p);p.nVersion=1;
         p.dwFlags=PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL|PFD_DOUBLEBUFFER;p.iPixelType=PFD_TYPE_RGBA;p.cColorBits=32;p.cDepthBits=24;p.cStencilBits=8;
         const int format=ChoosePixelFormat(dc,&p);require(format!=0 && SetPixelFormat(dc,format,&p),"Set hidden OpenGL pixel format");
@@ -65,7 +65,7 @@ public:
         wglMakeCurrent(nullptr,nullptr);wglDeleteContext(legacy);require(context && wglMakeCurrent(dc,context),"Create OpenGL 3.3 core reference");
         require(gladLoadGL(load_gl)!=0,"Load OpenGL reference entry points");
         std::printf("OpenGL reference %s / %s\n",glGetString(GL_RENDERER),glGetString(GL_VERSION));
-        const auto vertex=gx::gen_vertex_shader(),pixel=gx::gen_pixel_shader(color_key());
+        const auto vertex=gx::gen_vertex_shader(),pixel=gx::gen_pixel_shader(shader);
         auto compile=[&](GLenum type,const std::string& source){GLuint shader=glCreateShader(type);const auto* text=source.c_str();glShaderSource(shader,1,&text,nullptr);glCompileShader(shader);
             GLint valid=0;glGetShaderiv(shader,GL_COMPILE_STATUS,&valid);if(!valid){char log[8192];glGetShaderInfoLog(shader,sizeof(log),nullptr,log);throw std::runtime_error(log);}return shader;};
         const auto vs=compile(GL_VERTEX_SHADER,vertex),ps=compile(GL_FRAGMENT_SHADER,pixel);program=glCreateProgram();glAttachShader(program,vs);glAttachShader(program,ps);glLinkProgram(program);
@@ -102,6 +102,14 @@ public:
     void primitive(std::span<const gx::GpuVertex> vertices,unsigned prim,float width){
         glEnable(GL_PROGRAM_POINT_SIZE);glUniform1f(glGetUniformLocation(program,"u_point_size"),width);glLineWidth(1); // Existing GL renderer keeps native lines one pixel wide.
         glBufferData(GL_ARRAY_BUFFER,vertices.size_bytes(),vertices.data(),GL_STREAM_DRAW);glDrawArrays(prim==2?GL_POINTS:GL_LINES,0,GLsizei(vertices.size()));}
+    void point_texture(std::span<const uint32_t> pixels){
+        GLuint texture=0;glGenTextures(1,&texture);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,texture);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,4,4,0,GL_RGBA,GL_UNSIGNED_BYTE,pixels.data());glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        glUniform1i(glGetUniformLocation(program,"u_points"),1);float offsets[8]={1};glUniform1fv(glGetUniformLocation(program,"u_point_off"),8,offsets);
+        float sizes[16];for(auto& size:sizes)size=4;glUniform2fv(glGetUniformLocation(program,"u_texsize"),8,sizes);
+        // The context owns this tiny fixture texture until destruction.
+    }
     Pixels read(){Pixels p(size_t(rw)*rh*4);glReadPixels(0,0,rw,rh,GL_RGBA,GL_UNSIGNED_BYTE,p.data());require(glGetError()==GL_NO_ERROR,"OpenGL reference draw error");return p;}
     void clear_raw(uint32_t rgba,float z){glBindFramebuffer(GL_FRAMEBUFFER,fbo);glDisable(GL_SCISSOR_TEST);glDepthMask(GL_TRUE);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
         glClearColor(float(rgba>>24)/255,float((rgba>>16)&255)/255,float((rgba>>8)&255)/255,float(rgba&255)/255);glClearDepth(z);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);}
@@ -223,5 +231,18 @@ int main()try{
             throw std::runtime_error("GX primitive="+std::to_string(prim)+" direction="+std::to_string(direction)+" width="+std::to_string(width)+"/6 has "+std::to_string(count)+" different pixels, first="+std::to_string(first%640)+","+std::to_string(first/640));}++primitives;
     }
     std::printf("PASS %u exact GL/native point and directional line raster comparisons\n",primitives);
+    auto texture_key=color_key();texture_key.num_texgens=1;texture_key.order[0]=0x40;texture_key.cenv[0]=(texture_key.cenv[0]&~15u)|8;texture_key.aenv[0]=(texture_key.aenv[0]&~(7u<<4))|(4u<<4);
+    Reference point_reference(640,528,texture_key);std::vector<uint32_t> pattern;for(unsigned y=0;y<4;++y)for(unsigned x=0;x<4;++x)pattern.push_back(0xff000000u|((x+1)*51)|((y+1)*51<<8)|((x+y)*31<<16));
+    for(unsigned width:{60u,90u,120u}){
+        gx::GpuVertex v{};v.pos[0]=.1234f;v.pos[1]=-.281f;v.pos[2]=-.5f;v.tex[0][0]=v.tex[0][1]=.5f;v.tex[0][2]=1;
+        auto batch=primitive_batch(2,width,{&v,1});auto& st=batch.states[0];st.num_texgens=1;st.tex_id[0]=123;st.bp[0xc0]=texture_key.cenv[0];st.bp[0xc1]=texture_key.aenv[0];st.bp[0x28]=0x40;st.bp[0x30]=1u<<19;st.bp[0x22]|=5u<<19;st.bp[0x88]=3|(3<<10);
+        batch.packed.resize(32);std::memcpy(batch.packed.data(),&v,32);auto texture=std::make_shared<gx::TexData>();texture->id=123;texture->width=texture->height=4;texture->levels={pattern};batch.new_textures={texture};
+        point_reference.begin({});point_reference.point_texture(pattern);point_reference.primitive({&v,1},2,float(width)/6);const auto expected=point_reference.read();
+        require(renderer.prepare(batch,error),error);renderer.clear(0x000000ff,1);require(renderer.draw(batch,batch.cmds[0],1,0,error),error);Pixels actual;require(renderer.read_color(actual,error),error);
+        if(expected!=actual){unsigned mismatches=0;for(unsigned i=0;i<640*528;++i)if(std::memcmp(expected.data()+i*4,actual.data()+i*4,4)){
+            if(mismatches<12)std::printf("point width%u (%u,%u) GL=%u,%u,%u,%u D3D=%u,%u,%u,%u\n",width,i%640,i/640,expected[i*4],expected[i*4+1],expected[i*4+2],expected[i*4+3],actual[i*4],actual[i*4+1],actual[i*4+2],actual[i*4+3]);++mismatches;}
+            throw std::runtime_error("Native point-coordinate texture orientation/range differs at width="+std::to_string(width)+" pixels="+std::to_string(mismatches));}
+    }
+    std::puts("PASS three exact GL/native textured point-coordinate comparisons");
     std::puts("No game, rollback, mixed-renderer online or frame-pacing acceptance claimed.");return 0;
 }catch(const std::exception& failure){std::fprintf(stderr,"FAIL %s\n",failure.what());return 1;}

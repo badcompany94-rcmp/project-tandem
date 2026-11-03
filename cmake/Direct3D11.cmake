@@ -1,5 +1,5 @@
-# Native device layer; the game remains OpenGL until GX/backend integration is
-# complete. Building this target does not enable an unfinished renderer setting.
+# The default player renderer remains OpenGL. Native desktop selection is an
+# explicit build option while the private release gates are being completed.
 if(WIN32)
   option(TANDEM_NATIVE_D3D11 "Include the experimental native Direct3D11 desktop backend" OFF)
   add_library(tandem_d3d11_device STATIC EXCLUDE_FROM_ALL
@@ -18,6 +18,10 @@ if(WIN32)
   endif()
   option(TANDEM_D3D11_SHADER_TESTS "Build local GX to Direct3D compiler/interface fixture" OFF)
   if(TANDEM_D3D11_SHADER_TESTS OR TANDEM_NATIVE_D3D11)
+    set(TANDEM_D3D11_COMPILER_PACKAGE_DIR "" CACHE PATH "Verified native compiler archive from the player package")
+    if(TANDEM_D3D11_COMPILER_PACKAGE_DIR)
+      include("${CMAKE_CURRENT_LIST_DIR}/Direct3D11CompilerPackage.cmake")
+    else()
     set(TANDEM_GLSLANG_SOURCE_DIR "" CACHE PATH "Official glslang 16.6.0 source checkout")
     set(TANDEM_SPIRV_CROSS_SOURCE_DIR "" CACHE PATH "Official SPIRV-Cross vulkan-sdk-1.4.363.0 checkout")
     if(NOT EXISTS "${TANDEM_GLSLANG_SOURCE_DIR}/glslang/Public/ShaderLang.h" OR
@@ -49,6 +53,7 @@ if(WIN32)
       "${TANDEM_GLSLANG_SOURCE_DIR}" "${TANDEM_SPIRV_CROSS_SOURCE_DIR}")
     target_link_libraries(tandem_d3d11_shaders PRIVATE glslang::glslang glslang::SPIRV
       glslang::glslang-default-resource-limits spirv-cross-hlsl d3dcompiler dxguid)
+    endif()
     add_library(tandem_d3d11_program STATIC gcn-recomp/runtime/graphics/d3d11_program.cpp
       gcn-recomp/runtime/graphics/d3d11_geometry.cpp)
     target_compile_features(tandem_d3d11_program PUBLIC cxx_std_20)
@@ -77,12 +82,14 @@ if(WIN32)
     add_executable(d3d11_shader_library_test tests/d3d11_shader_library.cpp gcn-recomp/runtime/gx/shadergen.cpp)
     target_include_directories(d3d11_shader_library_test PRIVATE gcn-recomp/runtime/gx/glad/include)
     target_link_libraries(d3d11_shader_library_test PRIVATE tandem_d3d11_shaders)
+    if(TARGET glslang::glslang)
     add_executable(d3d11_shader_corpus_test tests/d3d11_shader_corpus.cpp gcn-recomp/runtime/gx/shadergen.cpp)
     target_compile_features(d3d11_shader_corpus_test PRIVATE cxx_std_20)
     target_include_directories(d3d11_shader_corpus_test PRIVATE "${TANDEM_GLSLANG_SOURCE_DIR}" "${TANDEM_SPIRV_CROSS_SOURCE_DIR}"
       gcn-recomp/runtime gcn-recomp/runtime/gx/glad/include)
     target_link_libraries(d3d11_shader_corpus_test PRIVATE glslang::glslang glslang::SPIRV
       glslang::glslang-default-resource-limits spirv-cross-hlsl d3dcompiler dxguid)
+    endif()
     endif()
   endif()
 endif()

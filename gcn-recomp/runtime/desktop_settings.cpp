@@ -295,11 +295,14 @@ void display_tab() {
     ImGui::TextWrapped("Experimental. Smooths 3D motion above 60 FPS. Gameplay stays at its original speed. Adds up to one game frame of visual delay.");
     ImGui::TextWrapped("Choose a rate supported by your monitor. With VSync on, your desktop refresh rate also limits output. Extra rendering requires GPU headroom.");
     const char* const scales[]={"Default (existing behavior)","1x (lowest GPU load)","2x","3x","4x"};
+    const bool online=SDL_getenv("MKDD_NET_LISTEN") || SDL_getenv("MKDD_NET_CONNECT");ImGui::BeginDisabled(online);
     ImGui::SetNextItemWidth(300);
     if(ImGui::Combo("Internal resolution",&presentation.internal_scale,scales,5)) {
         if(desktop_presentation::preview(presentation,status))changed();
     }
-    ImGui::TextWrapped("Lower this to improve performance on slower GPUs. This controls rendering detail independently of your display resolution. Changes preview immediately; Discard restores your previous choice.");
+    ImGui::EndDisabled();
+    if(online)ImGui::TextWrapped("Choose internal resolution before joining online. It stays fixed during this session to keep rollback safe; window and display resolution can still change.");
+    else ImGui::TextWrapped("Lower this to improve performance on slower GPUs. This controls rendering detail independently of your display resolution. Changes preview immediately; Discard restores your previous choice.");
     ImGui::Spacing();ImGui::SetNextItemWidth(420);
     const auto monitors=desktop_display::monitors();
     std::string monitor_label="Unavailable monitor";

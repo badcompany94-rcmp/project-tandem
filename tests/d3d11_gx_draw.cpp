@@ -57,6 +57,7 @@ void check(const std::vector<uint8_t>& p,bool texture){
         if(std::memcmp(v,expected.data(),4)){char error[200];std::snprintf(error,sizeof(error),"Native GX %s mismatch at %u,%u: %u,%u,%u,%u expected %u,%u,%u,%u",texture?"texture":"raster",x,y,v[0],v[1],v[2],v[3],expected[0],expected[1],expected[2],expected[3]);throw std::runtime_error(error);}}
     require(changed==105600,"Vacuous native GX draw check");
 }
+bool replacement(const gx::TexData&,gx::D3D11Renderer::Replacement& output){output.width=output.height=8;output.rgba.resize(8*8*4);for(unsigned i=0;i<64;++i){output.rgba[i*4]=17;output.rgba[i*4+1]=102;output.rgba[i*4+2]=221;output.rgba[i*4+3]=255;}return true;}
 }
 int main()try{
     Window window;desktop_d3d11::Device device;gx::D3D11Renderer renderer;std::string error;
@@ -139,9 +140,28 @@ int main()try{
         require(p[0]==(y<264?255:0) && p[1]==(y<264?0:255) && p[2]==0 && p[3]==255,"Native restored XFB lost its first strip or completion state");}
     require(renderer.restore(*partial,error),error);require(renderer.matches(*partial,error),error);
     require(!renderer.initialize(device,0,error),"Invalid renderer replacement accepted");require(renderer.width()==640,"Invalid replacement retired native GX backend");
+    // Exercise the real replacement upload callback and generated mip chain.
+    // The guest hash and texture identity must survive replacement/scale change.
+    gx::D3D11Renderer modded;require(modded.initialize(device,1,error),error);modded.set_texture_loader(replacement);gx::Batch hd;fill(hd,true);hd.new_textures[0]->hash=0x12345678;
+    require(modded.prepare(hd,error),error);modded.clear(0x000000ff,1);require(modded.draw(hd,hd.cmds[0],1,0,error),error);std::vector<uint8_t> hd_pixels;require(modded.read_color(hd_pixels,error),error);
+    for(unsigned y=0;y<528;++y)for(unsigned x=0;x<640;++x){const auto* p=hd_pixels.data()+(y*640+x)*4;const bool inside=x>=80 && x<400 && y>=66 && y<396;
+        require(p[0]==(inside?17:0) && p[1]==(inside?102:0) && p[2]==(inside?221:0) && p[3]==255,"Native replacement upload changed raster/color");}
+    auto hd_saved=modded.capture(true,error);require(bool(hd_saved) && modded.matches(*hd_saved,error),error);
+    // Uniform color/depth make an independent exact oracle for preservation:
+    // no intervening draw may repair a cleared EFB or an inverted alpha/depth.
+    modded.clear(0x3366cc40,.25f);require(modded.initialize(device,2,error),error);require(modded.read_color(hd_pixels,error),error);
+    for(unsigned i=0;i<hd_pixels.size();i+=4)require(hd_pixels[i]==51 && hd_pixels[i+1]==102 && hd_pixels[i+2]==204 && hd_pixels[i+3]==64,"Resolution change discarded previous EFB RGBA");
+    gx::EfbCopyCmd resized_depth{};resized_depth.src_w=resized_depth.dst_w=8;resized_depth.src_h=resized_depth.dst_h=4;resized_depth.tex_id=211;resized_depth.depth=true;resized_depth.format=1;std::vector<uint8_t> depth_bytes;
+    require(modded.copy(resized_depth,&depth_bytes,error),error);for(auto b:depth_bytes)require(b==64,"Resolution change discarded previous EFB depth");
+    require(modded.texture_hash(7)==0x12345678,"Resolution change lost guest replacement texture hash");hd.new_textures.clear();
+    require(modded.prepare(hd,error),error);modded.clear(0x000000ff,1);require(modded.draw(hd,hd.cmds[0],1,0,error),error);require(modded.read_color(hd_pixels,error),error);
+    for(unsigned y=0;y<1056;++y)for(unsigned x=0;x<1280;++x){const auto* p=hd_pixels.data()+(y*1280+x)*4;const bool inside=x>=160 && x<800 && y>=132 && y<792;
+        require(p[0]==(inside?17:0) && p[1]==(inside?102:0) && p[2]==(inside?221:0) && p[3]==255,"Native resolution change lost replacement image or geometry");}
+    require(!modded.restore(*hd_saved,error),"Cross-resolution checkpoint accepted");
     std::printf("PASS actual GX batch native renderer on %s: packed vertices, TEV uniforms, exact raster/texture rows and cached repeat\n",device.info().adapter.c_str());
     std::puts("PASS native scaled copy, GX RGBA tiled CPU bytes, partial alpha clear and far-depth copy");
     std::puts("PASS native scanout orientation, partial XFB completion/order and letterboxing");
     std::puts("PASS native GPU snapshot restore, independent readback oracle, texture/XFB copy-on-write and generation rejection");
+    std::puts("PASS native replacement upload/mips, guest hash preservation and 1x-to-2x resource retention");
     std::puts("Full game and mixed-renderer rollback races remain separate gates.");return 0;
 }catch(const std::exception& failure){std::fprintf(stderr,"FAIL %s\n",failure.what());return 1;}

@@ -138,7 +138,7 @@ struct D3D11Renderer::Impl {
     std::map<std::tuple<uint32_t,uint32_t,uint32_t>,Com<ID3D11BlendState>> blend_states;
     std::vector<uint32_t> dead_pending;
     TextureLoader texture_loader=nullptr;
-    ScreenPipeline copy_pipeline,clear_pipeline,scanout_pipeline;
+    ScreenPipeline copy_pipeline,clear_pipeline,scanout_pipeline,resize_pipeline;
     struct Xfb {uint32_t base,stride,height,written_rows=0;std::vector<uint8_t> written;Texture texture;};
     std::vector<Xfb> displays;
     float zplane[4]={};
@@ -353,6 +353,7 @@ bool D3D11Renderer::initialize(desktop_d3d11::Device& graphics,int scale,std::st
         s->copy_pipeline.initialize(d,copy_pixel_shader());
         s->scanout_pipeline.initialize(d,scanout_pixel_shader(),false);
         s->clear_pipeline.initialize(d,"#version 330 core\nuniform vec4 u_clear;uniform float u_clear_depth;out vec4 o;void main(){o=u_clear;gl_FragDepth=u_clear_depth;}\n");
+        s->resize_pipeline.initialize(d,"#version 330 core\nin vec2 v_uv;uniform sampler2D u_src;uniform sampler2D u_depth;out vec4 o;void main(){o=texture(u_src,v_uv);gl_FragDepth=texture(u_depth,v_uv).r;}\n");
         D3D11_RASTERIZER_DESC r{};r.FillMode=D3D11_FILL_SOLID;r.CullMode=D3D11_CULL_NONE;r.ScissorEnable=TRUE;r.DepthClipEnable=FALSE;
         checked(d->CreateRasterizerState(&r,s->screen_raster.out()),"Create native GX copy raster state");
         for(unsigned i=0;i<2;++i){D3D11_DEPTH_STENCIL_DESC ds{};ds.DepthEnable=i!=0;ds.DepthWriteMask=i?D3D11_DEPTH_WRITE_MASK_ALL:D3D11_DEPTH_WRITE_MASK_ZERO;ds.DepthFunc=D3D11_COMPARISON_ALWAYS;
@@ -368,11 +369,24 @@ bool D3D11Renderer::initialize(desktop_d3d11::Device& graphics,int scale,std::st
             const uint32_t opaque_black=0xff000000;D3D11_SUBRESOURCE_DATA data{};data.pSysMem=&opaque_black;data.SysMemPitch=4;
             checked(d->CreateTexture2D(&t,&data,s->black.resource.out()),"Create native GX unbound texture");checked(d->CreateShaderResourceView(s->black.resource.p,nullptr,s->black.view.out()),"Create native GX unbound texture view");}
         const float black[]={0,0,0,1};s->context->ClearRenderTargetView(s->target.p,black);s->context->ClearDepthStencilView(s->depth_target.p,D3D11_CLEAR_DEPTH,1,0);
+        if(state && state->device==d){
+            // Match GL's resize blits: preserve previous EFB RGBA with linear
+            // sampling and float depth with nearest sampling. Console frames
+            // need not begin with a clear, so discarding them can flash or alter
+            // the first CPU-visible copy after an offline scale change.
+            state->unbind();const D3D11_RECT rect={0,0,LONG(efb_w*scale),LONG(efb_h*scale)};
+            s->screen_begin(s->target.p,s->depth_target.p,efb_w*scale,efb_h*scale,15,true,rect);
+            auto& p=s->resize_pipeline;const float region[]={0,0,1,1};p.floats("u_rect",region);
+            ID3D11ShaderResourceView* views[16]={};ID3D11SamplerState* filters[16]={};
+            for(const auto& [name,slot]:p.samplers){views[slot]=name=="u_src"?state->color_srv.p:state->depth_srv.p;filters[slot]=name=="u_src"?s->linear.p:s->nearest.p;}
+            s->context->PSSetShaderResources(0,16,views);s->context->PSSetSamplers(0,16,filters);require(p.program.bind(s->context,error),error);s->context->Draw(4,0);s->unbind();
+        }
         // Warm the bounded GPU target pool during initialization, outside a
         // race. Two ordinary-resolution checkpoints need no fresh allocation.
         {std::vector<TargetLease> warm;for(unsigned i=0;i<(scale<8?2u:1u);++i){warm.push_back(s->clone(s->color.p));warm.push_back(s->clone(s->depth.p));}}
         if(state && state->device==d){
             s->texture_loader=state->texture_loader;
+            s->dead_pending=state->dead_pending;
             s->shader_cache=state->shader_cache;s->warm_keys=state->warm_keys;s->warm_done=state->warm_done;
             for(const auto& [id,texture]:state->textures)if(!texture.efb)s->textures.emplace(id,texture);
             if(s->native_logic==state->native_logic){

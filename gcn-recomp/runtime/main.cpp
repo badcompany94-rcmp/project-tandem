@@ -472,6 +472,11 @@ int main(int argc, char** argv) {
     }
 #endif
     gx::render_init(desktop_presentation::effective_scale(scale,scale));
+    // Render checkpoints require a fixed EFB size. Keep that size for the whole
+    // online process, including window resizes/default automatic UI scaling.
+    // Display/window resolution can still change independently of the EFB.
+    const int online_scale=(getenv("MKDD_NET_LISTEN") || getenv("MKDD_NET_CONNECT"))?
+        std::clamp(desktop_presentation::effective_scale(scale,scale),1,gx::kMaxInternalScale):0;
 #if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
     if(native_session){
         int done=0,total=0;std::string error;bool complete=false;
@@ -573,7 +578,7 @@ int main(int argc, char** argv) {
         if(!g_eye_mode && theater_stereo_m<=0.0f) {
             const unsigned ui_width=display_ui_render_width();
             const int ui_scale=ui_width && dw>0 ? int((unsigned(dw)+ui_width-1)/ui_width) : scale;
-            const int active_scale=desktop_presentation::effective_scale(scale,ui_scale);
+            const int active_scale=online_scale?online_scale:desktop_presentation::effective_scale(scale,ui_scale);
             gx::render_set_internal_scale(active_scale);
             int window_width=0,window_height=0;SDL_GetWindowSize(win,&window_width,&window_height);
             desktop_graphics::update({window_width,window_height,dw,dh,std::clamp(active_scale,1,gx::kMaxInternalScale),desktop_renderer::swap_interval(),refresh});

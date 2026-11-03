@@ -21,6 +21,15 @@ TANDEM_SPIRV_CROSS_SOURCE_DIR to these official source checkouts:
 - glslang 16.6.0: e1b562a8bed273a02f30b59b66a5d499793cede5
 - SPIRV-Cross vulkan-sdk-1.4.363.0: f11ba9f0b21ba8fc15153d50a2a1ae31ab1cf8f7
 
+Alternatively set TANDEM_D3D11_COMPILER_PACKAGE_DIR to a verified host compiler
+archive made by tools/package_d3d11_compiler.py. Player builds then need no
+Khronos source downloads or toolchain compilation. Its manifest checks archive
+SHA256, compiler/target ABI and canonical LF source hashes; stale or corrupted
+packages fail with repair diagnostics. This archive contains host support code,
+not a disc image or generated game functions. Both upstream license files travel
+with it. The merged archive is about76MB before package compression in the tested
+RelWithDebInfo build; slim toolchains may retain debug information.
+
 Dependencies are not fetched automatically. Shared GLSL compiles to SPIR-V, HLSL,
 then DXBC through Windows D3DCompile. SPIR-V is an intermediate representation;
 no Vulkan runtime is required. The tested Windows executable links Khronos and
@@ -60,6 +69,11 @@ uses SDL2/DX11. OpenGL retains existing backends. VSync and optional FPS use com
 settings. Native interpolation is currently disabled in F1, preserving the saved
 OpenGL rate. VR, eye/theater and CLI recording launches use OpenGL and preserve
 the renderer preference. Communicate these limitations before public delivery.
+Internal EFB resolution stays fixed for an online process because render rollback
+checkpoints require matching sizes. The F1 control explains this and is disabled
+until a new session; window/display changes remain available. Offline scale
+changes preserve EFB RGBA with linear sampling and depth with nearest sampling,
+decoded replacement textures and the existing in-memory shader cache.
 
 ## Shader cache and startup pacing
 
@@ -92,16 +106,24 @@ geometry/textures, uniform shadowing, viewport/scissor/culling/depth, 1,280 copy
 pixel comparisons, 760 tiled CPU writes, seven point widths, 42 directional line
 cases, partial clears/XFBs, letterboxing, z-freeze, snapshot COW/restoration and
 cache corruption/source invalidation. Live native signatures compile across443
-locally observed GX pairs. Both APIs boot real game/F1 in one executable; default
+locally observed GX pairs. Three textured point-coordinate cases also match GL.
+Native replacement upload/mips and 1x-to-2x RGBA/depth/resource preservation pass.
+Both APIs boot real game/F1 in one executable; default
 OpenGL runtime compilation passes. Same-state whole-game parity is not yet
-established: unsynchronized boot images differ in animation phase.
+established: unsynchronized boot images differ in animation phase. Native stock
+Grand Prix, two-player splitscreen and Plus retro-course gameplay captures have
+been inspected. Clean
+mixed-renderer1440-tick races in both host directions, D3D/D3D and GL/GL controls
+retain equal confirmed traces/checksums. Synthetic25ms one-way,5ms jitter,2%loss
+and100ms bursts also synchronize, including actual native rollback/correction.
+These same-PC tests use production garage/LAN fallback or a local mesh router;
+they do not test authenticated physical EOS delivery.
 
 Required before promotion/release:
 
-- Offline cups, splitscreen, Plus/course packs, HD replacement coverage,
-  resolution/VSync changes and textured points.
-- Mixed-renderer synchronized races in both host directions, correction/rollback,
-  disconnect recovery and clean/impaired conditions.
+- Broader offline cup/layout, actual HD-pack and visible resolution/VSync
+  coverage beyond the native device/replacement fixtures.
+- Longer mixed-renderer race/layout and disconnect/reconnect coverage.
 - Average FPS and p95/p99/max race/full presentation intervals, retaining startup
   and correction spikes and preserving the OpenGL baseline.
 - Older AMD/Intel/NVIDIA and physical Internet/NAT/relay checks.
