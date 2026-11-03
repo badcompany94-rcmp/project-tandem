@@ -66,3 +66,15 @@ Use `hash` to record the default OpenGL source hashes. The fixture never edits
 the input cache. Do not redistribute local shader caches as test assets. Compiler
 and signature checks do not prove pixel equivalence, rollback, or mixed-renderer
 online behavior.
+
+`graphics/d3d11_shaders` is the reusable CPU compiler module behind the native
+backend. It produces Direct3D bytecode, original uniform names with explicit
+buffer offsets/array and matrix strides, and texture/palette slot bindings. It
+validates live stage signatures and only replaces a valid compiled program after
+both stages succeed. Compilation needs no OpenGL context. Runtime integration
+must use a verified bytecode cache or prepare shaders outside active race draws.
+
+The same optional compiler-test configuration builds `d3d11_shader_library_test`.
+Pass the local shader cache path to validate generated programs and their reflected
+layouts, malformed-source/configuration failure preservation, and explicit target
+orientation options. Orientation compilation is not a pixel-parity test.

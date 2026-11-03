@@ -35,6 +35,15 @@ if(WIN32)
     set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
     add_subdirectory("${TANDEM_GLSLANG_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/d3d-glslang")
     add_subdirectory("${TANDEM_SPIRV_CROSS_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/d3d-spirv-cross")
+    add_library(tandem_d3d11_shaders STATIC gcn-recomp/runtime/graphics/d3d11_shaders.cpp)
+    target_compile_features(tandem_d3d11_shaders PUBLIC cxx_std_20)
+    target_include_directories(tandem_d3d11_shaders PUBLIC gcn-recomp/runtime PRIVATE
+      "${TANDEM_GLSLANG_SOURCE_DIR}" "${TANDEM_SPIRV_CROSS_SOURCE_DIR}")
+    target_link_libraries(tandem_d3d11_shaders PRIVATE glslang::glslang glslang::SPIRV
+      glslang::glslang-default-resource-limits spirv-cross-hlsl d3dcompiler dxguid)
+    add_executable(d3d11_shader_library_test tests/d3d11_shader_library.cpp gcn-recomp/runtime/gx/shadergen.cpp)
+    target_include_directories(d3d11_shader_library_test PRIVATE gcn-recomp/runtime/gx/glad/include)
+    target_link_libraries(d3d11_shader_library_test PRIVATE tandem_d3d11_shaders)
     add_executable(d3d11_shader_corpus_test tests/d3d11_shader_corpus.cpp gcn-recomp/runtime/gx/shadergen.cpp)
     target_compile_features(d3d11_shader_corpus_test PRIVATE cxx_std_20)
     target_include_directories(d3d11_shader_corpus_test PRIVATE "${TANDEM_GLSLANG_SOURCE_DIR}" "${TANDEM_SPIRV_CROSS_SOURCE_DIR}"
