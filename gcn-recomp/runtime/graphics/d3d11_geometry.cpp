@@ -31,16 +31,15 @@ bool geometry_compatible(std::span<const uint8_t> vertex,std::span<const uint8_t
             require(found,"Native expansion layout differs at "+f.semantic+std::to_string(f.index));}return true;
     }catch(const std::exception& failure){error=failure.what();return false;}
 }
-bool compile_geometry(std::span<const uint8_t> vertex,Expansion kind,std::vector<uint8_t>& output,std::string& error){
+bool compile_point_geometry(std::span<const uint8_t> vertex,std::vector<uint8_t>& output,std::string& error){
     error.clear();try{
         const auto fields=signature(vertex);std::string position,coordinate,size;
-        std::string hlsl="cbuffer ExpansionParameters:register(b1){float2 inverseSize;float lineWidth;float unused;}\nstruct Vertex{\n";
+        std::string hlsl="cbuffer ExpansionParameters:register(b1){float2 inverseSize;float2 padding;}\nstruct Vertex{\n";
         for(const auto& f:fields){hlsl+=f.type+" "+f.name+":"+f.semantic+std::to_string(f.index)+";\n";
             if(f.semantic=="SV_Position")position=f.name;
             if(f.semantic=="TEXCOORD" && f.index==12)coordinate=f.name;
             if(f.semantic=="TEXCOORD" && f.index==13)size=f.name;}
         require(!position.empty() && !coordinate.empty() && !size.empty(),"GX expansion interface lacks position/point varyings");hlsl+="};\n[maxvertexcount(4)] void main(";
-        if(kind==Expansion::Points){
             hlsl+="point Vertex input[1],inout TriangleStream<Vertex> output){\nVertex v=input[0];float4 center=v."+position+";\n";
             hlsl+="if(center.w<=0 || any(abs(center.xy)>center.ww))return;\n";
             for(const auto& f:fields)if(f.semantic=="SV_ClipDistance")hlsl+="if(any(v."+f.name+"<0))return;\n";
@@ -50,13 +49,6 @@ bool compile_geometry(std::span<const uint8_t> vertex,Expansion kind,std::vector
             const char* offsets[]={"float2(-1,1)","float2(-1,-1)","float2(1,1)","float2(1,-1)"};
             const char* coords[]={"float2(0,1)","float2(0,0)","float2(1,1)","float2(1,0)"};
             for(unsigned i=0;i<4;++i)hlsl+="v."+position+"=center;v."+position+".xy+="+offsets[i]+"*inverseSize*width*center.w;v."+coordinate+"="+coords[i]+";output.Append(v);\n";
-        }else{
-            hlsl+="line Vertex input[2],inout TriangleStream<Vertex> output){\n";
-            hlsl+="float4 a=input[0]."+position+",b=input[1]."+position+";if(a.w<=0 || b.w<=0)return;\n";
-            hlsl+="float2 delta=(b.xy/b.w-a.xy/a.w)/inverseSize;float width=max(1,round(lineWidth));float2 offset=abs(delta.x)>=abs(delta.y)?float2(0,width):float2(width,0);offset*=inverseSize;\nVertex v;\n";
-            for(unsigned i=0;i<4;++i){const unsigned endpoint=i/2;const char* sign=i%2?"-":"+";
-                hlsl+="v=input["+std::to_string(endpoint)+"];v."+position+".xy"+sign+"=offset*v."+position+".w;output.Append(v);\n";}
-        }
         hlsl+="output.RestartStrip();}\n";
         Com<ID3DBlob> code,diagnostic;const auto result=D3DCompile(hlsl.data(),hlsl.size(),"TandemNativeExpansion",nullptr,nullptr,"main","gs_5_0",D3DCOMPILE_ENABLE_STRICTNESS,0,code.out(),diagnostic.out());
         require(SUCCEEDED(result),diagnostic.p?std::string(static_cast<const char*>(diagnostic->GetBufferPointer()),diagnostic->GetBufferSize()):"Compile native GX expansion");

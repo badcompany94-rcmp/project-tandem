@@ -7,6 +7,8 @@
 #include <dxgi1_2.h>
 #include <cstdio>
 #include <utility>
+#include <cstring>
+#include <exception>
 
 namespace desktop_d3d11 {
 namespace {
@@ -35,6 +37,8 @@ struct Device::Impl {
     Com<ID3D11DeviceContext> context;
     Com<IDXGISwapChain> swap;
     Com<ID3D11RenderTargetView> target;
+    Com<ID3D11Texture2D> background;
+    unsigned background_w=0,background_h=0;
     DeviceInfo info;
     unsigned width=0,height=0;
     ~Impl(){if(context.value){context->ClearState();context->Flush();}}
@@ -111,6 +115,33 @@ bool Device::present(bool vsync,bool& occluded,std::string& error){
         error+=" Device status: "+std::string(code)+".";return false;
     }
     return true;
+}
+bool Device::window_pixels(std::vector<unsigned char>& output,std::string& error){
+    error.clear();if(!state->swap.value){error="Direct3D device is not initialized.";return false;}
+    try{
+        Com<ID3D11Texture2D> source,staging;
+        if(failed(state->swap->GetBuffer(0,IID_ID3D11Texture2D,reinterpret_cast<void**>(source.out())),"Read native window buffer",error))return false;
+        D3D11_TEXTURE2D_DESC d{};source->GetDesc(&d);d.Usage=D3D11_USAGE_STAGING;d.BindFlags=0;d.CPUAccessFlags=D3D11_CPU_ACCESS_READ;d.MiscFlags=0;
+        if(failed(state->device->CreateTexture2D(&d,nullptr,staging.out()),"Create native window readback",error))return false;
+        state->context->OMSetRenderTargets(0,nullptr,nullptr);state->context->CopyResource(staging.value,source.value);
+        std::vector<unsigned char> pixels(size_t(d.Width)*d.Height*4);D3D11_MAPPED_SUBRESOURCE mapped{};
+        if(failed(state->context->Map(staging.value,0,D3D11_MAP_READ,0,&mapped),"Read native window pixels",error))return false;
+        for(unsigned y=0;y<d.Height;++y)std::memcpy(pixels.data()+size_t(y)*d.Width*4,static_cast<const unsigned char*>(mapped.pData)+y*mapped.RowPitch,d.Width*4);
+        state->context->Unmap(staging.value,0);output=std::move(pixels);return true;
+    }catch(const std::exception&){error="Cannot allocate native window readback.";return false;}
+}
+bool Device::cache_window(bool restore,std::string& error){
+    error.clear();if(!state->swap.value){error="Direct3D device is not initialized.";return false;}
+    if(restore && (!state->background.value || state->background_w!=state->width || state->background_h!=state->height))return false;
+    Com<ID3D11Texture2D> source;
+    if(failed(state->swap->GetBuffer(0,IID_ID3D11Texture2D,reinterpret_cast<void**>(source.out())),"Access native window buffer",error))return false;
+    if(!restore && (!state->background.value || state->background_w!=state->width || state->background_h!=state->height)){
+        D3D11_TEXTURE2D_DESC d{};source->GetDesc(&d);d.BindFlags=0;d.MiscFlags=0;
+        if(failed(state->device->CreateTexture2D(&d,nullptr,state->background.out()),"Create native overlay background",error))return false;
+        state->background_w=state->width;state->background_h=state->height;
+    }
+    state->context->OMSetRenderTargets(0,nullptr,nullptr);
+    state->context->CopyResource(restore?source.value:state->background.value,restore?state->background.value:source.value);return true;
 }
 ID3D11Device* Device::device()const{return state->device.value;}
 ID3D11DeviceContext* Device::context()const{return state->context.value;}

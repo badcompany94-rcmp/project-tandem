@@ -28,6 +28,9 @@ struct ShaderOptions {
     // Offscreen targets may use GL's row-address orientation; window scanout
     // does not. The render backend chooses this explicitly for each program.
     bool flip_vertex_y=false;
+    // -1 uses ordinary TEV output. Native D3D11.0 logical blending reads a
+    // separate destination snapshot through texture t16 (no sampler needed).
+    int logic_operation=-1;
 };
 // CPU/compiler work only. Call outside active race rendering or use a validated
 // bytecode cache. Compilation never needs an OpenGL context or driver.

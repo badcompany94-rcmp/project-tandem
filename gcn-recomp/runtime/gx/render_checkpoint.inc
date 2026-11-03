@@ -242,6 +242,17 @@ static RenderImage read_saved_gpu_image(const GpuRenderImage& saved) {
     checkpoint_gl_ok();return image;
 }
 static DeviceFragment render_checkpoint_on_thread() {
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(auto* renderer=native_backend()){
+        std::string error;auto image=renderer->capture(getenv("GCN_RENDER_VERIFY")!=nullptr,error);if(!image)throw std::runtime_error(error);
+        const auto frame=g_render_frame,present=g_present_count,taken=frames_taken();
+        return {"graphics native Direct3D GPU resources",[renderer,image,frame,present,taken]{
+            render_interpolation_reset();std::string error;if(!renderer->restore(*image,error))throw std::runtime_error(error);
+            g_render_frame=frame;g_present_count=present;restore_frames_taken(taken);
+        },[renderer,image,frame,present,taken]{std::string error;const bool matches=renderer->matches(*image,error);if(!error.empty())throw std::runtime_error(error);
+            return matches && g_render_frame==frame && g_present_count==present && frames_taken()==taken;}};
+    }
+#endif
     if(getenv("GCN_RENDER_CPU_CHECKPOINT")) {
         auto image=std::make_shared<const RenderImage>(read_render_image());
         return {"graphics CPU readback resources",[image]{render_interpolation_reset();write_render_image(*image);},[image]{return read_render_image()==*image;}};

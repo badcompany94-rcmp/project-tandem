@@ -73,9 +73,14 @@ void resources(spirv_cross::CompilerHLSL& compiler,CompiledProgram& output){
     }
     for(const auto& resource:resources.sampled_images){
         Sampler sampler;sampler.name=resource.name;sampler.count=array_count(compiler.get_type(resource.type_id));
-        sampler.binding=sampler.name=="u_tex"?0:sampler.name=="u_pal"?8:compiler.get_decoration(resource.id,spv::DecorationBinding);
-        require(sampler.binding<16 && sampler.count<=16-sampler.binding,"Native shader exceeds sampler slots");
+        const bool logic=sampler.name=="u_logic_destination";
+        sampler.binding=sampler.name=="u_tex"?0:sampler.name=="u_pal"?8:logic?16:compiler.get_decoration(resource.id,spv::DecorationBinding);
+        require(logic?(sampler.binding==16 && sampler.count==1):(sampler.binding<16 && sampler.count<=16-sampler.binding),"Native shader exceeds sampler slots");
         compiler.set_decoration(resource.id,spv::DecorationBinding,sampler.binding);
+        if(logic){
+            spirv_cross::HLSLResourceBinding binding;binding.stage=compiler.get_execution_model();binding.desc_set=0;binding.binding=16;
+            binding.srv.register_binding=16;binding.sampler.register_binding=0;compiler.add_hlsl_resource_binding(binding);
+        }
         const auto old=std::find_if(output.samplers.begin(),output.samplers.end(),[&](const auto& s){return s.name==sampler.name;});
         if(old==output.samplers.end())output.samplers.push_back(std::move(sampler));
         else require(*old==sampler,"Shader stages disagree on sampler bindings");
@@ -145,7 +150,18 @@ bool compile_gx_program(const gx::ShaderKey& key,CompiledProgram& output,std::st
     try{
         require(key.num_texgens<=8 && ((key.genmode>>16)&7)<=4 && key.fg_depth<=1 && key.dst_alpha<=2 && key.efb_has_alpha<=1,
             "Unsupported native GX shader configuration");
-        return compile_program(gx::gen_vertex_shader(true),gx::gen_pixel_shader(key,true),output,error,options);
+        require(options.logic_operation>=-1 && options.logic_operation<=15,"Invalid native logical operation");
+        auto pixel=gx::gen_pixel_shader(key,true);
+        if(options.logic_operation>=0){
+            const auto main=pixel.find("void main()");require(main!=std::string::npos,"Missing native GX pixel entry");
+            pixel.insert(main,"uniform sampler2D u_logic_destination;\n");
+            static const char* operations[]={"ivec4(0)","(s & d)","(s & ~d)","s","(~s & d)","d","(s ^ d)","(s | d)","~(s | d)","~(s ^ d)","~d","(s | ~d)","~s","(~s | d)","~(s & d)","ivec4(255)"};
+            const std::string logic="  ivec4 s=ivec4(clamp(o_color,0.0,1.0)*255.0+0.5);\n"
+                "  ivec4 d=ivec4(texelFetch(u_logic_destination,ivec2(gl_FragCoord.xy),0)*255.0+0.5);\n"
+                "  o_color=vec4(("+std::string(operations[options.logic_operation])+") & ivec4(255))/255.0;\n";
+            pixel.insert(pixel.rfind('}'),logic);
+        }
+        return compile_program(gx::gen_vertex_shader(true),pixel,output,error,options);
     }catch(const std::exception& failure){error=failure.what();return false;}
 }
 }

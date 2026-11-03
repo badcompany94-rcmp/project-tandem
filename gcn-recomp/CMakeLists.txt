@@ -293,6 +293,7 @@ function(gcn_add_game)
   # front end, including the batch queue in gx/xf.cpp -- is free of both GL and SDL.
   set(CORE_SOURCES ${RUNTIME_SOURCES})
   list(REMOVE_ITEM CORE_SOURCES
+    ${RT}/desktop_renderer.cpp
     ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
     ${RT}/gx/render_gl.cpp ${RT}/gx/gl_load.cpp ${RT}/gx/shadergen.cpp ${RT}/gx/copy_shaders.cpp)
   list(APPEND CORE_SOURCES ${RT}/audio_stub.cpp)
@@ -356,6 +357,11 @@ function(gcn_add_game)
     _gcn_set_standards(gcn_desktop_ui)
     target_include_directories(gcn_desktop_ui PUBLIC ${GCN_IMGUI})
     target_link_libraries(gcn_desktop_ui PUBLIC ${GCN_SDL_TARGET} ${CMAKE_DL_LIBS})
+    if(WIN32 AND TANDEM_NATIVE_D3D11)
+      target_sources(gcn_desktop_ui PRIVATE ${GCN_IMGUI}/backends/imgui_impl_dx11.cpp)
+      target_link_libraries(gcn_desktop_ui PRIVATE d3d11 d3dcompiler)
+      target_compile_definitions(gcn_desktop_ui PRIVATE TANDEM_NATIVE_D3D11=1)
+    endif()
   endif()
 
   if(MSVC)
@@ -421,6 +427,9 @@ function(gcn_add_game)
     endif()
     target_compile_options(runtime_check PRIVATE ${GCN_RUNTIME_WARNINGS})
     target_compile_definitions(runtime_check PRIVATE ${GCN_GAME_DEFS} ${GCN_GL_DEFS})
+    if(WIN32 AND TANDEM_NATIVE_D3D11)
+      target_compile_definitions(runtime_check PRIVATE TANDEM_NATIVE_D3D11=1)
+    endif()
   endif()
 
   if(HAVE_GAME_ISO AND NOT GCN_BENCH_ONLY)
@@ -433,6 +442,10 @@ function(gcn_add_game)
     endif()
     target_compile_options(${G_NAME} PRIVATE ${GCN_RUNTIME_WARNINGS})
     target_compile_definitions(${G_NAME} PRIVATE ${GCN_GAME_DEFS} ${GCN_GL_DEFS} GCN_DEFAULT_AUDIO_VOLUME=${G_DEFAULT_AUDIO_VOLUME})
+    if(WIN32 AND TANDEM_NATIVE_D3D11)
+      target_link_libraries(${G_NAME} PRIVATE tandem_d3d11_gx)
+      target_compile_definitions(${G_NAME} PRIVATE TANDEM_NATIVE_D3D11=1)
+    endif()
 
     # PC VR (--vr): the headset frontend in openxr/, on the window's own GL context. The
     # loader is Khronos' own, built from source and linked statically, so the executable

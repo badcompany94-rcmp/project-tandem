@@ -7,3 +7,6 @@ void desktop_stats_present(int width,int height);
 // Returns true when the caller should swap; this is not a new game frame.
 bool desktop_stats_idle(int width,int height,bool host_ui=false);
 void desktop_stats_shutdown();
+// Called inside the settings ImGui frame for the native renderer only.
+bool desktop_stats_native_visible();
+void desktop_stats_draw_native();

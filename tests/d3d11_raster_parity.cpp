@@ -100,7 +100,7 @@ public:
     }
     void draw(const std::array<gx::GpuVertex,6>& v){glBufferData(GL_ARRAY_BUFFER,sizeof(v),v.data(),GL_STREAM_DRAW);glDrawArrays(GL_TRIANGLES,0,6);}
     void primitive(std::span<const gx::GpuVertex> vertices,unsigned prim,float width){
-        glEnable(GL_PROGRAM_POINT_SIZE);glUniform1f(glGetUniformLocation(program,"u_point_size"),width);glLineWidth(width);
+        glEnable(GL_PROGRAM_POINT_SIZE);glUniform1f(glGetUniformLocation(program,"u_point_size"),width);glLineWidth(1); // Existing GL renderer keeps native lines one pixel wide.
         glBufferData(GL_ARRAY_BUFFER,vertices.size_bytes(),vertices.data(),GL_STREAM_DRAW);glDrawArrays(prim==2?GL_POINTS:GL_LINES,0,GLsizei(vertices.size()));}
     Pixels read(){Pixels p(size_t(rw)*rh*4);glReadPixels(0,0,rw,rh,GL_RGBA,GL_UNSIGNED_BYTE,p.data());require(glGetError()==GL_NO_ERROR,"OpenGL reference draw error");return p;}
     void clear_raw(uint32_t rgba,float z){glBindFramebuffer(GL_FRAMEBUFFER,fbo);glDisable(GL_SCISSOR_TEST);glDepthMask(GL_TRUE);glColorMask(GL_TRUE,GL_TRUE,GL_TRUE,GL_TRUE);
@@ -206,9 +206,13 @@ int main()try{
         batch.verts.assign(vertices.begin(),vertices.end());for(unsigned i=0;i<vertices.size();++i){batch.indices.push_back(i);const auto* bytes=reinterpret_cast<const uint8_t*>(&vertices[i]);batch.packed.insert(batch.packed.end(),bytes,bytes+20);}
         gx::Cmd draw{};draw.type=gx::CmdType::Draw;draw.prim=uint8_t(prim);draw.count=unsigned(vertices.size());draw.vcount=draw.count;batch.cmds={draw};return batch;};
     unsigned primitives=0;
-    for(unsigned prim:{2u,1u})for(unsigned width:{6u,12u,15u,18u,30u,36u,60u}){
+    for(unsigned prim:{2u,1u})for(unsigned direction=0;direction<(prim==1?6u:1u);++direction)for(unsigned width:{6u,12u,15u,18u,30u,36u,60u}){
         std::array<gx::GpuVertex,2> v;std::memset(v.data(),0,sizeof(v));for(unsigned i=0;i<2;++i){v[i].pos[0]=.1234f+i*.3f;v[i].pos[1]=-.281f;v[i].pos[2]=-.5f;
             for(auto& c:v[i].col){c[0]=51;c[1]=102;c[2]=204;c[3]=255;}}
+        if(direction==1)v[1].pos[0]=v[0].pos[0],v[1].pos[1]+=.3f;
+        if(direction>=2)v[1].pos[1]+=(direction==3?-.2f:.2f);
+        if(direction==4)std::swap(v[0],v[1]);
+        if(direction==5)v[1].pos[0]=v[0].pos[0]+.05f,v[1].pos[1]=v[0].pos[1]+.3f;
         const std::span<const gx::GpuVertex> vertices(v.data(),prim==2?1:2);auto batch=primitive_batch(prim,width,vertices);
         copy_reference.begin({});copy_reference.primitive(vertices,prim,float(width)/6);const auto expected=copy_reference.read();
         require(renderer.prepare(batch,error),error);renderer.clear(0x000000ff,1);require(renderer.draw(batch,batch.cmds[0],1,0,error),error);Pixels actual;require(renderer.read_color(actual,error),error);
@@ -216,8 +220,8 @@ int main()try{
             for(const auto* pixels:std::array<const Pixels*,2>{&expected,&actual}){unsigned n=0,x0=640,y0=528,x1=0,y1=0;
                 for(unsigned y=0;y<528;++y)for(unsigned x=0;x<640;++x)if((*pixels)[(y*640+x)*4]){++n;x0=std::min(x0,x);x1=std::max(x1,x);y0=std::min(y0,y);y1=std::max(y1,y);}
                 std::printf("%s lit=%u box=%u,%u..%u,%u\n",pixels==&expected?"GL":"native",n,x0,y0,x1,y1);}
-            throw std::runtime_error("GX primitive="+std::to_string(prim)+" width="+std::to_string(width)+"/6 has "+std::to_string(count)+" different pixels, first="+std::to_string(first%640)+","+std::to_string(first/640));}++primitives;
+            throw std::runtime_error("GX primitive="+std::to_string(prim)+" direction="+std::to_string(direction)+" width="+std::to_string(width)+"/6 has "+std::to_string(count)+" different pixels, first="+std::to_string(first%640)+","+std::to_string(first/640));}++primitives;
     }
-    std::printf("PASS %u exact GL/native point and horizontal line raster comparisons\n",primitives);
+    std::printf("PASS %u exact GL/native point and directional line raster comparisons\n",primitives);
     std::puts("No game, rollback, mixed-renderer online or frame-pacing acceptance claimed.");return 0;
 }catch(const std::exception& failure){std::fprintf(stderr,"FAIL %s\n",failure.what());return 1;}

@@ -14,6 +14,7 @@ namespace desktop_presentation {
 namespace {
 Settings active;
 std::string path;
+VSyncDriver vsync_driver=nullptr;
 bool valid(Settings s) {
     return s.internal_scale >= 0 && s.internal_scale <= 4 &&
            (s.refresh_hz == 0 || s.refresh_hz == 120 || s.refresh_hz == 144 ||
@@ -21,6 +22,7 @@ bool valid(Settings s) {
 }
 }
 Settings current() { return active; }
+void set_vsync_driver(VSyncDriver driver){vsync_driver=driver;}
 int effective_scale(int launch_scale, int menu_scale) {
     return active.internal_scale ? active.internal_scale : std::max(launch_scale,menu_scale);
 }
@@ -29,7 +31,8 @@ bool preview(Settings next, std::string& error) {
     if (!valid(next)) { error = "Choose a supported interpolation rate."; return false; }
     // Interpolation and discard must still work on a driver that cannot change an
     // already-disabled interval. A changed driver interval is reapplied as needed.
-    if (SDL_GL_GetSwapInterval() != (next.vsync ? 1 : 0) && SDL_GL_SetSwapInterval(next.vsync ? 1 : 0) < 0) {
+    if(vsync_driver){if(!vsync_driver(next.vsync,error))return false;}
+    else if (SDL_GL_GetSwapInterval() != (next.vsync ? 1 : 0) && SDL_GL_SetSwapInterval(next.vsync ? 1 : 0) < 0) {
         error = std::string("Cannot change VSync: ") + SDL_GetError();
         return false;
     }
@@ -37,15 +40,15 @@ bool preview(Settings next, std::string& error) {
     diagnostic_log("[presentation-settings] vsync=%d interpolation_hz=%d internal_scale=%d\n", active.vsync, active.refresh_hz,active.internal_scale);
     return true;
 }
-bool load(const std::string& file, std::string& error) {
-    path = file; active = {}; error.clear();
+Settings read(const std::string& file,std::string& error) {
+    error.clear();
     Settings next;
     std::error_code ec;
-    if (std::filesystem::exists(path, ec)) {
-        if (std::filesystem::file_size(path, ec) > 1024 || ec) {
+    if (std::filesystem::exists(file, ec)) {
+        if (std::filesystem::file_size(file, ec) > 1024 || ec) {
             error = "Presentation settings are unreadable. Using defaults.";
         } else {
-            std::ifstream in(path); std::string tag, extra; int version = 0, vsync = 0;
+            std::ifstream in(file); std::string tag, extra; int version = 0, vsync = 0;
             bool parsed=bool(in >> tag >> version >> vsync >> next.refresh_hz);
             if(parsed && version==2)parsed=bool(in >> next.internal_scale);
             if (!parsed || (in >> extra) || tag != "GCN_PRESENTATION" ||
@@ -54,8 +57,10 @@ bool load(const std::string& file, std::string& error) {
             else next.vsync = vsync != 0;
         }
     } else if (ec) error = "Cannot read presentation settings. Using defaults.";
-    const auto read_error = error;
-    if (!read_error.empty()) next = {};
+    return error.empty()?next:Settings{};
+}
+bool load(const std::string& file,std::string& error){
+    path=file;active={};const auto next=read(file,error);const auto read_error=error;
     if (!preview(next, error)) return false;
     error = read_error;
     return error.empty();

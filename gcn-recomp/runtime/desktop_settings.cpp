@@ -4,6 +4,8 @@
 #include "desktop_display.h"
 #include "desktop_sound.h"
 #include "desktop_presentation.h"
+#include "desktop_renderer.h"
+#include "desktop_stats.h"
 #include "desktop_graphics.h"
 #include "desktop_overlay.h"
 #include "desktop_online_ui.h"
@@ -19,6 +21,10 @@
 #include "imgui.h"
 #include "backends/imgui_impl_sdl2.h"
 #include "backends/imgui_impl_opengl3.h"
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+#include "backends/imgui_impl_dx11.h"
+#include "graphics/d3d11_device.h"
+#endif
 #ifndef GCN_DEFAULT_AUDIO_VOLUME
 #define GCN_DEFAULT_AUDIO_VOLUME 100
 #endif
@@ -33,9 +39,28 @@ int selected_port=0,listen_action=-1,listen_slot=0;
 Configuration before;
 desktop_sound::Settings sound_before;
 desktop_presentation::Settings presentation_before;
+desktop_renderer::Api renderer_before=desktop_renderer::Api::OpenGL;
 bool overlay_before=false;
 std::string status;
 uint64_t chord_start=0;bool chord_latched=false;
+void renderer_new_frame(){
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){ImGui_ImplDX11_NewFrame();return;}
+#endif
+    ImGui_ImplOpenGL3_NewFrame();
+}
+void renderer_draw(){
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){desktop_renderer::bind_window_target();ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());return;}
+#endif
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+void renderer_shutdown(){
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){ImGui_ImplDX11_Shutdown();return;}
+#endif
+    ImGui_ImplOpenGL3_Shutdown();
+}
 
 const char* device_label(const Port& p) {
     switch(p.device) {
@@ -55,10 +80,11 @@ void close(bool discard=false) {
         select_display=true;return;
     }
     if(discard){
+        if(!desktop_renderer::preview(renderer_before,status))return;
         if(!desktop_presentation::preview(presentation_before,status))return;
         configuration()=before;desktop_sound::preview(sound_before);desktop_overlay::preview(overlay_before);
     }
-    else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status) || !desktop_overlay::save(status))return;
+    else if(!save(status) || !desktop_sound::save(status) || !desktop_presentation::save(status) || !desktop_overlay::save(status) || !desktop_renderer::save(status))return;
     opened=false;dirty=false;listen_action=-1;cancel_capture();block(false);
     if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);desktop_gamepad_clear_quit();
     fprintf(stderr,"[settings] closed\n");
@@ -242,6 +268,12 @@ void mapping_tab() {
 }
 void display_tab() {
     ImGui::TextWrapped("Choose the monitor, window mode and resolution for this PC.");
+    if(desktop_renderer::supported()){
+        int choice=int(desktop_renderer::preference());const char* labels[]={"OpenGL (default)","Direct3D 11 (experimental)"};ImGui::SetNextItemWidth(350);
+        if(ImGui::Combo("Graphics renderer",&choice,labels,2))if(desktop_renderer::preview(desktop_renderer::Api(choice),status))changed();
+        ImGui::TextDisabled("Changing the renderer takes effect after restarting the game.");
+        if(desktop_renderer::preference()!=desktop_renderer::running())ImGui::TextColored(ImVec4(1,.8f,.3f,1),"Restart to apply the selected renderer.");
+    }
     auto presentation=desktop_presentation::current();
     if(ImGui::Checkbox("VSync",&presentation.vsync)) {
         if(desktop_presentation::preview(presentation,status))changed();
@@ -254,10 +286,12 @@ void display_tab() {
     const char* const labels[]={"Off (native 60 FPS)","120 Hz","144 Hz","165 Hz","240 Hz"};
     int selected=0;for(int i=0;i<5;++i)if(presentation.refresh_hz==rates[i])selected=i;
     ImGui::SetNextItemWidth(300);
+    const bool native=desktop_renderer::running()==desktop_renderer::Api::Direct3D11;ImGui::BeginDisabled(native);
     if(ImGui::Combo("High-refresh interpolation",&selected,labels,5)) {
         presentation.refresh_hz=rates[selected];
         if(desktop_presentation::preview(presentation,status))changed();
     }
+    ImGui::EndDisabled();if(native)ImGui::TextDisabled("High-refresh interpolation currently uses OpenGL. Its saved choice is preserved.");
     ImGui::TextWrapped("Experimental. Smooths 3D motion above 60 FPS. Gameplay stays at its original speed. Adds up to one game frame of visual delay.");
     ImGui::TextWrapped("Choose a rate supported by your monitor. With VSync on, your desktop refresh rate also limits output. Extra rendering requires GPU headroom.");
     const char* const scales[]={"Default (existing behavior)","1x (lowest GPU load)","2x","3x","4x"};
@@ -315,7 +349,7 @@ void display_tab() {
     ImGui::TextDisabled("F11 switches between windowed and borderless fullscreen.");
     if(ImGui::CollapsingHeader("Graphics diagnostics")) {
         ImGui::TextWrapped("GPU: %s",desktop_graphics::device.renderer.c_str());
-        ImGui::TextWrapped("OpenGL / driver: %s",desktop_graphics::device.version.c_str());
+        ImGui::TextWrapped("Graphics API / driver: %s",desktop_graphics::device.version.c_str());
         if(desktop_graphics::software_renderer())ImGui::TextWrapped("A software renderer was detected. Check that your graphics driver is installed and the game is using your GPU.");
         if(ImGui::Button("Copy graphics diagnostics"))ImGui::SetClipboardText(desktop_graphics::report().c_str());
         ImGui::TextWrapped("Paste these details into a performance report. The same graphics details are recorded in the session log.");
@@ -344,11 +378,25 @@ bool desktop_settings_init(SDL_Window* win,void* context) {
     style.Colors[ImGuiCol_Button]=ImVec4(.12f,.23f,.36f,1);
     style.Colors[ImGuiCol_ButtonHovered]=ImVec4(.18f,.39f,.58f,1);
     style.Colors[ImGuiCol_CheckMark]=ImVec4(.45f,.85f,.94f,1);
-    if(!ImGui_ImplSDL2_InitForOpenGL(win,context)){ImGui::DestroyContext();return false;}
-    if(!ImGui_ImplOpenGL3_Init("#version 330 core")){ImGui_ImplSDL2_Shutdown();ImGui::DestroyContext();return false;}
+    bool backend_ready=false;
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){
+        if(!ImGui_ImplSDL2_InitForD3D(win)){ImGui::DestroyContext();return false;}
+        auto* graphics=desktop_renderer::device();backend_ready=ImGui_ImplDX11_Init(graphics->device(),graphics->context());
+    }else
+#endif
+    {
+        if(!ImGui_ImplSDL2_InitForOpenGL(win,context)){ImGui::DestroyContext();return false;}
+        backend_ready=ImGui_ImplOpenGL3_Init("#version 330 core");
+    }
+    if(!backend_ready){ImGui_ImplSDL2_Shutdown();ImGui::DestroyContext();return false;}
     ready=true;
     const char* file=SDL_getenv("GCN_INPUT_CONFIG");
     if(!load(file?file:"saves/controllers.cfg",status))fprintf(stderr,"[input-settings] %s\n",status.c_str());
+    const char* renderer_file=SDL_getenv("GCN_RENDERER_CONFIG");std::string renderer_error;
+    const auto renderer_path=renderer_file?std::filesystem::u8path(renderer_file):std::filesystem::u8path(path()).parent_path()/"renderer.cfg";
+    const auto renderer_u8=renderer_path.u8string();
+    if(!desktop_renderer::load(std::string(reinterpret_cast<const char*>(renderer_u8.data()),renderer_u8.size()),renderer_error))fprintf(stderr,"[renderer-settings] %s\n",renderer_error.c_str());
     const char* display_file=SDL_getenv("GCN_DISPLAY_CONFIG");std::string error;
     const auto display_path=display_file?std::filesystem::path(display_file):std::filesystem::path(path()).parent_path()/"display.cfg";
     if(!desktop_display::init(win,display_path.string(),error)) {status=error;fprintf(stderr,"[display-settings] %s\n",error.c_str());}
@@ -365,9 +413,10 @@ bool desktop_settings_init(SDL_Window* win,void* context) {
     return true;
 }
 bool desktop_settings_open(){return opened;}
-void desktop_settings_show() {
+void desktop_settings_show(bool display_page) {
     if(!ready || opened)return;
-    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();overlay_before=desktop_overlay::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);
+    before=configuration();sound_before=desktop_sound::current();presentation_before=desktop_presentation::current();renderer_before=desktop_renderer::preference();overlay_before=desktop_overlay::current();display_draft=desktop_display::current();close_after_keep=false;dirty=false;opened=true;block(true);SDL_SetRelativeMouseMode(SDL_FALSE);if(SDL_ShowCursor(SDL_QUERY)!=SDL_ENABLE)SDL_ShowCursor(SDL_ENABLE);
+    select_display=display_page;
     ImGui::GetIO().ClearInputKeys();
     fprintf(stderr,"[settings] opened\n");
 }
@@ -411,7 +460,7 @@ void desktop_settings_update() {
     desktop_pointer::update(window,opened);
 }
 void desktop_settings_draw() {
-    if(!ready || (!opened && !display_settings_hint()))return;
+    if(!ready || (!opened && !display_settings_hint() && !desktop_stats_native_visible()))return;
     // The backend's manual mode borrows the existing handles and opens no duplicates.
     auto* pad=desktop_gamepad_active();ImGui_ImplSDL2_SetGamepadMode(ImGui_ImplSDL2_GamepadMode_Manual,pad?&pad:nullptr,pad?1:0);
     // The passive F1 hint must not reveal or replace the game's cursor. Only
@@ -419,14 +468,17 @@ void desktop_settings_draw() {
     auto& io=ImGui::GetIO();
     if(opened)io.ConfigFlags&=~ImGuiConfigFlags_NoMouseCursorChange;
     else io.ConfigFlags|=ImGuiConfigFlags_NoMouseCursorChange;
-    ImGui_ImplOpenGL3_NewFrame();ImGui_ImplSDL2_NewFrame();ImGui::NewFrame();
+    renderer_new_frame();ImGui_ImplSDL2_NewFrame();ImGui::NewFrame();
+    desktop_stats_draw_native();
     if(!opened) {
+        if(display_settings_hint()){
         const float pulse=.78f+.22f*std::sin(float(SDL_GetTicks64()%4000)*(6.2831853f/4000));
         ImGui::SetNextWindowPos(ImVec2(12,12));ImGui::SetNextWindowBgAlpha(.78f*pulse);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(8,5));
         ImGui::Begin("Settings shortcut",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoInputs|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoNav);
         ImGui::TextColored(ImVec4(1.f,.91f,.27f,pulse),"F1  Settings");ImGui::End();ImGui::PopStyleVar();
-        ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());return;
+        }
+        ImGui::Render();renderer_draw();return;
     }
     const auto display=ImGui::GetIO().DisplaySize;
     ImGui::SetNextWindowSize(ImVec2(std::min(960.f,display.x-24),std::min(820.f,display.y-24)),ImGuiCond_Always);
@@ -471,12 +523,23 @@ void desktop_settings_draw() {
         if(!desktop_display::pending())ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
-    ImGui::Render();ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui::Render();renderer_draw();
+}
+void desktop_settings_loading(int done,int total){
+    if(!ready)return;renderer_new_frame();ImGui_ImplSDL2_NewFrame();ImGui::NewFrame();
+    const auto display=ImGui::GetIO().DisplaySize;
+    ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0,0),display,IM_COL32(13,18,30,255));
+    ImGui::SetNextWindowPos(ImVec2(display.x*.5f,display.y*.5f),ImGuiCond_Always,ImVec2(.5f,.5f));
+    ImGui::SetNextWindowSize(ImVec2(std::min(460.f,display.x-24),0));
+    ImGui::Begin("Preparing Direct3D shaders",nullptr,ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoInputs);
+    ImGui::TextWrapped("Preparing shaders before play helps reduce interruptions during the game.");
+    ImGui::ProgressBar(total>0?float(done)/total:1.f,ImVec2(-1,0));ImGui::Text("%d / %d",done,total);
+    ImGui::End();ImGui::Render();renderer_draw();
 }
 void desktop_settings_shutdown() {
     if(!ready)return;
     desktop_pointer::shutdown();
     desktop_display::shutdown();
-    if(opened && dirty){std::string error;if(!save(error))fprintf(stderr,"[input-settings] %s\n",error.c_str());if(!desktop_sound::save(error))fprintf(stderr,"[sound-settings] %s\n",error.c_str());if(!desktop_presentation::save(error))fprintf(stderr,"[presentation-settings] %s\n",error.c_str());}
-    desktop_controls::shutdown();ImGui_ImplOpenGL3_Shutdown();ImGui_ImplSDL2_Shutdown();ImGui::DestroyContext();ready=false;
+    if(opened && dirty){std::string error;if(!save(error))fprintf(stderr,"[input-settings] %s\n",error.c_str());if(!desktop_sound::save(error))fprintf(stderr,"[sound-settings] %s\n",error.c_str());if(!desktop_presentation::save(error))fprintf(stderr,"[presentation-settings] %s\n",error.c_str());if(!desktop_renderer::save(error))fprintf(stderr,"[renderer-settings] %s\n",error.c_str());}
+    desktop_controls::shutdown();renderer_shutdown();ImGui_ImplSDL2_Shutdown();ImGui::DestroyContext();ready=false;
 }

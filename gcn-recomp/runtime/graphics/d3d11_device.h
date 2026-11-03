@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #include <memory>
 #include <string>
+#include <vector>
 struct ID3D11Device;
 struct ID3D11DeviceContext;
 struct ID3D11RenderTargetView;
@@ -23,6 +24,8 @@ public:
     bool initialize(void* window,unsigned width,unsigned height,std::string& error);
     bool resize(unsigned width,unsigned height,std::string& error);
     bool present(bool vsync,bool& occluded,std::string& error);
+    bool window_pixels(std::vector<unsigned char>& rgba,std::string& error);
+    bool cache_window(bool restore,std::string& error);
     ID3D11Device* device()const;
     ID3D11DeviceContext* context()const;
     ID3D11RenderTargetView* window_target()const;

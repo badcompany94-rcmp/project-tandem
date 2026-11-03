@@ -5,4 +5,5 @@ namespace gx {
 // explicit clip-space convention; the OpenGL default source stays unchanged.
 std::string copy_vertex_shader();
 std::string copy_pixel_shader();
+std::string scanout_pixel_shader();
 }

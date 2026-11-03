@@ -11,6 +11,9 @@ struct Settings {
     bool operator==(const Settings&) const = default;
 };
 Settings current();
+Settings read(const std::string& file,std::string& error);
+using VSyncDriver=bool(*)(bool,std::string&);
+void set_vsync_driver(VSyncDriver);
 bool load(const std::string& file, std::string& error);
 bool preview(Settings settings, std::string& error);
 bool save(std::string& error);

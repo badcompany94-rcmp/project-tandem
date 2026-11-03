@@ -6,7 +6,9 @@ bool desktop_settings_init(SDL_Window* window,void* gl_context);
 bool desktop_settings_event(const SDL_Event& event);
 void desktop_settings_update();
 bool desktop_settings_open();
-void desktop_settings_show();
+void desktop_settings_show(bool display_page=false);
 void desktop_settings_toggle_fullscreen();
 void desktop_settings_draw();
+// Startup progress, before the game simulation runs. Keeps the window responsive.
+void desktop_settings_loading(int done,int total);
 void desktop_settings_shutdown();

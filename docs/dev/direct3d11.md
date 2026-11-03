@@ -1,122 +1,112 @@
-# Native Direct3D 11 desktop backend (in development)
+# Native Direct3D 11 desktop backend (private experimental build)
 
-The requested release will offer OpenGL (default) and Direct3D 11 (Experimental)
-in the F1 Display settings. Renderer selection will apply after restarting. It
-must use shared simulation, networking, content checks and compatible release
-identities; renderer choice alone must not partition online rooms. This setting
-is not exposed until the native game backend works.
+The same executable supports OpenGL (default) and Direct3D 11 (experimental).
+F1 > Display > Graphics API saves the choice in renderer.cfg; restart to apply.
+Discard restores the previous choice. Missing/invalid preferences default to
+OpenGL. Failed native device creation falls back to OpenGL without replacing the
+saved preference. Renderer choice does not change simulation, networking,
+content validation or the executable's online compatibility identity.
 
-Direct3D 11 is the initial Windows target. Feature level 11_0 provides the
-shader-model 5 baseline used by the implementation. Device creation tests actual
-support; API version is not a performance guarantee. See Microsoft's
-[feature-level documentation](https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-devices-downlevel-intro).
+Direct3D 11 hardware feature level 11_0 / shader model 5 is the Windows target.
+Flip-discard presentation falls back to flip-sequential or legacy discard where
+required. Software rendering is not selected automatically. Native device,
+resource, pipeline and draw submission use D3D; no OpenGL context or ANGLE is used
+in native desktop mode. A different API does not guarantee better FPS.
 
-## Implemented foundation
+## Developer build and dependencies
 
-`graphics/d3d11_device` owns a hardware device, immediate context, swap chain and
-window render target on the render thread. It prefers flip presentation with a
-legacy swap-chain fallback. It handles resizing/minimization and reports device
-creation/presentation failures. It does not silently choose software rendering.
-This layer does not execute gameplay or modify network state.
+Set TANDEM_NATIVE_D3D11=ON, TANDEM_GLSLANG_SOURCE_DIR and
+TANDEM_SPIRV_CROSS_SOURCE_DIR to these official source checkouts:
 
-On Windows, configure `TANDEM_D3D11_TESTS=ON` and build `d3d11_device_test`. The
-hidden test compiles native HLSL and checks exact color output, depth occlusion,
-color/depth resource restoration, readback row pitch, resize/minimize, VSync modes
-and preservation of a working device after invalid replacement input. Run GPU
-tests only while no competing game/GPU workload is active. This is a correctness
-probe, not a game performance measurement.
+- glslang 16.6.0: e1b562a8bed273a02f30b59b66a5d499793cede5
+- SPIRV-Cross vulkan-sdk-1.4.363.0: f11ba9f0b21ba8fc15153d50a2a1ae31ab1cf8f7
 
-## Release gates still outstanding
+Dependencies are not fetched automatically. Shared GLSL compiles to SPIR-V, HLSL,
+then DXBC through Windows D3DCompile. SPIR-V is an intermediate representation;
+no Vulkan runtime is required. The tested Windows executable links Khronos and
+C++ libraries statically. Release builds and notice packaging remain gates.
+Retain glslang's multi-license and SPIRV-Cross's Apache-2.0 notices.
 
-- Native GX draws, textures, sampler state, EFB copies/readbacks and presentation.
-- Correct point expansion, coordinate/depth conventions, blend and logic behavior.
-- Backend-specific F1 and FPS overlays, diagnostics and persistent renderer choice.
-- Native rollback snapshots and equivalent CPU-visible graphics results.
-- Stock offline/cup/splitscreen/course-pack rendering and settings/save preservation.
-- Mixed OpenGL/Direct3D online races, each host direction, player layouts,
-  reconnect/abort and packet loss/jitter with matching simulation checksums.
-- Average FPS plus p95/p99/max presentation and race intervals, including startup
-  and correction spikes, on clean and impaired links. Preserve the OpenGL baseline.
-- Supported older AMD/Intel/NVIDIA testing; no promised FPS gain on untested GPUs.
+The unmodified Dear ImGui DX11 backend comes from upstream v1.92.9b,
+f1cc2ae15e53a861a874c3034aae6798fde194ab, matching existing ImGui.
+Its MIT license remains in gcn-recomp/third_party/imgui/LICENSE.txt.
+Backend SHA256:
+cpp 749d12b01011f504284497db21cb52b3c6f73c59612e7115f46f41e0c4ea1c49
+h fb8a314a6a2904dcc5bfeb938a169389e170f233ad367d33f1ce5c7bde586a7c
 
-Shader compiler feasibility work is isolated outside the source tree. Khronos
-glslang and SPIRV-Cross can compile the current shader-generation output to HLSL
-and then Direct3D bytecode. This is shader compilation, not a replacement of the
-native device/rendering API with an OpenGL runtime layer. Any integrated compiler
-dependencies must be pinned, licensed, packaged and credited before release.
-Compiler success alone does not establish coordinate, point or readback parity.
+Default builds retain TANDEM_NATIVE_D3D11=OFF until release gates pass.
+OpenGL-only builds require neither Khronos dependency. CPU benchmark/runtime
+source lists exclude native implementation modules and SDL desktop owners.
 
-The shader generator has an opt-in interface for backend-managed point expansion.
-It exports point size and coordinates explicitly and fixes varying locations,
-including optional fog/depth inputs. OpenGL callers use the unchanged default
-source. Native pixel shaders require actual interpolated point coordinates, not
-the shader compiler's constant-coordinate compatibility substitution. A native
-geometry expansion stage is still required.
+## Implementation
 
-For developer compiler validation, set `TANDEM_D3D11_SHADER_TESTS=ON`,
-`TANDEM_GLSLANG_SOURCE_DIR` and `TANDEM_SPIRV_CROSS_SOURCE_DIR`, then build
-`d3d11_shader_corpus_test`. Reference dependency commits are glslang 16.6.0
-`e1b562a8bed273a02f30b59b66a5d499793cede5` and SPIRV-Cross
-`vulkan-sdk-1.4.363.0`, `f11ba9f0b21ba8fc15153d50a2a1ae31ab1cf8f7`.
-These optional developer tests do not download or package dependencies.
+The native device owns hardware context, swap chain, resize/minimize and window
+target. The GX renderer consumes shared batches: packed geometry, decoded mips,
+reflected TEV/flat uniforms, depth/blend/logic/raster/samplers and EFB copies.
+Offscreen clip-Y inversion and clockwise native front faces preserve GL raw EFB
+rows. D32_FLOAT matches GL DEPTH_COMPONENT32F. Opaque-black fallback matches GL's
+unbound texture value. Point geometry preserves programmable size/coordinates.
+Lines remain one native pixel wide, matching GL's current lack of glLineWidth.
 
-Pass a local `saves/shaders.bin` path followed by `points` to compile the native
-variants and check the live Direct3D stage signatures through shader reflection.
-Use `hash` to record the default OpenGL source hashes. The fixture never edits
-the input cache. Do not redistribute local shader caches as test assets. Compiler
-and signature checks do not prove pixel equivalence, rollback, or mixed-renderer
-online behavior.
+Shared copy shaders/tile encoders preserve CPU-visible copies. Scanout assembles
+partial XFB strips and aspect/letterboxing. Checkpoints retain EFB/depth and
+immutable textures, with copy-on-write for later EFB writes. A bounded GPU target
+pool is warmed at initialization; an independent CPU oracle verifies resource
+preservation in tests. The existing texture replacement callback supplies RGBA
+and native mip generation; actual HD-pack coverage remains pending.
 
-`graphics/d3d11_shaders` is the reusable CPU compiler module behind the native
-backend. It produces Direct3D bytecode, original uniform names with explicit
-buffer offsets/array and matrix strides, and texture/palette slot bindings. It
-validates live stage signatures and only replaces a valid compiled program after
-both stages succeed. Compilation needs no OpenGL context. Runtime integration
-must use a verified bytecode cache or prepare shaders outside active race draws.
+Window/presentation, F1 and statistics dispatch to the active API. Native ImGui
+uses SDL2/DX11. OpenGL retains existing backends. VSync and optional FPS use common
+settings. Native interpolation is currently disabled in F1, preserving the saved
+OpenGL rate. VR, eye/theater and CLI recording launches use OpenGL and preserve
+the renderer preference. Communicate these limitations before public delivery.
 
-The same optional compiler-test configuration builds `d3d11_shader_library_test`.
-Pass the local shader cache path to validate generated programs and their reflected
-layouts, malformed-source/configuration failure preservation, and explicit target
-orientation options. Orientation compilation is not a pixel-parity test.
+## Shader cache and startup pacing
 
-`graphics/d3d11_program` creates native vertex/pixel shaders and reflected constant
-buffers. Cached uniform slots avoid string searches per draw; a CPU shadow skips
-uploads when values are unchanged. Array and matrix updates retain their reflected
-strides. Failed initialization or invalid updates preserve a working program.
+Native DXBC/reflection lives separately in saves/shaders.bin.d3d11. GL is read
+only for known keys; its driver binaries/identity are not used, and Direct3D never
+rewrites it. Native files are bounded, checksummed and atomically replaced.
+Lengths, metadata and source/compiler fingerprints are checked. Stale records
+recompile; bad files preserve working memory entries. Device-rejected cached
+programs are invalidated/rebuilt. Saves run after startup warming/at exit, not
+per rendered frame.
 
-With compiler tests configured, `d3d11_program_test` checks these layouts through
-actual GPU pixels, then draws the shared GX integer TEV color pipeline with packed
-vertex colors in desktop-flat and neutral-view modes. Its hidden window does not
-load game assets. It does not yet cover complete GX command batches, textures,
-point expansion, framebuffer copies, rollback, or mixed-renderer online play.
+Remembered pipelines warm before simulation starts in time-budgeted steps, with
+visible progress/event pumping. A single compile can exceed the step budget.
+New-course/cold misses still compile synchronously before submission; this is a
+remaining frame-pacing concern, not a solved-stutter claim.
 
-`gx/render_d3d11` now accepts actual GX packed draw batches and immutable mipmapped
-textures, with native input layouts, samplers, TEV constants and cached blend,
-depth and raster states. It implements GPU framebuffer copies and partial channel
-clears. Its 32-bit floating-point depth target matches the existing GL target;
-using D24 here would change depth-copy rounding. This module is still isolated
-from the playable frontend. Unsupported logical operations are explicitly
-rejected until their native path is complete. Point/line geometry expansion is
-implemented, with broader clipping/interpolation parity still required.
+An actual hidden boot converted 442 GL keys in 13,050 ms. The next launch restored
+all 442 with zero compilation in 114 ms on the development RTX 3070 Ti. These are
+startup observations, not race performance or promises for other hardware.
 
-`d3d11_gx_draw_test` validates exact packed-vertex/texture pixels and cached repeat
-draws, scaled copies, GX tiled RGBA CPU bytes, partial alpha clears and the far
-depth boundary. `d3d11_raster_parity_test` additionally creates a hidden OpenGL
-3.3 core reference. It checks exact raw EFB rows for asymmetric geometry, viewport
-transforms, scissoring, front/back culling, overlapping depth, pre-viewport clipping
-and depth clamping. The offscreen native compiler uses clip-Y inversion; this
-requires `FrontCounterClockwise=FALSE` for the GL-equivalent cull convention.
+## Validation and remaining release gates
 
-The parity fixture compares all 32 copy modes for color and depth across four
-RGBA patterns and five depth boundaries: 1,280 GPU pixel comparisons and 760
-supported tiled CPU writebacks. Copy conversion shaders are shared with GL and
-retain the committed default shader text. These tests do not prove whole-game,
-rollback, mixed-renderer netplay or frame-pacing acceptance.
+TANDEM_D3D11_TESTS enables device/preference fixtures. TANDEM_D3D11_SHADER_TESTS
+also enables compiler/library/program, cache, GX and GL/native parity fixtures.
+GPU tests use hidden windows only with no competing GPU workload. Use local
+caches privately; do not redistribute them as test assets.
 
-`graphics/d3d11_geometry` reflects the real vertex-stage interface and generates
-native point/line geometry shaders without losing packed varyings. Geometry
-bytecode is shared across programs after interface validation. Core GL point
-rasterization uses an unrounded center/width (OpenGL 3.3 section 3.4.1), unlike
-older compatibility-profile point snapping. The fixture currently passes seven
-point widths and seven horizontal line widths, including the 2.5-pixel tie case.
-Diagonal lines, clipping and point texture coordinates are not yet accepted.
+Passed fixtures cover all 16 logic ops (hardware/forced 11_0 fallback), packed
+geometry/textures, uniform shadowing, viewport/scissor/culling/depth, 1,280 copy
+pixel comparisons, 760 tiled CPU writes, seven point widths, 42 directional line
+cases, partial clears/XFBs, letterboxing, z-freeze, snapshot COW/restoration and
+cache corruption/source invalidation. Live native signatures compile across443
+locally observed GX pairs. Both APIs boot real game/F1 in one executable; default
+OpenGL runtime compilation passes. Same-state whole-game parity is not yet
+established: unsynchronized boot images differ in animation phase.
+
+Required before promotion/release:
+
+- Offline cups, splitscreen, Plus/course packs, HD replacement coverage,
+  resolution/VSync changes and textured points.
+- Mixed-renderer synchronized races in both host directions, correction/rollback,
+  disconnect recovery and clean/impaired conditions.
+- Average FPS and p95/p99/max race/full presentation intervals, retaining startup
+  and correction spikes and preserving the OpenGL baseline.
+- Older AMD/Intel/NVIDIA and physical Internet/NAT/relay checks.
+- Dependency notices, release build/launcher packaging, settings/save/pack
+  preservation and candidate identity/manifest verification.
+
+Local tests do not establish physical Internet reliability. Main/live-test copies
+remain untouched while required stability gates are open.

@@ -10,6 +10,7 @@
 #include "scanout_overlay.h"
 #include "shadergen.h"
 #include "copy_shaders.h"
+#include "flat_math.h"
 #include "gl.h"
 #include <algorithm>
 #include <chrono>
@@ -18,10 +19,21 @@
 #include <stdexcept>
 #include <mutex>
 #include <future>
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+#include "render_d3d11.h"
+#include "../desktop_renderer.h"
+#endif
 
 bool write_png(const char* path, const uint8_t* rgba, int w, int h);
 
 namespace gx {
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+static D3D11Renderer* native_backend(){return desktop_renderer::renderer();}
+static bool native_texture_replacement(const TexData& texture,D3D11Renderer::Replacement& result){
+    TextureReplacement replacement;if(!texture_mods_load(texture.replacement_name,texture.width,texture.height,replacement))return false;
+    result.width=unsigned(replacement.width);result.height=unsigned(replacement.height);result.rgba=std::move(replacement.pixels);return true;
+}
+#endif
 
 static bool g_interpolating = false;
 static bool render_with_interpolation(Batch&);
@@ -678,17 +690,18 @@ static const Program& get_program(const ShaderKey& k) {
     return pr;
 }
 
-static const char* kBlitFS = GCN_GLSL_VERSION R"(
-in vec2 v_uv;
-uniform sampler2D u_src;
-out vec4 o;
-void main() { o = vec4(texture(u_src, vec2(v_uv.x, 1.0 - v_uv.y)).rgb, 1.0); }
-)";
-
 void render_init(int internal_scale) {
     g_scale = internal_scale < 1 ? 1
                                  : (internal_scale > kMaxInternalScale ? kMaxInternalScale
                                                                        : internal_scale);
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(auto* renderer=native_backend()){
+        if(renderer->width()!=unsigned(EFB_W*g_scale)){std::string error;if(!renderer->initialize(*desktop_renderer::device(),g_scale,error))fatal("Direct3D initialization: %s",error.c_str());}
+        renderer->set_texture_loader(native_texture_replacement);
+        if(!g_shader_cache_path.empty())renderer->open_shader_cache(g_shader_cache_path+".d3d11",g_shader_cache_path);
+        g_renderer_writes_back=true;return;
+    }
+#endif
     const std::string vs_src = gen_vertex_shader();
 #ifdef GCN_GL_ES
     {
@@ -787,7 +800,7 @@ void render_init(int internal_scale) {
     g_copy_u_depth = glGetUniformLocation(g_copy_prog, "u_depth");
     g_copy_u_rect = glGetUniformLocation(g_copy_prog, "u_rect");
     g_copy_u_mode = glGetUniformLocation(g_copy_prog, "u_mode");
-    g_blit_prog = link(cvs, compile(GL_FRAGMENT_SHADER, kBlitFS));
+    g_blit_prog = link(cvs, compile(GL_FRAGMENT_SHADER, scanout_pixel_shader()));
     g_blit_u_src = glGetUniformLocation(g_blit_prog, "u_src");
     g_blit_u_rect = glGetUniformLocation(g_blit_prog, "u_rect");
     glGenVertexArrays(1, &g_copy_vao);
@@ -847,6 +860,9 @@ void render_set_window_size(int w, int h) { g_win_w = w; g_win_h = h; }
 static void gl_state_invalidate();
 static void uniforms_invalidate();
 void render_set_internal_scale(int scale) {
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(native_backend()){const int next=std::clamp(scale,1,kMaxInternalScale);if(next!=g_scale)render_init(next);return;}
+#endif
     if (scale < 1) scale = 1;
     if (scale > kMaxInternalScale) scale = kMaxInternalScale;
     if (scale == g_scale) return;
@@ -913,6 +929,9 @@ void render_set_internal_scale(int scale) {
 
 // ---------------------------------------------------------------------------
 uint64_t render_texture_hash(uint32_t id) {
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(auto* renderer=native_backend())return renderer->texture_hash(id);
+#endif
     auto it = g_textures.find(id);
     return it == g_textures.end() ? 0 : it->second.hash;
 }
@@ -1239,39 +1258,8 @@ static float g_zplane[4];
 
 // The plane of a draw's last triangle, as the flat path's vertex shader places it: the
 // GX projection, then the viewport (less the scissor offset), Y flipped for the EFB blit.
-static bool zfreeze_plane(const Batch& b, const Cmd& c, float out[4]) {
-    if (c.prim != 0 || c.count < 3) return false;
-    const PixelState& st = b.states[c.state];
-    const float* p = st.proj;
-    const float* vp = st.viewport;
-    const bool perspective = (int)p[6] == 0;
-    int xoff, yoff;
-    scissor_offset(st.bp, xoff, yoff);
-    const float vpa[4] = {2.0f * (vp[3] - xoff) / EFB_W - 1.0f, 2.0f * vp[0] / EFB_W, 2.0f * (vp[4] - yoff) / EFB_H - 1.0f, 2.0f * vp[1] / EFB_H};
-    const float vpb[2] = {2.0f * vp[5] / 16777215.0f - 1.0f, 2.0f * vp[2] / 16777215.0f};
-    double X[3], Y[3], Z[3];
-    for (int i = 0; i < 3; i++) {
-        const float* v = b.verts[b.indices[c.first + c.count - 3 + i]].pos;
-        float cx, cy, cz, cw;
-        if (perspective) { cx = p[0] * v[0] + p[1] * v[2]; cy = p[2] * v[1] + p[3] * v[2]; cw = -v[2]; }
-        else { cx = p[0] * v[0] + p[1]; cy = p[2] * v[1] + p[3]; cw = 1.0f; }
-        cz = p[4] * v[2] + p[5];
-        if (cw <= 0.0f) return false;
-        const float px = vpa[0] * cw + vpa[1] * cx, py = vpa[2] * cw + vpa[3] * cy, pz = vpb[0] * cw + vpb[1] * cz;
-        X[i] = (px / cw + 1.0) * 0.5 * EFB_W * g_scale;
-        Y[i] = (-py / cw + 1.0) * 0.5 * EFB_H * g_scale;
-        Z[i] = (pz / cw + 1.0) * 0.5;
-    }
-    const double ux = X[1] - X[0], uy = Y[1] - Y[0], uz = Z[1] - Z[0];
-    const double wx = X[2] - X[0], wy = Y[2] - Y[0], wz = Z[2] - Z[0];
-    const double det = ux * wy - uy * wx;
-    if (fabs(det) < 1e-9) return false;
-    const double a = (uz * wy - uy * wz) / det, bb = (ux * wz - uz * wx) / det;
-    out[0] = (float)a;
-    out[1] = (float)bb;
-    out[2] = (float)(Z[0] - a * X[0] - bb * Y[0]);
-    out[3] = 1.0f;
-    return true;
+static bool zfreeze_plane(const Batch& b,const Cmd& c,float out[4]) {
+    return flat_zfreeze_plane(b,c,unsigned(g_scale),out);
 }
 
 // The same plane as an eye sees the triangle: the eye's projection and its view of the
@@ -3739,6 +3727,52 @@ static bool execute_batch(Batch& b, bool do_present, const std::vector<uint8_t>*
 }
 
 bool render_execute(Batch& b) {
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(auto* renderer=native_backend()){
+        frame_observe(b,nullptr);texture_mods_sync();g_render_frame++;std::string error;
+        if(!renderer->prepare(b,error))fatal("Direct3D batch preparation: %s",error.c_str());
+        std::vector<uint8_t> offscreen;if(g_flat_overlay_scale!=1.f)mark_offscreen_passes(b,offscreen);
+        EfbCopyCmd screen{};screen.src_w=EFB_W;screen.src_h=EFB_H;float center=0,halfwidth=1;
+        for(const auto& cmd:b.cmds)if(((cmd.type==CmdType::EfbCopy && cmd.copy.to_xfb) || cmd.type==CmdType::Present) && cmd.copy.src_w){
+            screen=cmd.copy;center=(2.f*screen.src_x+screen.src_w)/EFB_W-1;halfwidth=float(screen.src_w)/EFB_W;}
+        bool presented=false;
+        for(size_t index=0;index<b.cmds.size();++index){const auto& cmd=b.cmds[index];
+            if(cmd.type==CmdType::Draw){
+                const bool full=(!offscreen.empty() && offscreen[index]) || flat_fullscreen_overlay(b,cmd,screen);
+                const bool overlay=!full && int(b.states[cmd.state].proj[6])!=0;const float scale=overlay?g_flat_overlay_scale:1;
+                const float anchor=overlay && scale!=1 && g_flat_overlay_hook?g_flat_overlay_hook(b,cmd):0;
+                const float offset=(1-scale)*(center+halfwidth*anchor);
+                if(!renderer->draw(b,cmd,scale,offset,error))fatal("Direct3D draw: %s",error.c_str());
+            }else if(cmd.type==CmdType::EfbCopy){
+                const auto& copy=cmd.copy;const auto format=copy.format&15;const bool one=format==1 || (format>=7 && format<=10),two=format==3 || format==11 || format==12,color=format==4 || format==5 || format==6;
+                const unsigned tw=one?8:4;const uint64_t bytes=uint64_t((copy.dst_w+tw-1)/tw)*((copy.dst_h+3)/4)*(format==6?64:32);
+                const bool requested=copy.writeback && !copy.to_xfb && copy.tex_id;
+                const bool supported=requested && (one || two || (color && !copy.depth)) && uint64_t(copy.dest&0x01ffffff)+bytes<=RAM_SIZE;
+                std::vector<uint8_t> writeback;if(!renderer->copy(copy,supported?&writeback:nullptr,error))fatal("Direct3D framebuffer copy: %s",error.c_str());
+                if(requested){if(supported){memcpy(phys_ptr(copy.dest),writeback.data(),writeback.size());debug_guard_dma("EFB copy write-back",copy.dest,uint32_t(writeback.size()));}
+                    else{static bool warned=false;if(!warned){warned=true;fprintf(stderr,"[copy] write-back of format %X%s not done\n",copy.format,copy.depth?" (depth)":"");}}
+                    g_copy_writebacks_done++;}
+            }else if(cmd.type==CmdType::Present){
+                bool complete=false;if(!renderer->scanout(cmd.copy,b.display_height,g_flat_aspect,!b.suppress_present,complete,error))fatal("Direct3D scanout: %s",error.c_str());
+                if(complete){g_present_count++;presented=true;
+                    static const auto range=[] {std::array<int,2> r={-1,-1};if(const char* text=getenv("GCN_DUMP_RANGE")){r[0]=atoi(text);const auto* dash=strchr(text,'-');r[1]=dash?atoi(dash+1):r[0];}return r;}();
+                    const bool in_range=range[0]<0 || (int(g_present_count)>=range[0] && int(g_present_count)<=range[1]);
+                    if(!b.suppress_present && g_dump_dir && g_dump_every && g_present_count%g_dump_every==0 && in_range){
+                        std::vector<uint8_t> image;unsigned w=0,h=0;
+                        if(b.display_height && cmd.copy.dst_h<b.display_height){if(!desktop_renderer::window_pixels(image,error))fatal("Native frame capture: %s",error.c_str());w=unsigned(g_win_w);h=unsigned(g_win_h);}
+                        else{std::vector<uint8_t> efb;if(!renderer->read_color(efb,error))fatal("Native frame capture: %s",error.c_str());
+                            w=cmd.copy.src_w*g_scale;h=cmd.copy.src_h*g_scale;image.resize(size_t(w)*h*4);
+                            const unsigned x=cmd.copy.src_x*g_scale,y=(EFB_H-cmd.copy.src_y-cmd.copy.src_h)*g_scale;
+                            for(unsigned row=0;row<h;++row)memcpy(image.data()+size_t(row)*w*4,efb.data()+(size_t(y+h-1-row)*EFB_W*g_scale+x)*4,w*4);
+                            for(size_t i=3;i<image.size();i+=4)image[i]=255;}
+                        char path[512];snprintf(path,sizeof(path),"%s/frame_%05u.png",g_dump_dir,g_present_count);write_png(path,image.data(),int(w),int(h));
+                    }
+                }
+            }
+        }
+        return presented && !b.suppress_present;
+    }
+#endif
     return render_with_interpolation(b);
 }
 

@@ -20,6 +20,11 @@
 #include "presentation_stats.h"
 #include "display_config.h"
 #include "desktop_presentation.h"
+#include "desktop_renderer.h"
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+#include "graphics/d3d11_device.h"
+#include "gx/render_d3d11.h"
+#endif
 #include "desktop_graphics.h"
 #include "refresh_clock.h"
 #include "presentation_wait.h"
@@ -368,16 +373,35 @@ int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) != 0) fatal("SDL_Init: %s", SDL_GetError());
     input_map_load(controls);
     desktop_gamepad_refresh(input_map_binds_index);
+    auto path_utf8=[](const std::filesystem::path& path){const auto text=path.u8string();return std::string(reinterpret_cast<const char*>(text.data()),text.size());};
+    const char* input_config=getenv("GCN_INPUT_CONFIG");const auto settings_folder=std::filesystem::u8path(input_config?input_config:"saves/controllers.cfg").parent_path();
+    const char* renderer_config=getenv("GCN_RENDERER_CONFIG");std::string renderer_error;
+    const auto renderer_path=renderer_config?std::filesystem::u8path(renderer_config):settings_folder/"renderer.cfg";
+    if(!desktop_renderer::load(path_utf8(renderer_path),renderer_error))diagnostic_log("[renderer-settings] %s\n",renderer_error.c_str());
+    bool want_native=desktop_renderer::supported() && desktop_renderer::preference()==desktop_renderer::Api::Direct3D11;
+    // These developer/stereo paths currently own an OpenGL target themselves.
+    if(want_native && (vr || g_eye_mode || record_to || getenv("GCN_THEATER_STEREO"))){want_native=false;diagnostic_log("[renderer] Stereo/recording launch uses OpenGL. The saved renderer choice was preserved.\n");}
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     const bool gl_debug = getenv("GCN_GL_DEBUG") != nullptr;
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG |
                                                   (gl_debug ? SDL_GL_CONTEXT_DEBUG_FLAG : 0));
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_Window* win = SDL_CreateWindow(GCN_APP_LABEL, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                       window_w, window_h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
+    const Uint32 window_flags=SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
                                        (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) |
-                                       (hidden ? SDL_WINDOW_HIDDEN : 0));
+                                       (hidden ? SDL_WINDOW_HIDDEN : 0);
+    auto create_window=[&](bool gl){return SDL_CreateWindow(GCN_APP_LABEL,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,window_w,window_h,window_flags|(gl?SDL_WINDOW_OPENGL:0));};
+    SDL_Window* win=create_window(!want_native);
     if (!win) fatal("SDL_CreateWindow: %s", SDL_GetError());
+    if(want_native){
+        const char* presentation_file=getenv("GCN_PRESENTATION_CONFIG");std::string error;
+        const auto values=desktop_presentation::read(presentation_file?presentation_file:path_utf8(settings_folder/"presentation.cfg"),error);
+        const int initial_scale=values.internal_scale?values.internal_scale:std::clamp(scale,1,gx::kMaxInternalScale);
+        if(!desktop_renderer::initialize_native(win,initial_scale,renderer_error)){
+            diagnostic_log("[renderer] Direct3D unavailable: %s Using OpenGL; saved settings were preserved.\n",renderer_error.c_str());
+            SDL_DestroyWindow(win);win=create_window(true);if(!win)fatal("SDL_CreateWindow fallback: %s",SDL_GetError());
+        }
+    }
+    const bool native_session=desktop_renderer::running()==desktop_renderer::Api::Direct3D11;
 #if defined(_WIN32) && defined(GCN_APP_ICON_RESOURCE)
     SDL_SysWMinfo window_info{};SDL_VERSION(&window_info.version);
     if(SDL_GetWindowWMInfo(win,&window_info)) {
@@ -390,6 +414,7 @@ int main(int argc, char** argv) {
     // OpenXR runtime may want more of the context it shares (Meta's wants 4.0), and drivers
     // hand back exactly the version asked for.
     SDL_GLContext ctx = nullptr;
+    if(!native_session){
     static const int kTry[][2] = {{4, 6}, {4, 5}, {4, 3}, {4, 1}, {4, 0}};
     for (const auto& v : kTry) {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, v[0]);
@@ -417,14 +442,21 @@ int main(int argc, char** argv) {
               glGetString(GL_RENDERER) ? (const char*)glGetString(GL_RENDERER) : "?", kGLHelp);
     }
     LOG(LOG_GX, "GL: %s / %s", glGetString(GL_RENDERER), glGetString(GL_VERSION));
+    }
     SDL_version sdl_version;SDL_GetVersion(&sdl_version);
     const auto sdl_text=std::to_string(sdl_version.major)+"."+std::to_string(sdl_version.minor)+"."+std::to_string(sdl_version.patch);
-    desktop_graphics::initialize((const char*)glGetString(GL_VENDOR),(const char*)glGetString(GL_RENDERER),
+    if(native_session){
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+        const auto& info=desktop_renderer::device()->info();const auto vendor=info.vendor==0x10de?"NVIDIA":info.vendor==0x1002?"AMD":info.vendor==0x8086?"Intel":"Hardware GPU";
+        desktop_graphics::initialize(vendor,info.adapter.c_str(),"Direct3D 11 / feature level 11_0","5.0",SDL_GetPlatform(),sdl_text.c_str(),"Direct3D 11");
+#endif
+    }else desktop_graphics::initialize((const char*)glGetString(GL_VENDOR),(const char*)glGetString(GL_RENDERER),
         (const char*)glGetString(GL_VERSION),(const char*)glGetString(GL_SHADING_LANGUAGE_VERSION),SDL_GetPlatform(),sdl_text.c_str());
-    if (gl_debug) gl_debug_enable(SDL_GL_GetProcAddress);
+    if (gl_debug && !native_session) gl_debug_enable(SDL_GL_GetProcAddress);
+    desktop_presentation::set_vsync_driver(desktop_renderer::apply_vsync);
     if(!desktop_settings_init(win,ctx))fatal("Cannot initialize desktop settings");
     if(stats_override>=0)desktop_stats_enable(stats_override!=0);
-    if(getenv("GCN_SETTINGS_OPEN"))desktop_settings_show();
+    if(const char* initial_page=getenv("GCN_SETTINGS_OPEN"))desktop_settings_show(!strcmp(initial_page,"display"));
     // Beside the memory card: both are state this machine accumulates for this game.
     plat_make_dirs("saves");
     gx::render_set_shader_cache("saves/shaders.bin");
@@ -440,6 +472,24 @@ int main(int argc, char** argv) {
     }
 #endif
     gx::render_init(desktop_presentation::effective_scale(scale,scale));
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(native_session){
+        int done=0,total=0;std::string error;bool complete=false;
+        const auto start=std::chrono::steady_clock::now();
+        while(!complete){
+            if(!pump_events(win)){
+                desktop_settings_shutdown();desktop_stats_shutdown();record::finish();input_log_end();input_map_shutdown();desktop_gamepad_shutdown();desktop_renderer::shutdown();plat_exit_now(0);
+            }
+            complete=desktop_renderer::renderer()->warm_shader_cache(8,done,total,error);
+            if(!error.empty()){diagnostic_log("[d3d11-shaders] Startup warming stopped: %s\n",error.c_str());break;}
+            if(total){
+                if(!desktop_renderer::resize(win,error))fatal("Direct3D resize: %s",error.c_str());
+                desktop_settings_loading(done,total);if(!desktop_renderer::present(win,error))fatal("Direct3D startup presentation: %s",error.c_str());
+            }
+        }
+        diagnostic_log("[d3d11-shaders] Startup preparation %.0f ms\n",std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count());
+    }
+#endif
     if (g_eye_mode) eye_init();
     if (first_person) gx::render_set_first_person(true);
     if (gx::g_dump_dir) plat_make_dirs(gx::g_dump_dir);
@@ -472,11 +522,13 @@ int main(int argc, char** argv) {
         FILE* file=fopen(path,"w");if(!file)fatal("Cannot open refresh trace");
         fprintf(file,"native_frame,host_ns,alpha,interpolated,work_ns,swap_ns\n");return file;
     }();
+    auto swap_window=[&]{std::string error;if(!desktop_renderer::present(win,error))fatal("Desktop presentation: %s",error.c_str());};
+    auto bind_window=[&]{if(native_session)desktop_renderer::bind_window_target();else glBindFramebuffer(GL_FRAMEBUFFER,0);};
     auto swap_refresh=[&](float alpha,bool interpolated,uint64_t began) {
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
-        int w,h;SDL_GL_GetDrawableSize(win,&w,&h);
+        bind_window();
+        int w,h;desktop_renderer::drawable_size(win,w,h);
         desktop_stats_present(w,h);desktop_settings_draw();
-        const auto swapping=host_ns();SDL_GL_SwapWindow(win);const auto done=host_ns();
+        const auto swapping=host_ns();swap_window();const auto done=host_ns();
         if(refresh_trace)fprintf(refresh_trace,"%u,%llu,%.6f,%d,%llu,%llu\n",gx::present_count(),
             (unsigned long long)done,alpha,interpolated,(unsigned long long)(swapping-began),(unsigned long long)(done-swapping));
     };
@@ -484,13 +536,14 @@ int main(int argc, char** argv) {
         uint64_t mark=profile_host?host_ns():0;
         running = pump_events(win);
         update_pad();
+        std::string resize_error;if(!desktop_renderer::resize(win,resize_error))fatal("Desktop resize: %s",resize_error.c_str());
         int dw, dh;
-        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        desktop_renderer::drawable_size(win,dw,dh);
         gx::render_set_window_size(dw, dh);
         const auto presentation=desktop_presentation::current();
         // VR owns a separate presentation clock. Desktop interpolation never changes
         // the virtual clock, PAD sampling, audio rate, or network input cadence.
-        const int refresh=(!g_eye_mode && theater_stereo_m<=0.0f)?presentation.refresh_hz:0;
+        const int refresh=(!native_session && !g_eye_mode && theater_stereo_m<=0.0f)?presentation.refresh_hz:0;
         if(refresh!=previous_refresh) {refresh_clock.reset();refresh_wait.reset();native_arrived=0;previous_refresh=refresh;}
         gx::render_interpolation_enable(refresh>0);
         if(profile_host){const auto now=host_ns();event_ns+=now-mark;mark=now;}
@@ -505,7 +558,7 @@ int main(int argc, char** argv) {
                 if(gx::render_interpolated(alpha)) {swap_refresh(alpha,true,now);continue;}
             }
             // Refresh the host UI even when the guest is waiting for network input.
-            if(desktop_stats_idle(dw,dh,desktop_settings_open() || display_settings_hint())) {desktop_settings_draw();SDL_GL_SwapWindow(win);}
+            if(desktop_stats_idle(dw,dh,desktop_settings_open() || display_settings_hint())) {desktop_settings_draw();swap_window();}
             if(refresh) {
                 const auto after=host_ns(),deadline=refresh_clock.deadline();
                 refresh_wait.sleep(deadline>after?std::min<uint64_t>(1000000,deadline-after):1000000);
@@ -523,7 +576,7 @@ int main(int argc, char** argv) {
             const int active_scale=desktop_presentation::effective_scale(scale,ui_scale);
             gx::render_set_internal_scale(active_scale);
             int window_width=0,window_height=0;SDL_GetWindowSize(win,&window_width,&window_height);
-            desktop_graphics::update({window_width,window_height,dw,dh,std::clamp(active_scale,1,gx::kMaxInternalScale),SDL_GL_GetSwapInterval(),presentation.refresh_hz});
+            desktop_graphics::update({window_width,window_height,dw,dh,std::clamp(active_scale,1,gx::kMaxInternalScale),desktop_renderer::swap_interval(),refresh});
         }
         // GCN_STEREOLOG=1: what the game's stereo hook (vr_game.h) would have a headset
         // show, whenever the answer changes, numbered as the frame dumps are.
@@ -569,24 +622,28 @@ int main(int argc, char** argv) {
         if (presented) {
             native_arrived=host_ns();
             // macOS (GL on Metal) only presents correctly with the window framebuffer bound.
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            bind_window();
             const bool smooth=refresh && gx::render_interpolation_ready();
             if(!smooth){desktop_stats_present(dw,dh);desktop_settings_draw();}
             if (dump_output && gx::g_dump_dir && gx::g_dump_every &&
                 gx::present_count() % gx::g_dump_every == 0) {
-                std::vector<uint8_t> pixels((size_t)dw * dh * 4), flipped(pixels.size());
+                std::vector<uint8_t> flipped;
+                if(native_session){std::string error;if(!desktop_renderer::window_pixels(flipped,error))fatal("Native output capture: %s",error.c_str());}
+                else {
+                std::vector<uint8_t> pixels((size_t)dw * dh * 4);flipped.resize(pixels.size());
                 glReadBuffer(GL_BACK);
                 glReadPixels(0, 0, dw, dh, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
                 for (int row = 0; row < dh; ++row)
                     memcpy(flipped.data() + (size_t)row * dw * 4,
                            pixels.data() + (size_t)(dh - 1 - row) * dw * 4, (size_t)dw * 4);
+                }
                 char path[512];
                 snprintf(path, sizeof(path), "%s/output_%05u.png", gx::g_dump_dir, gx::present_count());
                 write_png(path, flipped.data(), dw, dh);
             }
             if (record::active()) {
                 int rw, rh;
-                SDL_GL_GetDrawableSize(win, &rw, &rh);
+                desktop_renderer::drawable_size(win,rw,rh);
                 record::frame(0, rw, rh);
             }
             const uint64_t swap_began=profile_host?host_ns():0;
@@ -599,7 +656,7 @@ int main(int argc, char** argv) {
                 }
             } else {
                 refresh_clock.native_frame(host_ns(),refresh,false);
-                SDL_GL_SwapWindow(win);
+                swap_window();
                 if(refresh_trace)fprintf(refresh_trace,"%u,%llu,1.000000,0,0,0\n",gx::present_count(),(unsigned long long)host_ns());
             }
             // Optional timing evidence counts only newly rendered game frames,
@@ -648,5 +705,6 @@ int main(int argc, char** argv) {
     input_map_shutdown();
     desktop_gamepad_shutdown();
     threads_request_quit();
+    desktop_renderer::shutdown();
     plat_exit_now(0);
 }

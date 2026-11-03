@@ -2,6 +2,10 @@
 #include "desktop_stats.h"
 #include "desktop_overlay.h"
 #include "performance_stats.h"
+#include "desktop_renderer.h"
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+#include "imgui.h"
+#endif
 #include "gx/gl.h"
 #include <algorithm>
 #include <array>
@@ -213,8 +217,37 @@ void desktop_stats_toggle(){
     desktop_stats_enable(!desktop_overlay::current());std::string error;
     if(!desktop_overlay::save(error))diagnostic_log("[overlay-settings] %s\n",error.c_str());
 }
-void desktop_stats_present(int width,int height){draw(width,height,true);}
-bool desktop_stats_idle(int width,int height,bool host_ui){return draw(width,height,false,host_ui);}
+void desktop_stats_present(int width,int height){
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){
+        enabled=desktop_overlay::current();const auto now=milliseconds();stats.frame(now);drawn_at=now;dirty=false;std::string error;
+        if(!desktop_renderer::cache_window(false,error) && !error.empty())diagnostic_log("[stats] %s\n",error.c_str());return;
+    }
+    draw(width,height,true);
+}
+bool desktop_stats_idle(int width,int height,bool host_ui){
+    if(desktop_renderer::running()==desktop_renderer::Api::Direct3D11){
+        if(enabled!=desktop_overlay::current()){enabled=desktop_overlay::current();dirty=true;}const auto now=milliseconds();
+        if(width<=0 || height<=0 || (!host_ui && !enabled && !dirty) || (!dirty && now<drawn_at+(host_ui?16:100)))return false;
+        std::string error;if(!desktop_renderer::cache_window(true,error))return false;drawn_at=now;dirty=false;return true;
+    }
+    return draw(width,height,false,host_ui);
+}
+bool desktop_stats_native_visible(){return desktop_renderer::running()==desktop_renderer::Api::Direct3D11 && desktop_overlay::current();}
+void desktop_stats_draw_native(){
+#if defined(_WIN32) && defined(TANDEM_NATIVE_D3D11)
+    if(!desktop_stats_native_visible())return;const auto now=milliseconds();read_network(now);
+    if(const int effective=network_input_delay_override.load();effective>=0)buffer_ms=effective;
+    if(now>=sample_at+500){fps=stats.fps(now);sample_at=now;}const auto rtt=stats.rtt(now);const bool online=network_path() && *network_path();
+    const auto display=ImGui::GetIO().DisplaySize;ImGui::SetNextWindowPos(ImVec2(display.x-12,12),ImGuiCond_Always,ImVec2(1,0));ImGui::SetNextWindowBgAlpha(.48f);
+    ImGui::Begin("FPS and network",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoInputs|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoNav);
+    if(fps<0)ImGui::TextColored(ImVec4(.55f,1,.35f,1),"FPS --");else ImGui::TextColored(ImVec4(.55f,1,.35f,1),"FPS %.1f",fps);
+    if(!online)ImGui::TextUnformatted("OFFLINE");else{
+        if(rtt<0)ImGui::TextUnformatted("RTT --");else ImGui::Text("RTT %.0f MS",rtt);
+        if(buffer_ms>=0)ImGui::Text("BUF %d MS",buffer_ms);if(jitter_ms>=0)ImGui::Text("JIT %d MS",jitter_ms);if(!route.empty())ImGui::TextUnformatted(route.c_str());
+    }ImGui::End();
+    if(now>=log_at+2000){diagnostic_log("[desktop-stats] fps=%.1f rtt_ms=%.1f buffer_ms=%d\n",fps,online?rtt:-1,buffer_ms);log_at=now;}
+#endif
+}
 void desktop_stats_shutdown() {
     if(program)glDeleteProgram(program);if(vao)glDeleteVertexArrays(1,&vao);if(vbo)glDeleteBuffers(1,&vbo);
     if(cache_texture)glDeleteTextures(1,&cache_texture);if(cache_fbo)glDeleteFramebuffers(1,&cache_fbo);

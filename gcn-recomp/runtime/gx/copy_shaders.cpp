@@ -79,6 +79,14 @@ void main() {
 }
 )";
 
+static const char* kBlitFS = GCN_GLSL_VERSION R"(
+in vec2 v_uv;
+uniform sampler2D u_src;
+out vec4 o;
+void main() { o = vec4(texture(u_src, vec2(v_uv.x, 1.0 - v_uv.y)).rgb, 1.0); }
+)";
+
+std::string scanout_pixel_shader(){return kBlitFS;}
 std::string copy_vertex_shader(){return glsl_header_with_clip()+kCopyVS;}
 std::string copy_pixel_shader(){return kCopyFS;}
 }

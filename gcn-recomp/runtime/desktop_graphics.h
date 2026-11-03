@@ -7,7 +7,7 @@
 
 // Accessed only by the desktop render/UI thread. Contains no local file paths.
 namespace desktop_graphics {
-struct Device {std::string vendor,renderer,version,shading,platform,sdl;};
+struct Device {std::string vendor,renderer,version,shading,platform,sdl;std::string api="OpenGL";};
 struct Output {
     int window_w=0,window_h=0,drawable_w=0,drawable_h=0,scale=0,swap_interval=0,refresh_hz=0;
     bool operator==(const Output&) const=default;
@@ -29,8 +29,8 @@ inline bool software_renderer() {
 }
 inline std::string report() {
     std::ostringstream text;
-    text<<"Graphics API: OpenGL\nGPU vendor: "<<device.vendor<<"\nGPU renderer: "<<device.renderer
-        <<"\nOpenGL / driver: "<<device.version<<"\nGLSL: "<<device.shading
+    text<<"Graphics API: "<<device.api<<"\nGPU vendor: "<<device.vendor<<"\nGPU renderer: "<<device.renderer
+        <<"\n"<<(device.api=="OpenGL"?"OpenGL / driver: ":"API details: ")<<device.version<<"\n"<<(device.api=="OpenGL"?"GLSL: ":"Shader model: ")<<device.shading
         <<"\nPlatform: "<<device.platform<<"\nSDL: "<<device.sdl
         <<"\nSoftware renderer detected: "<<(software_renderer()?"yes":"no")
         <<"\nWindow: "<<output.window_w<<'x'<<output.window_h
@@ -39,10 +39,12 @@ inline std::string report() {
         <<"\nVSync interval: "<<output.swap_interval<<"\nInterpolation target: "<<output.refresh_hz<<" Hz\n";
     return text.str();
 }
-inline void initialize(const char* vendor,const char* renderer,const char* version,const char* shading,const char* platform,const char* sdl) {
-    device={clean(vendor),clean(renderer),clean(version),clean(shading),clean(platform),clean(sdl)};
+inline void initialize(const char* vendor,const char* renderer,const char* version,const char* shading,const char* platform,const char* sdl,const char* api="OpenGL") {
+    device={clean(vendor),clean(renderer),clean(version),clean(shading),clean(platform),clean(sdl),clean(api)};
     output={};
-    diagnostic_log("[graphics-device] api=OpenGL vendor=%s renderer=%s version=%s glsl=%s platform=%s SDL=%s known_software=%d\n",
+    if(device.api=="OpenGL")diagnostic_log("[graphics-device] api=OpenGL vendor=%s renderer=%s version=%s glsl=%s platform=%s SDL=%s known_software=%d\n",
+        device.vendor.c_str(),device.renderer.c_str(),device.version.c_str(),device.shading.c_str(),device.platform.c_str(),device.sdl.c_str(),software_renderer());
+    else diagnostic_log("[graphics-device] api=Direct3D11 vendor=%s renderer=%s version=%s shading=%s platform=%s SDL=%s known_software=%d\n",
         device.vendor.c_str(),device.renderer.c_str(),device.version.c_str(),device.shading.c_str(),device.platform.c_str(),device.sdl.c_str(),software_renderer());
 }
 inline void update(Output next) {
