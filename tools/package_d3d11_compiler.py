@@ -38,6 +38,7 @@ def main():
  if strip.is_file():subprocess.run([str(strip),'--strip-debug',str(library)],check=True)
  notices=a.output/'licenses';notices.mkdir()
  shutil.copy2(a.deps/'glslang/LICENSE.txt',notices/'glslang-LICENSE.txt');shutil.copy2(a.deps/'spirv-cross/LICENSE',notices/'SPIRV-Cross-LICENSE.txt')
+ shutil.copy2(a.source/'LICENSE',notices/'Project-Tandem-LICENSE.txt')
  manifest=dict(schema=1,compiler=identity,target=target,library=library.name,sha256=digest(library),pins=PINS,sources={name:source_digest(a.source/'gcn-recomp/runtime'/name) for name in SOURCES},notices={f.name:digest(f) for f in notices.iterdir()})
  (a.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
  print(json.dumps(dict(folder=str(a.output),bytes=library.stat().st_size,sha256=manifest['sha256'],compiler=identity),indent=2))

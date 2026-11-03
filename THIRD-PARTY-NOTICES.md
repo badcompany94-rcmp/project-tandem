@@ -7,6 +7,8 @@ Project Tandem's MIT License covers its original source, subject to retained ups
 | mariokartdd-recomp | `LICENSE` |
 | gcn-recomp | `gcn-recomp/LICENSE` |
 | Dear ImGui | `gcn-recomp/third_party/imgui/LICENSE.txt` |
+| glslang 16.6.0 (native Direct3D shader compiler) | Retained multi-license notices in `tools/d3d11-compiler/licenses/glslang-LICENSE.txt` in the Windows player package |
+| SPIRV-Cross vulkan-sdk-1.4.363.0 (native Direct3D shader compiler) | Apache-2.0 notice in `tools/d3d11-compiler/licenses/SPIRV-Cross-LICENSE.txt` in the Windows player package |
 | libco | `gcn-recomp/third_party/libco/LICENSE` and `ORIGIN.txt` |
 | glad | Copyright/license notices in the generated source headers |
 | SDL | `tools/SDL2/LICENSE.txt` in the full Windows player package |
