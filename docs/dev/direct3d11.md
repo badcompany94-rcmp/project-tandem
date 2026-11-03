@@ -27,8 +27,7 @@ Khronos source downloads or toolchain compilation. Its manifest checks archive
 SHA256, compiler/target ABI and canonical LF source hashes; stale or corrupted
 packages fail with repair diagnostics. This archive contains host support code,
 not a disc image or generated game functions. Both upstream license files travel
-with it. The merged archive is about76MB before package compression in the tested
-RelWithDebInfo build; slim toolchains may retain debug information.
+with it. The packaged compiler archive is about11MB before ZIP compression.
 
 Dependencies are not fetched automatically. Shared GLSL compiles to SPIR-V, HLSL,
 then DXBC through Windows D3DCompile. SPIR-V is an intermediate representation;
