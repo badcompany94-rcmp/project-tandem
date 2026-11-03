@@ -78,3 +78,14 @@ The same optional compiler-test configuration builds `d3d11_shader_library_test`
 Pass the local shader cache path to validate generated programs and their reflected
 layouts, malformed-source/configuration failure preservation, and explicit target
 orientation options. Orientation compilation is not a pixel-parity test.
+
+`graphics/d3d11_program` creates native vertex/pixel shaders and reflected constant
+buffers. Cached uniform slots avoid string searches per draw; a CPU shadow skips
+uploads when values are unchanged. Array and matrix updates retain their reflected
+strides. Failed initialization or invalid updates preserve a working program.
+
+With compiler tests configured, `d3d11_program_test` checks these layouts through
+actual GPU pixels, then draws the shared GX integer TEV color pipeline with packed
+vertex colors in desktop-flat and neutral-view modes. Its hidden window does not
+load game assets. It does not yet cover complete GX command batches, textures,
+point expansion, framebuffer copies, rollback, or mixed-renderer online play.
