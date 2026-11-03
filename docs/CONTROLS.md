@@ -59,3 +59,16 @@ Existing controller settings load with 50% defaults. New trigger settings are st
 - F10 toggles the performance overlay.
 - Use F1 → Exit to desktop, Alt+F4, or the window close button. Select + Menu held together is the controller exit shortcut.
 - Escape goes back or opens the appropriate in-game menu; it is not the desktop-exit shortcut.
+
+### Experimental Windows renderer
+
+F1 > Display > Graphics renderer offers OpenGL (default) and Direct3D 11
+(experimental). Save, then restart the game to switch. Both use the same gameplay
+and online build identity, so players on the same release can mix renderers.
+Unsupported Direct3D hardware falls back to OpenGL. Direct3D currently runs at the
+original 60 FPS target; high-refresh interpolation, VR and CLI recording use OpenGL.
+
+For slower computers, Apply Very Low preset selects 1x internal resolution and
+turns interpolation off. It previews immediately offline; Save keeps it and
+Discard restores the previous settings. VSync stays as you selected it. Choose
+the resolution before joining online. Performance still depends on your hardware.

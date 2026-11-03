@@ -296,16 +296,15 @@ void display_tab() {
     ImGui::TextWrapped("Choose a rate supported by your monitor. With VSync on, your desktop refresh rate also limits output. Extra rendering requires GPU headroom.");
     const bool online=SDL_getenv("MKDD_NET_LISTEN") || SDL_getenv("MKDD_NET_CONNECT");
     ImGui::BeginDisabled(online);
-    const bool very_low=presentation.internal_scale==1 && presentation.refresh_hz==0 && !desktop_enhancements::current().hd;
+    const bool very_low=presentation.internal_scale==1 && presentation.refresh_hz==0;
     if(ImGui::Button(very_low?"Very Low preset active":"Apply Very Low preset")) {
         auto low=presentation;low.internal_scale=1;low.refresh_hz=0;
         if(desktop_presentation::preview(low,status)) {
-            auto textures=desktop_enhancements::current();textures.hd=false;
-            if(desktop_enhancements::preview(textures,status)){presentation=low;changed();}
+            presentation=low;changed();
         }
     }
     ImGui::EndDisabled();
-    ImGui::TextWrapped("Very Low uses original-resolution rendering, original textures and native 60 FPS. VSync and your renderer choice stay as selected. Save to keep it, or Discard to restore your previous settings.");
+    ImGui::TextWrapped("Very Low uses original-resolution rendering with high-refresh interpolation off. VSync and your renderer choice stay as selected. Save to keep it, or Discard to restore your previous settings.");
     const char* const scales[]={"Default (existing behavior)","1x (lowest GPU load)","2x","3x","4x"};
     ImGui::BeginDisabled(online);
     ImGui::SetNextItemWidth(300);

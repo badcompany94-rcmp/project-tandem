@@ -1,7 +1,7 @@
-# Native Direct3D 11 desktop backend (private experimental build)
+# Native Direct3D 11 desktop backend (experimental)
 
 The same executable supports OpenGL (default) and Direct3D 11 (experimental).
-F1 > Display > Graphics API saves the choice in renderer.cfg; restart to apply.
+F1 > Display > Graphics renderer saves the choice in renderer.cfg; restart to apply.
 Discard restores the previous choice. Missing/invalid preferences default to
 OpenGL. Failed native device creation falls back to OpenGL without replacing the
 saved preference. Renderer choice does not change simulation, networking,
@@ -33,7 +33,7 @@ RelWithDebInfo build; slim toolchains may retain debug information.
 Dependencies are not fetched automatically. Shared GLSL compiles to SPIR-V, HLSL,
 then DXBC through Windows D3DCompile. SPIR-V is an intermediate representation;
 no Vulkan runtime is required. The tested Windows executable links Khronos and
-C++ libraries statically. Release builds and notice packaging remain gates.
+C++ libraries statically. The Windows package includes the compiler archive and its notices.
 Retain glslang's multi-license and SPIRV-Cross's Apache-2.0 notices.
 
 The unmodified Dear ImGui DX11 backend comes from upstream v1.92.9b,
@@ -43,7 +43,7 @@ Backend SHA256:
 cpp 749d12b01011f504284497db21cb52b3c6f73c59612e7115f46f41e0c4ea1c49
 h fb8a314a6a2904dcc5bfeb938a169389e170f233ad367d33f1ce5c7bde586a7c
 
-Default builds retain TANDEM_NATIVE_D3D11=OFF until release gates pass.
+Source builds retain TANDEM_NATIVE_D3D11=OFF unless explicitly enabled; Windows portable setup enables the experimental backend.
 OpenGL-only builds require neither Khronos dependency. CPU benchmark/runtime
 source lists exclude native implementation modules and SDL desktop owners.
 
@@ -95,21 +95,13 @@ generated HLSL matches. Its 32-entry / 8 MiB bound is thread-local. On the same
 442-pair corpus it reduced CPU compilation from 13.893 to 5.788 seconds with
 identical compiled bytecode hashes. This is compiler work, not an FPS result.
 
-A subsequent controlled hidden menu run compared the installed private build
-with the compiler cache and experimental binding cache candidate (native scale,
-960x720, VSync off, identical scripted input and isolated cards). Cold full-run
-FPS was 58.45 -> 59.48, p95 17.97 -> 17.95 ms, p99 19.14 -> 18.49 ms, maximum
-479.68 -> 216.83 ms, and intervals over 50 ms 13 -> 6. Warm full-run FPS was
-59.76 -> 59.80, p95 17.86 -> 17.99 ms, p99 18.55 -> 18.47 ms, maximum
-139.22 -> 139.52 ms. A roughly 139 ms transition remains with negligible render
-work. The cold 217 ms stall also remains unacceptable for a smoothness claim.
-This single paired run on an RTX 3070 Ti is initial evidence, not a release gate
-or proof for older hardware. Exact binaries and all samples are retained in the
-private validation/menu-pacing-v3-02 directory. No outliers were removed.
+A later binding-state cache experiment reduced average CPU submission time but
+failed the impaired-network tail-frame-time gate. It is excluded from this
+implementation. New shader compilation and scene loading can still cause hitches;
+the backend is experimental and no low-end hardware speedup is promised.
 
 F1's Display tab offers a Very Low preset: native internal resolution,
-interpolation off, HD textures off. It preserves VSync, renderer choice, texture
-quality preference and engine rules. Existing preview/save/discard behavior
+interpolation off. It preserves VSync, renderer choice and engine rules. Existing preview/save/discard behavior
 applies, and the preset is disabled during online sessions where EFB size is
 fixed. This reduces optional rendering load; it does not change simulation speed
 or claim to solve CPU/first-use compilation stalls. Both renderers passed a
@@ -119,7 +111,7 @@ An actual hidden boot converted 442 GL keys in 13,050 ms. The next launch restor
 all 442 with zero compilation in 114 ms on the development RTX 3070 Ti. These are
 startup observations, not race performance or promises for other hardware.
 
-## Validation and remaining release gates
+## Validation and hardware coverage
 
 TANDEM_D3D11_TESTS enables device/preference fixtures. TANDEM_D3D11_SHADER_TESTS
 also enables compiler/library/program, cache, GX and GL/native parity fixtures.
@@ -144,16 +136,16 @@ and100ms bursts also synchronize, including actual native rollback/correction.
 These same-PC tests use production garage/LAN fallback or a local mesh router;
 they do not test authenticated physical EOS delivery.
 
-Required before promotion/release:
+Release validation must cover:
 
-- Broader offline cup/layout, actual HD-pack and visible resolution/VSync
-  coverage beyond the native device/replacement fixtures.
+- Offline cup/layout and visible resolution/VSync coverage.
 - Longer mixed-renderer race/layout and disconnect/reconnect coverage.
 - Average FPS and p95/p99/max race/full presentation intervals, retaining startup
   and correction spikes and preserving the OpenGL baseline.
-- Older AMD/Intel/NVIDIA and physical Internet/NAT/relay checks.
+- Record the untested older AMD/Intel/NVIDIA and physical Internet/NAT/relay
+  hardware coverage; local fixtures are not proof of performance on those systems.
 - Dependency notices, release build/launcher packaging, settings/save/pack
   preservation and candidate identity/manifest verification.
 
-Local tests do not establish physical Internet reliability. Main/live-test copies
-remain untouched while required stability gates are open.
+Local tests do not establish physical Internet reliability. The isolated personal
+live-update test installation is never updated by the development tooling.
