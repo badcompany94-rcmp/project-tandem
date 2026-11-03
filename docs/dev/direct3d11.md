@@ -90,6 +90,31 @@ visible progress/event pumping. A single compile can exceed the step budget.
 New-course/cold misses still compile synchronously before submission; this is a
 remaining frame-pacing concern, not a solved-stutter claim.
 
+An exact-source vertex compiler cache reuses DXBC and reflection only after the
+generated HLSL matches. Its 32-entry / 8 MiB bound is thread-local. On the same
+442-pair corpus it reduced CPU compilation from 13.893 to 5.788 seconds with
+identical compiled bytecode hashes. This is compiler work, not an FPS result.
+
+A subsequent controlled hidden menu run compared the installed private build
+with the compiler cache and experimental binding cache candidate (native scale,
+960x720, VSync off, identical scripted input and isolated cards). Cold full-run
+FPS was 58.45 -> 59.48, p95 17.97 -> 17.95 ms, p99 19.14 -> 18.49 ms, maximum
+479.68 -> 216.83 ms, and intervals over 50 ms 13 -> 6. Warm full-run FPS was
+59.76 -> 59.80, p95 17.86 -> 17.99 ms, p99 18.55 -> 18.47 ms, maximum
+139.22 -> 139.52 ms. A roughly 139 ms transition remains with negligible render
+work. The cold 217 ms stall also remains unacceptable for a smoothness claim.
+This single paired run on an RTX 3070 Ti is initial evidence, not a release gate
+or proof for older hardware. Exact binaries and all samples are retained in the
+private validation/menu-pacing-v3-02 directory. No outliers were removed.
+
+F1's Display tab offers a Very Low preset: native internal resolution,
+interpolation off, HD textures off. It preserves VSync, renderer choice, texture
+quality preference and engine rules. Existing preview/save/discard behavior
+applies, and the preset is disabled during online sessions where EFB size is
+fixed. This reduces optional rendering load; it does not change simulation speed
+or claim to solve CPU/first-use compilation stalls. Both renderers passed a
+hidden F1 visual/boot check with this control.
+
 An actual hidden boot converted 442 GL keys in 13,050 ms. The next launch restored
 all 442 with zero compilation in 114 ms on the development RTX 3070 Ti. These are
 startup observations, not race performance or promises for other hardware.
