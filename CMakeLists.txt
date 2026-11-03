@@ -9,6 +9,7 @@ endif()
 # README.
 add_subdirectory(gcn-recomp)
 include(cmake/EOS.cmake)
+include(cmake/Direct3D11.cmake)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # Local ISO builds have different paths and PE timestamps. Compare their source
