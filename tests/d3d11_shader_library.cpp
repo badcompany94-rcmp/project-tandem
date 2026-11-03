@@ -6,12 +6,14 @@
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <chrono>
 #include <stdexcept>
 
 namespace {
 void require(bool ok,const std::string& error){if(!ok)throw std::runtime_error(error);}
 }
 int main(int argc,char** argv)try{
+    const auto began=std::chrono::steady_clock::now();
     std::vector<gx::ShaderKey> keys(1);keys[0].alpha_func=0xff;keys[0].efb_has_alpha=1;
     if(argc==2){
         std::ifstream input(argv[1],std::ios::binary);require(bool(input),"Cannot read local shader cache");
@@ -56,8 +58,16 @@ int main(int argc,char** argv)try{
             desktop_d3d11::CompiledProgram flipped;
             require(desktop_d3d11::compile_gx_program(keys[index],flipped,error,{true}),error);
             require(flipped.vertex!=saved && flipped.pixel==saved_pixel && flipped.uniforms==program.uniforms,"Target orientation changed unrelated shader state");
+            const auto counters=desktop_d3d11::shader_compile_stats();
+            desktop_d3d11::CompiledProgram repeated;
+            require(desktop_d3d11::compile_gx_program(keys[index],repeated,error,{true}),error);
+            require(repeated.vertex==flipped.vertex && repeated.pixel==flipped.pixel && repeated.uniforms==flipped.uniforms && repeated.samplers==flipped.samplers,"Vertex cache changed bytecode or reflection");
+            const auto after=desktop_d3d11::shader_compile_stats();
+            require(after.vertex_compiles==counters.vertex_compiles && after.vertex_hits==counters.vertex_hits+1 && after.pixel_compiles==counters.pixel_compiles+1,"Identical linked vertex was recompiled");
         }
     }
     std::printf("PASS native shader library: %zu GX pairs, %zu bytecode bytes, uniform/sampler layouts, live stage signatures and atomic failure preservation\n",keys.size(),total_bytes);
+    const auto stats=desktop_d3d11::shader_compile_stats();
+    std::printf("Compiler CPU %.3f seconds; vertex compiles=%llu exact-source reuse=%llu pixel compiles=%llu\n",std::chrono::duration<double>(std::chrono::steady_clock::now()-began).count(),(unsigned long long)stats.vertex_compiles,(unsigned long long)stats.vertex_hits,(unsigned long long)stats.pixel_compiles);
     std::puts("No game/GPU execution, coordinate parity or mixed-renderer online acceptance claimed.");return 0;
 }catch(const std::exception& error){std::fprintf(stderr,"FAIL %s\n",error.what());return 1;}

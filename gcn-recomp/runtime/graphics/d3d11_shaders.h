@@ -32,6 +32,9 @@ struct ShaderOptions {
     // separate destination snapshot through texture t16 (no sampler needed).
     int logic_operation=-1;
 };
+struct ShaderCompileStats {uint64_t vertex_compiles=0,vertex_hits=0,pixel_compiles=0;};
+// Current compiler thread only; useful for cold-cache regression measurements.
+ShaderCompileStats shader_compile_stats();
 // CPU/compiler work only. Call outside active race rendering or use a validated
 // bytecode cache. Compilation never needs an OpenGL context or driver.
 bool compile_program(const std::string& vertex,const std::string& pixel,

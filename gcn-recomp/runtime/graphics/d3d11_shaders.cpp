@@ -14,6 +14,7 @@
 #include <cstring>
 #include <map>
 #include <stdexcept>
+#include <deque>
 
 namespace desktop_d3d11 {
 namespace {
@@ -88,6 +89,14 @@ void resources(spirv_cross::CompilerHLSL& compiler,CompiledProgram& output){
 }
 struct Signature {D3D_REGISTER_COMPONENT_TYPE type;unsigned mask;};
 using Signatures=std::map<std::pair<std::string,unsigned>,Signature>;
+struct VertexCompilation {std::string source;std::vector<uint8_t> code;Signatures signature;};
+// The linked uniform layout can differ between TEV programs. Reuse only EXACT
+// generated HLSL, not the original GLSL or a hash alone. No device/GPU objects.
+// Keep this cache thread-local so compilation workers never contend with draws.
+thread_local std::deque<VertexCompilation> vertex_compilations;
+thread_local ShaderCompileStats compile_stats;
+constexpr size_t vertex_cache_budget=8*1024*1024;
+thread_local size_t vertex_cache_bytes=0;
 void reflect(ID3DBlob* code,bool vertex,Signatures& outputs){
     Com<ID3D11ShaderReflection> reflection;
     require(SUCCEEDED(D3DReflect(code->GetBufferPointer(),code->GetBufferSize(),IID_ID3D11ShaderReflection,reinterpret_cast<void**>(reflection.out()))),"Cannot reflect native bytecode");
@@ -106,6 +115,7 @@ void reflect(ID3DBlob* code,bool vertex,Signatures& outputs){
     }
 }
 }
+ShaderCompileStats shader_compile_stats(){return compile_stats;}
 bool compile_program(const std::string& vertex,const std::string& pixel,CompiledProgram& output,std::string& error,ShaderOptions options){
     error.clear();
     try{
@@ -137,11 +147,27 @@ bool compile_program(const std::string& vertex,const std::string& pixel,Compiled
             auto common=compiler.get_common_options();common.vertex.fixup_clipspace=true;
             common.vertex.flip_vert_y=options.flip_vertex_y;compiler.set_common_options(common);
             const auto source=compiler.compile();Com<ID3DBlob> code,diagnostic;
+            if(i==0){
+                const auto found=std::find_if(vertex_compilations.begin(),vertex_compilations.end(),[&](const auto& entry){return entry.source==source;});
+                if(found!=vertex_compilations.end()){
+                    next.vertex=found->code;signatures=found->signature;++compile_stats.vertex_hits;continue;
+                }
+            }
             const auto result=D3DCompile(source.c_str(),source.size(),"Project Tandem native shaders",nullptr,nullptr,"main",i?"ps_5_0":"vs_5_0",D3DCOMPILE_ENABLE_STRICTNESS,0,code.out(),diagnostic.out());
             require(SUCCEEDED(result),diagnostic.value?std::string(static_cast<const char*>(diagnostic->GetBufferPointer()),diagnostic->GetBufferSize()):"Native shader compilation failed");
             reflect(code.value,i==0,signatures);
             auto& bytes=i?next.pixel:next.vertex;const auto* data=static_cast<const uint8_t*>(code->GetBufferPointer());
             bytes.assign(data,data+code->GetBufferSize());
+            if(i==0){
+                ++compile_stats.vertex_compiles;
+                const auto size=source.size()+bytes.size();
+                if(size<=vertex_cache_budget){
+                    while(!vertex_compilations.empty() && (vertex_compilations.size()>=32 || vertex_cache_bytes>vertex_cache_budget-size)){
+                        vertex_cache_bytes-=vertex_compilations.front().source.size()+vertex_compilations.front().code.size();vertex_compilations.pop_front();
+                    }
+                    vertex_compilations.push_back({source,bytes,signatures});vertex_cache_bytes+=size;
+                }
+            }else ++compile_stats.pixel_compiles;
         }
         output=std::move(next);return true;
     }catch(const std::exception& failure){error=failure.what();return false;}
