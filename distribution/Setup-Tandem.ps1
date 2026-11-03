@@ -60,7 +60,7 @@ if(Test-TandemBuildMoved $root) {
 }
 Write-Host 'Compiling locally from your disc. This may take several minutes.'
 $script:SetupStage='3/5 Configure'
-Run-Tool $cmake @('-S',$source,'-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',"-DCMAKE_MAKE_PROGRAM=$ninja","-DCMAKE_C_COMPILER=$llvm\x86_64-w64-mingw32-clang.exe","-DCMAKE_CXX_COMPILER=$llvm\x86_64-w64-mingw32-clang++.exe","-DCMAKE_RC_COMPILER:FILEPATH=$resourceCompiler",'-DCMAKE_EXE_LINKER_FLAGS=-static',"-DPython3_EXECUTABLE=$python","-DGAME_ISO=$GameImage",'-DGCN_OPENXR=OFF','-DMKDD_EOS=OFF','-DGCN_INPUT_TESTS=OFF','-DGCN_NET_TESTS=OFF','-DMKDD_ONLINE_TESTS=OFF',"-DFETCHCONTENT_SOURCE_DIR_SDL2=$(Join-Path $root 'tools\SDL2')")
+Run-Tool $cmake @('-S',$source,'-B',$build,'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo',"-DCMAKE_MAKE_PROGRAM=$ninja","-DCMAKE_C_COMPILER=$llvm\x86_64-w64-mingw32-clang.exe","-DCMAKE_CXX_COMPILER=$llvm\x86_64-w64-mingw32-clang++.exe","-DCMAKE_RC_COMPILER:FILEPATH=$resourceCompiler",'-DCMAKE_EXE_LINKER_FLAGS=-static',"-DPython3_EXECUTABLE=$python","-DGAME_ISO=$GameImage",'-DGCN_OPENXR=OFF','-DTANDEM_NATIVE_D3D11=ON',"-DTANDEM_D3D11_COMPILER_PACKAGE_DIR=$(Join-Path $Root 'tools/d3d11-compiler')",'-DMKDD_EOS=OFF','-DGCN_INPUT_TESTS=OFF','-DGCN_NET_TESTS=OFF','-DMKDD_ONLINE_TESTS=OFF',"-DFETCHCONTENT_SOURCE_DIR_SDL2=$(Join-Path $root 'tools\SDL2')")
 $script:SetupStage='4/5 Build game'
 Run-Tool $cmake @('--build',$build,'--target','mkdd','--parallel',([Math]::Max(1,[Math]::Min($Jobs,16))))
 Show-TandemProgress '5/5 Final checks' -1 'Checking multiplayer compatibility'
