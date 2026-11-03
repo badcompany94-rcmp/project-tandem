@@ -56,12 +56,12 @@ int main(int argc,char** argv) {
     if(argc>4 && std::string(argv[4])=="graphics") {
         click(570,95);frame();
         require(desktop_presentation::current().internal_scale==0,"existing rendering scale stays the default");
-        click(460,333);ImGui::GetIO().AddFocusEvent(true);frame();key(SDL_SCANCODE_DOWN);frame();key(SDL_SCANCODE_RETURN);frame();
+        click(460,410);ImGui::GetIO().AddFocusEvent(true);frame();key(SDL_SCANCODE_DOWN);frame();key(SDL_SCANCODE_RETURN);frame();
         require(desktop_presentation::current().internal_scale==1,"F1 internal resolution selects 1x");
         capture(out/"graphics-1x.png");
         click(420,640);require(!desktop_settings_open() && desktop_presentation::current().internal_scale==0,"Discard restores original scale");
         key(SDL_SCANCODE_F1);frame();frame();
-        click(460,333);frame();frame();click(260,422);frame();
+        click(460,410);frame();frame();click(260,498);frame();
         capture(out/"graphics-2x.png");
         require(desktop_presentation::current().internal_scale==2,"F1 supports 2x independently");
         key(SDL_SCANCODE_ESCAPE);std::string error;
@@ -79,6 +79,19 @@ int main(int argc,char** argv) {
         char* copied=SDL_GetClipboardText();const std::string copied_text=copied?copied:"";SDL_free(copied);
         SDL_SetClipboardText(previous_clipboard.c_str());
         require(copied_text.find("GPU renderer: Test GPU")!=std::string::npos && copied_text.find("Active internal scale: 2x")!=std::string::npos && copied_text.find(out.string())==std::string::npos,"real Copy diagnostics button copies useful graphics state without save/install paths");
+    }
+    if(argc>4 && std::string(argv[4])=="verylow") {
+        click(570,95);frame();
+        require(desktop_presentation::current()==desktop_presentation::Settings{},"preset does not change fresh defaults");
+        click(460,213);ImGui::GetIO().AddFocusEvent(true);frame();key(SDL_SCANCODE_DOWN);frame();key(SDL_SCANCODE_RETURN);frame();
+        require(desktop_presentation::current().refresh_hz==120,"choose interpolation through real settings control");
+        click(280,333);frame();
+        require(desktop_presentation::current()==desktop_presentation::Settings{false,0,1},"Very Low applies 1x and disables interpolation");
+        capture(out/"very-low.png");
+        click(420,640);require(!desktop_settings_open() && desktop_presentation::current()==desktop_presentation::Settings{},"Discard restores pre-preset settings");
+        key(SDL_SCANCODE_F1);frame();frame();click(280,333);key(SDL_SCANCODE_ESCAPE);std::string error;
+        require(desktop_presentation::load((out/"presentation.cfg").string(),error) && desktop_presentation::current()==desktop_presentation::Settings{false,0,1},"Very Low persists through normal settings save and reload");
+        key(SDL_SCANCODE_F1);frame();frame();
     }
     if(argc>4 && std::string(argv[4])=="overlay") {
         require(!desktop_overlay::current(),"FPS counter starts off in fresh settings");
