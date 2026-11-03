@@ -281,6 +281,9 @@ function(gcn_add_game)
 
   # ---- Runtime ----
   file(GLOB_RECURSE RUNTIME_SOURCES CONFIGURE_DEPENDS ${RT}/*.cpp)
+  # Native renderer modules are linked through their own Windows targets. Keep
+  # developer compiler dependencies out of the CPU benchmark and stock GL build.
+  list(FILTER RUNTIME_SOURCES EXCLUDE REGEX "/(graphics/d3d11_[^/]*|gx/render_d3d11)\\.cpp$")
 
   # Alternative entry points and the stubs: none of these may land in a target that
   # already has main.cpp, audio.cpp or the renderer.
@@ -291,7 +294,7 @@ function(gcn_add_game)
   set(CORE_SOURCES ${RUNTIME_SOURCES})
   list(REMOVE_ITEM CORE_SOURCES
     ${RT}/main.cpp ${RT}/input_map.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/desktop_stats.cpp ${RT}/ffb.cpp ${RT}/audio.cpp ${RT}/audio_sdl.cpp ${RT}/png.cpp ${RT}/record.cpp
-    ${RT}/gx/render_gl.cpp ${RT}/gx/gl_load.cpp ${RT}/gx/shadergen.cpp)
+    ${RT}/gx/render_gl.cpp ${RT}/gx/gl_load.cpp ${RT}/gx/shadergen.cpp ${RT}/gx/copy_shaders.cpp)
   list(APPEND CORE_SOURCES ${RT}/audio_stub.cpp)
   # The benchmark compiles the game's SOURCES too (gcn_add_game), and a game's eye hook
   # installs itself into the renderer; render_stub.cpp answers those calls with nothing.

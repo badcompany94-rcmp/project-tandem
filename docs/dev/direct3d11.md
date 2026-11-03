@@ -89,3 +89,34 @@ actual GPU pixels, then draws the shared GX integer TEV color pipeline with pack
 vertex colors in desktop-flat and neutral-view modes. Its hidden window does not
 load game assets. It does not yet cover complete GX command batches, textures,
 point expansion, framebuffer copies, rollback, or mixed-renderer online play.
+
+`gx/render_d3d11` now accepts actual GX packed draw batches and immutable mipmapped
+textures, with native input layouts, samplers, TEV constants and cached blend,
+depth and raster states. It implements GPU framebuffer copies and partial channel
+clears. Its 32-bit floating-point depth target matches the existing GL target;
+using D24 here would change depth-copy rounding. This module is still isolated
+from the playable frontend. Unsupported logical operations are explicitly
+rejected until their native path is complete. Point/line geometry expansion is
+implemented, with broader clipping/interpolation parity still required.
+
+`d3d11_gx_draw_test` validates exact packed-vertex/texture pixels and cached repeat
+draws, scaled copies, GX tiled RGBA CPU bytes, partial alpha clears and the far
+depth boundary. `d3d11_raster_parity_test` additionally creates a hidden OpenGL
+3.3 core reference. It checks exact raw EFB rows for asymmetric geometry, viewport
+transforms, scissoring, front/back culling, overlapping depth, pre-viewport clipping
+and depth clamping. The offscreen native compiler uses clip-Y inversion; this
+requires `FrontCounterClockwise=FALSE` for the GL-equivalent cull convention.
+
+The parity fixture compares all 32 copy modes for color and depth across four
+RGBA patterns and five depth boundaries: 1,280 GPU pixel comparisons and 760
+supported tiled CPU writebacks. Copy conversion shaders are shared with GL and
+retain the committed default shader text. These tests do not prove whole-game,
+rollback, mixed-renderer netplay or frame-pacing acceptance.
+
+`graphics/d3d11_geometry` reflects the real vertex-stage interface and generates
+native point/line geometry shaders without losing packed varyings. Geometry
+bytecode is shared across programs after interface validation. Core GL point
+rasterization uses an unrounded center/width (OpenGL 3.3 section 3.4.1), unlike
+older compatibility-profile point snapping. The fixture currently passes seven
+point widths and seven horizontal line widths, including the 2.5-pixel tie case.
+Diagonal lines, clipping and point texture coordinates are not yet accepted.
