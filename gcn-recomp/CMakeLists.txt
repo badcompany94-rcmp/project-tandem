@@ -521,6 +521,7 @@ function(gcn_add_game)
       ${GCN_IMGUI}/backends/imgui_impl_sdl2.cpp
       ${RT}/desktop_settings.cpp ${RT}/desktop_pointer.cpp ${RT}/desktop_controls.cpp ${RT}/desktop_gamepad.cpp ${RT}/desktop_gc_adapter.cpp ${RT}/desktop_display.cpp ${RT}/desktop_sound.cpp ${RT}/desktop_presentation.cpp ${RT}/display_config.cpp ${RT}/input_defaults.cpp
       ${RT}/gx/gl_load.cpp ${RT}/png.cpp ${GLAD_SOURCE})
+    target_sources(desktop_settings_test PRIVATE ${RT}/desktop_renderer.cpp ${RT}/renderer_preference.cpp ${RT}/desktop_stats.cpp)
     _gcn_set_standards(desktop_settings_test)
     target_include_directories(desktop_settings_test PRIVATE ${RT} ${GLAD_INCLUDE_DIR})
     # Count cursor mutations from our runtime and the real SDL backend. The
@@ -537,6 +538,7 @@ function(gcn_add_game)
     target_include_directories(desktop_sound_test PRIVATE ${RT})
     add_executable(desktop_stats_test ${GCN_RECOMP_DIR}/tests/desktop_stats.cpp ${RT}/desktop_stats.cpp
       ${RT}/gx/gl_load.cpp ${RT}/png.cpp ${GLAD_SOURCE})
+    target_sources(desktop_stats_test PRIVATE ${RT}/desktop_renderer.cpp ${RT}/renderer_preference.cpp)
     _gcn_set_standards(desktop_stats_test)
     target_include_directories(desktop_stats_test PRIVATE ${RT} ${GLAD_INCLUDE_DIR})
     target_compile_definitions(desktop_stats_test PRIVATE ${GCN_GL_DEFS})
