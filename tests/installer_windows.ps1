@@ -20,6 +20,37 @@ $lock=Initialize-TandemInstall $root $bootstrap;$lock.Dispose()
 Require ((Read-TandemJson (Join-Path $root '.tandem-install.json')).phase -eq 'Downloading') 'interrupted installation can resume'
 $link=Join-Path $Evidence 'linked';New-Item -ItemType Junction -Path $link -Target $occupied|Out-Null
 Reject {Initialize-TandemInstall $link $bootstrap} 'junction installation rejected'
+$retained=Join-Path $Evidence 'retained saves'
+$card=Join-Path $retained 'local-data/game/saves/memcard_a.raw';Text $card 'existing progress fixture'
+$controls=Join-Path $retained 'local-data/game/saves/controllers.cfg';Text $controls 'existing controls fixture'
+Write-TandemJson (Join-Path $retained 'local-data/settings.json') @{player_name='Returning player'}
+$retainedHashes=@{};foreach($file in @(Get-ChildItem -LiteralPath (Join-Path $retained 'local-data') -Recurse -File)){$retainedHashes[$file.FullName]=Get-TandemHash $file.FullName}
+Require (Test-TandemPathEqual (Get-TandemInstallSaveFolder $retained) (Split-Path -Parent $card)) 'retained default save path recognized'
+$lock=Initialize-TandemInstall $retained $bootstrap;$lock.Dispose()
+Require ((Read-TandemJson (Join-Path $retained '.tandem-install.json')).phase -eq 'Downloading') 'save-only old installation admitted'
+$remainingGame=Join-Path $Evidence 'working game';Text (Join-Path $remainingGame 'local-data/game/saves/memcard_a.raw') 'progress'
+Text (Join-Path $remainingGame 'Tandem-Launcher.ps1') 'working launcher'
+Reject {Initialize-TandemInstall $remainingGame $bootstrap} 'working installation must use normal launcher'
+Require (-not (Test-Path -LiteralPath (Join-Path $remainingGame '.tandem-install.json'))) 'rejected working installation not claimed'
+$linkedData=Join-Path $Evidence 'linked retained';[IO.Directory]::CreateDirectory($linkedData)|Out-Null
+New-Item -ItemType Junction -Path (Join-Path $linkedData 'local-data') -Target (Join-Path $retained 'local-data')|Out-Null
+Reject {Initialize-TandemInstall $linkedData $bootstrap} 'linked retained data rejected'
+$linkedSaves=Join-Path $Evidence 'linked saves';[IO.Directory]::CreateDirectory((Join-Path $linkedSaves 'local-data/game'))|Out-Null
+New-Item -ItemType Junction -Path (Join-Path $linkedSaves 'local-data/game/saves') -Target (Split-Path -Parent $card)|Out-Null
+Reject {Initialize-TandemInstall $linkedSaves $bootstrap} 'linked save folder rejected'
+$pending=Join-Path $Evidence 'retained unfinished update';Text (Join-Path $pending 'local-data/update-transaction.json') '{}'
+Reject {Initialize-TandemInstall $pending $bootstrap} 'unfinished update requires recovery before reinstall'
+Require (-not (Test-Path -LiteralPath (Join-Path $pending '.tandem-install.json'))) 'unfinished update not claimed'
+$custom=Join-Path $Evidence 'retained custom';$customData=Join-Path $Evidence 'external data'
+Write-TandemJson (Join-Path $custom 'paths.json') @{data=$customData}
+$null=Initialize-TandemDataRoot $custom;Text (Join-Path $customData 'game/saves/memcard_a.raw') 'custom progress'
+$ownerHash=Get-TandemHash (Join-Path $customData '.tandem-owner.json')
+$lock=Initialize-TandemInstall $custom $bootstrap;$lock.Dispose()
+Require (Test-TandemPathEqual (Get-TandemInstallSaveFolder $custom) (Join-Path $customData 'game/saves')) 'retained custom save path recognized'
+Require (Test-TandemPathEqual (Initialize-TandemDataRoot $custom) $customData) 'original external data owner retained'
+Require ((Get-TandemHash (Join-Path $customData '.tandem-owner.json')) -eq $ownerHash) 'external ownership bytes unchanged'
+$otherOwner=Join-Path $Evidence 'wrong custom owner';Write-TandemJson (Join-Path $otherOwner 'paths.json') @{data=$customData}
+Reject {Initialize-TandemDataRoot $otherOwner} 'existing external data is never silently adopted by another installation'
 function Release([int]$Beta,[bool]$Draft=$false){return [pscustomobject]@{tag_name=('v0.1.0-beta.'+$Beta);name='Fixture';draft=$Draft;published_at='2026-11-03';prerelease=$true;assets=@(
     [pscustomobject]@{name=('Project-Tandem-Windows-Public-Beta-'+$Beta+'.zip');state='uploaded';size=100;browser_download_url=('https://github.com/badcompany94-rcmp/project-tandem/releases/download/v0.1.0-beta.'+$Beta+'/full.zip')})}}
 function Get-TandemReleaseJson([string]$Url){return @((Release 9),(Release 11 $true),(Release 10))}
@@ -42,6 +73,16 @@ Set-Item -Path Function:Copy-TandemAtomic -Value $script:originalCopy
 Install-TandemPackage $root $candidate $null|Out-Null
 Require ((Read-TandemJson (Join-Path $root '.tandem-install.json')).phase -eq 'FilesReady') 'retry reaches disc selection'
 foreach($file in $files){Require ((Get-TandemHash (Join-Path $root $file.path)) -eq $file.sha256) ('installed exact bytes '+$file.path)}
+# An interrupted reinstall and its retry must preserve every retained byte.
+$script:copied=0
+function Copy-TandemAtomic([string]$From,[string]$To){if(++$script:copied -eq 2){throw 'simulated reinstall interruption'};& $script:originalCopy $From $To}
+Reject {Install-TandemPackage $retained $candidate $null} 'interrupted reinstall reported'
+Set-Item -Path Function:Copy-TandemAtomic -Value $script:originalCopy
+foreach($path in $retainedHashes.Keys){Require ((Get-TandemHash $path) -eq $retainedHashes[$path]) 'interrupted reinstall preserves retained data'}
+Install-TandemPackage $retained $candidate $null|Out-Null
+foreach($path in $retainedHashes.Keys){Require ((Get-TandemHash $path) -eq $retainedHashes[$path]) 'completed reinstall preserves retained data'}
+Require ((Get-TandemSettings $retained).player_name -eq 'Returning player') 'existing player preferences reused'
+Require (Test-TandemPathEqual (Get-TandemInstallSaveFolder $retained) (Split-Path -Parent $card)) 'reinstalled game resolves original save folder'
 $registration=Join-Path $Evidence 'registration/installed-root.txt'
 Reject {Complete-TandemInstall $root $bootstrap $registration} 'cannot register an unbuilt installation'
 Require (-not (Test-Path -LiteralPath $registration)) 'incomplete build does not replace remembered installation'

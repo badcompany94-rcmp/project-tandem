@@ -49,6 +49,14 @@ do so. Redirecting saves alone does not remove that requirement.
 
 ## Updates and recovery
 
+The single-file installer also accepts an old installation folder containing
+only retained `local-data` and optional `paths.json`/`portable.txt`. Select the
+installation folder, not the `saves` folder itself. Existing saves at
+`local-data/game/saves` are reused in place and never supplied by the installation
+package. Keep a backup before removing a game installation. Custom external data
+still requires its original data-location preference and installation identity;
+the installer does not take ownership of another installation's data.
+
 Update archives cannot supply `paths.json`, `portable.txt` or private data. Update
 journals, recovery helpers and compiler backups stay inside the installation;
 the existing installation path protections remain in force. Only the explicitly

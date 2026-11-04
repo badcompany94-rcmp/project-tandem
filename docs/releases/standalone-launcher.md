@@ -21,6 +21,12 @@ folders and shortcuts are preserved. The installer uses the updater's official
 GitHub host restrictions, SHA-256 checks, archive validation and Windows process
 containment. Logs remain under `local-data/installer/logs`.
 
+Reinstalling now recognizes retained `local-data` in the chosen installation
+folder. The installer shows when an existing save folder is present and reuses
+it without replacing saves. Keep only user data and any data-location preferences
+when removing an old installation; use the normal launcher for an existing game.
+It does not scan other drives or import saves from unrelated folders.
+
 This is a launcher-only addition to Beta 13. It installs the existing public
 game build **8434831f693c998f**; no race, renderer, physics, or networking code was
 changed. Existing players can keep using their current launcher. Full and

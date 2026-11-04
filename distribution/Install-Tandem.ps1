@@ -28,6 +28,13 @@ $folder.Text=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'P
 if($SelfTest -or $IntegrationTest){$folder.Text=Join-Path $Evidence 'installed game'}
 $form.Controls.Add($folder)
 $browse=New-Object Windows.Forms.Button;$browse.Text='Browse';$browse.SetBounds(642,202,106,33);$form.Controls.Add($browse)
+$saveNotice=Label '' 31 238 715 22 10
+$saveNotice.ForeColor=[Drawing.Color]::FromArgb(255,220,90)
+function Show-SaveNotice {
+    try{$saveNotice.Text=if(Get-TandemInstallSaveFolder $folder.Text){'Existing save folder found. Your saves will be kept and reused.'}else{''}}
+    catch{$saveNotice.Text='Check the selected folder and its data-location preferences.'}
+}
+$folder.add_TextChanged({Show-SaveNotice});Show-SaveNotice
 $status=Label 'Ready to install' 31 260 715 34 16
 $detailLabel=Label 'The latest Windows release will be downloaded from the official GitHub page.' 31 303 715 58
 $progress=New-Object Windows.Forms.ProgressBar;$progress.SetBounds(31,370,717,15);$progress.Style='Continuous';$form.Controls.Add($progress)
@@ -101,6 +108,7 @@ function Finish-Install {
     Complete-TandemInstall $folder.Text $Bootstrap $registration
     $script:done=$true;$script:finalRoot=$folder.Text
     $folder.Visible=$false;$folderLabel.Visible=$false;$browse.Visible=$false
+    Show-SaveNotice
     $desktopOption.Visible=$true;$steamOption.Visible=$true
     $steps.Text='Installation complete. Choose your shortcuts below.'
     $footer.Text='Steam opens its game picker for you to confirm the shortcut. Tandem handles game updates.'
@@ -125,7 +133,7 @@ function Open-InstalledLauncher {
     $form.Close()
 }
 $browse.add_Click({
-    $dialog=New-Object Windows.Forms.FolderBrowserDialog;$dialog.Description='Choose an empty folder for Project Tandem';$dialog.SelectedPath=$folder.Text
+    $dialog=New-Object Windows.Forms.FolderBrowserDialog;$dialog.Description='Choose an empty folder, or your old Tandem folder with retained local-data';$dialog.SelectedPath=$folder.Text
     try{if($dialog.ShowDialog($form) -eq [Windows.Forms.DialogResult]::OK){$folder.Text=$dialog.SelectedPath}}finally{$dialog.Dispose()}
 })
 $logs.add_LinkClicked({if($script:lastLog){Start-Process -FilePath 'notepad.exe' -ArgumentList (Join-TandemArguments @($script:lastLog)) -WindowStyle Normal|Out-Null}})

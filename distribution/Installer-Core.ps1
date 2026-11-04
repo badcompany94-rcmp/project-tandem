@@ -13,6 +13,26 @@ function Get-TandemInstallRelease {
     if(-not $best){throw 'No supported Windows release was found. Please try again later.'}
     return $best
 }
+function Get-TandemInstallSaveFolder([string]$Root){
+    $data=Get-TandemDataRoot $Root
+    $saves=Assert-TandemUserPath $data (Join-Path $data 'game/saves')
+    if(Test-Path -LiteralPath $saves -PathType Container){return $saves}
+    return $null
+}
+function Test-TandemRetainedDataFolder([string]$Root,[string]$Bootstrap){
+    # A removed installation may leave user data, but must not be mistaken for
+    # a working installation or an arbitrary nonempty destination. Never import,
+    # rename or overwrite saves: setup uses this same data path after reinstall.
+    if(-not (Test-Path -LiteralPath (Join-Path $Root 'local-data') -PathType Container)){return $false}
+    foreach($item in @(Get-ChildItem -LiteralPath $Root -Force)){
+        Assert-TandemNoLinks $item.FullName
+        if($item.Name -eq 'local-data' -and $item.PSIsContainer){continue}
+        if(-not $item.PSIsContainer -and ($item.Name -in @('paths.json','portable.txt') -or (Test-TandemPathEqual $item.FullName $Bootstrap))){continue}
+        return $false
+    }
+    $null=Get-TandemInstallSaveFolder $Root
+    return $true
+}
 function Initialize-TandemInstall([string]$Root,[string]$Bootstrap){
     $full=[IO.Path]::GetFullPath($Root).TrimEnd('\')
     if($full -notmatch '^[A-Za-z]:\\' -or $full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\')){throw 'Choose a dedicated folder on a local drive.'}
@@ -25,10 +45,15 @@ function Initialize-TandemInstall([string]$Root,[string]$Bootstrap){
             if((Get-Item -LiteralPath $receipt).Length -gt 16KB){throw 'The installation record is invalid.'}
             $record=Read-TandemJson $receipt
             if($record.format -ne 1 -or -not (Test-TandemPathEqual ([string]$record.root) $full)){throw 'The installation record belongs to another folder.'}
-        }elseif($children.Count -and -not ($children.Count -eq 1 -and (Test-TandemPathEqual $children[0].FullName $Bootstrap))){
-            throw 'Choose an empty folder for this installation. Existing Tandem copies have their own launcher.'
+        }elseif($children.Count -and -not ($children.Count -eq 1 -and -not $children[0].PSIsContainer -and (Test-TandemPathEqual $children[0].FullName $Bootstrap)) -and
+                 -not (Test-TandemRetainedDataFolder $full $Bootstrap)){
+            throw 'Choose an empty folder or your old Tandem folder containing only retained local-data and data-location preferences. Existing Tandem copies have their own launcher.'
         }
     }
+    # A retained update journal needs its own recovery, not an installation over
+    # its unfinished transaction. Recheck this before creating any receipt.
+    Assert-TandemClosed $full
+    $null=Get-TandemInstallSaveFolder $full
     [IO.Directory]::CreateDirectory($full)|Out-Null
     $lock=Get-TandemUpdateLock $full
     try {

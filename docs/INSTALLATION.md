@@ -14,6 +14,15 @@ Click **Open Launcher** to reach the normal Play/update window. The original dow
 
 For manual installation, the full Windows ZIP remains available. Extract it completely into a writable folder and run `Setup-Tandem.cmd`.
 
+**Reinstalling with existing saves:** keep the old installation's `local-data`
+folder, then choose that same installation folder in the single-file installer.
+It recognizes retained data, shows an existing-save notice, and keeps saves in
+`local-data/game/saves` for the reinstalled game. Other installed game files must
+have been removed; use the normal launcher to update or repair a working copy.
+If you configured an external data folder, also retain `paths.json` (and any
+`portable.txt`) and `local-data/installation-id.txt`; existing ownership checks
+still apply. The installer does not search other folders or drives for saves.
+
 Setup verifies the packaged files and the disc's `main.dol` SHA-1, caches a private copy of your ISO under `local-data`, and compiles the native game. The progress display covers verification, disc checking, configuration, compilation, and final checks. First setup can take several minutes and substantial disk space.
 
 After setup, open **Project Tandem.lnk** or **ProjectTandem.exe** for the
