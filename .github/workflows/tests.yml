@@ -45,3 +45,7 @@ jobs:
       - name: Test visible updater handoff and progress window
         shell: powershell
         run: ./tests/updater_progress_windows.ps1 -Evidence "$env:RUNNER_TEMP/tandem-update-progress-check"
+
+      - name: Test persistent per-install Time Trial identities
+        shell: powershell
+        run: ./tests/trials_identity_windows.ps1

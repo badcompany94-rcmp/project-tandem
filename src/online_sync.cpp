@@ -20,6 +20,7 @@
 #include "hw/pad.h"
 extern "C" bool mkdd_online_pause_capture(uint64_t);
 extern "C" bool mkdd_online_pause_open();
+extern "C" bool mkdd_trial_result_open();
 #include <deque>
 #include <map>
 #include <thread>
@@ -755,15 +756,26 @@ void online_end_inputs() {
 
 // Candidate replay boundary: RaceApp::calc in this retail revision. Audit is
 // opt-in and observational; do not enable rollback until external state is owned.
+extern "C" void mkdd_trial_pause_exec(CPU* c);
 extern "C" void hle_fn_80126804(CPU* c) {
     const auto race=mkdd::race_read();
     if(getenv("MKDD_ROOM_TOKEN") && race.exists && race.phase<19)return;
-    orig_fn_80126804(c);
+    mkdd_trial_pause_exec(c);
 }
 extern "C" void hle_fn_801CD92C(CPU* c) {
     // Keep the configured race bindings through results, next-course prompts and
     // the award ceremony. SequenceApp owns the switch back to menu bindings.
-    if(!g_replay_guard || g_replay_guard->publish_outputs){const auto current=mkdd::race_read();const bool menu=mkdd_online_pause_open();desktop_pointer::context(menu);desktop_pointer::navigation_enabled=!menu && (current.paused || current.phase>=19 || current.mode==8);desktop_pointer::text_enabled=false;mkdd::online::race_ui_tick(menu || current.phase>=19 || current.mode==8);}
+    if(!g_replay_guard || g_replay_guard->publish_outputs){
+        const auto current=mkdd::race_read();
+        // A trial result is a persistent mouse/text menu too. Clearing its
+        // context each race tick discarded clicks before PauseManager saw them.
+        const bool trial_menu=mkdd_trial_result_open();
+        const bool menu=mkdd_online_pause_open() || trial_menu;
+        desktop_pointer::context(menu);
+        desktop_pointer::navigation_enabled=!menu && (current.paused || current.phase>=19 || current.mode==8);
+        if(!trial_menu)desktop_pointer::text_enabled=false;
+        mkdd::online::race_ui_tick(menu || current.phase>=19 || current.mode==8);
+    }
     struct PauseMenuInput {
         unsigned count=0;uint32_t addresses[16]{},values[16][5]{};
         const unsigned offsets[5]={0x18,0x1c,0x20,0x2c,0x30};

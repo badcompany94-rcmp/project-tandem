@@ -12,6 +12,10 @@ Gameplay uses direct peer connections where available and Epic relay fallback wh
 
 You can play without starting these online services by launching with `Launch-Tandem.cmd -Offline`.
 
+## Online Time Trials
+
+Optional ghost uploads send your recording, chosen name, course, time and game build to the Tandem service hosted at vowbi.com. Other players can see uploaded times and download ghosts. A separate random local identity identifies submissions; it is not an EOS account. Network addresses are processed for abuse prevention; the trial database stores a secret-salted hash for bounded rate limits, not the raw address. Private test boards are separate. No disc image or memory card is uploaded. See [Time Trials](docs/TIME-TRIALS.md).
+
 ## Local diagnostics
 
 Setup and gameplay write diagnostic files under `local-data`. These can contain local paths, timestamps, player or service identifiers, room/session information, counters, and credentials used by a current session. Tandem does not automatically attach these files to GitHub issues.

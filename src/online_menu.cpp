@@ -11,6 +11,11 @@
 #include "gx/texture.h"
 #include "replay_audit.h"
 #include "hw/pad.h"
+#include "time_trials_runtime.h"
+#include "time_trial_client.h"
+#include "time_trial_navigation.h"
+#include <map>
+#include "desktop_engine.h"
 extern "C" {
 #include "recomp_funcs.h"
 }
@@ -25,7 +30,9 @@ extern "C" {
 #include <cmath>
 
 namespace {
-bool enabled() { return getenv("MKDD_ONLINE_MENU")!=nullptr; }
+bool enabled() {
+    return getenv("MKDD_ONLINE_MENU")!=nullptr;
+}
 void env_set(const char* key,const char* value) {
 #ifdef _WIN32
     _putenv_s(key,value);
@@ -91,6 +98,12 @@ std::string draft_mode,draft_layout,draft_engine,draft_cup;
 int draft_rounds=3;
 unsigned draft_arena=52,draft_course=36,draft_kart=0,draft_driver=7,draft_partner=8;
 std::string initials="P1",draft_initials="P1";
+bool save_online_name(const std::string& value,std::string& error){
+    if(value.empty() || value.size()>7 || value.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")!=std::string::npos){error="USE 1 TO 7 LETTERS OR NUMBERS";return false;}
+    std::ofstream file("online-initials.txt",std::ios::trunc);file<<value<<'\n';file.close();
+    if(!file){error="COULD NOT SAVE YOUR ONLINE NAME";return false;}
+    initials=value;error.clear();return true;
+}
 std::string draft_lobby_name;
 Page profile_return=Page::Type;
 bool profile_loaded=false,native_selection=false;
@@ -540,6 +553,8 @@ Json native_course_preview(CPU*,uint32_t);
 void native_follow_course(CPU*,uint32_t);
 #include "online_native_selection.inc"
 #include "native_pointer.inc"
+#include "time_trial_art.inc"
+#include "time_trial_menu.inc"
 bool native_dialog_regions(CPU* c) {
     const auto state=mem_r32(c->r[13]-0x5644);
     if(state!=3 && state!=4)return false;
@@ -549,9 +564,9 @@ bool native_dialog_regions(CPU* c) {
     else hit(90,310,430,85,91);
     desktop_pointer::context(true);desktop_pointer::publish("memory-card-"+std::to_string(mem_r32(dialog+0x10)),clickable);return true;
 }
-void desktop_online(CPU* c) {
+void desktop_online(CPU* c,bool names_only=false) {
     using namespace desktop_online_ui;
-    State state;state.available=enabled();state.can_join=token.empty() && !native_selection;
+    State state;state.available=enabled();state.can_join=!names_only && token.empty() && !native_selection;
     state.can_edit=token.empty() || (room_reply.has("room") && room_reply.at("room").at("state").str()=="forming");
     state.name=initials;state.version=release_label();state.status=message;
     if(room_reply.has("room")) {
@@ -566,8 +581,7 @@ void desktop_online(CPU* c) {
     if(!command || !can_act())return;
     const auto action=*command;command.reset();
     if(action.action==Action::Name && state.can_edit) {
-        if(action.text.empty() || action.text.size()>7 || action.text.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")!=std::string::npos){message="USE 1 TO 7 LETTERS OR NUMBERS";return;}
-        initials=action.text;std::ofstream("online-initials.txt",std::ios::trunc)<<initials<<'\n';
+        if(!save_online_name(action.text,message))return;
         if(!token.empty())submit(Work::Change,Json::dict({{"op","profile"},{"initials",initials}}));
     }else if(action.action==Action::Join && state.can_join) {
         if(action.text.size()!=8 || action.text.find_first_not_of(alphabet)!=std::string::npos){message="ENTER AN 8 CHARACTER ROOM CODE";return;}
@@ -719,7 +733,9 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         unsigned selected=mem_r8(scene+0x168);
         if (up || down) { selected=(selected+(up?3:1))%4;mem_w8(scene+0x168,(uint8_t)selected);sound(c,0x20000); }
         if (pressed&0x1100) {
-            if (selected==1) open(c,Page::HostJoin);
+            if (selected==1) {
+                open(c,Page::HostJoin);
+            }
             else {
                 // Retain the original offline transition and sound behaviour.
                 classic_release(c);
@@ -820,7 +836,7 @@ extern "C" void hle_fn_8012DCC4(CPU* c) {
         else if(((pressed&0x100) && selection==37) || (pressed&0x1000)) {
             if(draft_initials.empty())message="CHOOSE 1 TO 7 LETTERS OR NUMBERS";
             else if(can_act()) {
-                initials=draft_initials;std::ofstream("online-initials.txt",std::ios::trunc)<<initials<<'\n';
+                if(!save_online_name(draft_initials,message))return;
                 if(token.empty())open(c,profile_return);else submit(Work::Change,Json::dict({{"op","profile"},{"initials",initials}}));
             }
         }else if((pressed&0x100) && selection<36 && draft_initials.size()<7)draft_initials+=keyboard_keys[selection];
@@ -890,9 +906,14 @@ extern "C" void hle_fn_80015F40(CPU* c) {
 
 extern "C" void hle_calc__11SequenceAppFv(CPU* c) {
     const uint32_t app=c->r[3];
+    mkdd::trials::native_menu_boundary();
+#ifdef TANDEM_TIME_TRIAL_PROBE
+    extern void time_trial_probe_menu(CPU*);
+    time_trial_probe_menu(c);
+#endif
     desktop_pointer::context(true);
     desktop_pointer::text_enabled=page==Page::Code || page==Page::Initials || page==Page::Browser || page==Page::Search || page==Page::RoomName;
-    if(enabled())desktop_online(c);
+    if(enabled() && getenv("MKDD_ONLINE_MENU"))desktop_online(c);
     if(enabled() && getenv("MKDD_ROOM_RESUME")) {
         if(token.empty() && getenv("MKDD_ROOM_TOKEN")) {
             token=getenv("MKDD_ROOM_TOKEN");open(c,Page::Lobby);submit(Work::Poll,Json::dict({{"op","state"}}));
@@ -915,7 +936,11 @@ extern "C" void hle_calc__11SequenceAppFv(CPU* c) {
         }
     }
     if(hold)for(unsigned i=0;i<5;++i){buttons[i]=mem_r32(0x803b4410+offsets[i]);mem_w32(0x803b4410+offsets[i],0);}
-    {PointerPadRestore restore;native_character_pointer(c,app,hold);orig_calc__11SequenceAppFv(c);}
+    {TrialPadRestore restore;
+     const bool trial_handled=trial_menu_update(c,app);
+     if(!trial_handled)native_character_pointer(c,app,hold);
+     trial_course_guard(c,app);
+     orig_calc__11SequenceAppFv(c);}
     if(valid(app,0x4c)) {
         const auto title_scene=mem_r32(app+0xc),kind=mem_r32(c->r[13]-30528);
         if(kind!=0){title_hint_hidden=false;display_set_settings_hint(false);}
@@ -947,7 +972,9 @@ extern "C" void hle_draw__11SequenceAppFv(CPU* c) {
     const uint32_t app=c->r[3];
     if(native_selection && native_ui.battle_menu){draw_online(c,mem_r32(app+0xc));return;}
     orig_draw__11SequenceAppFv(c);
+    if(trial_menu_draw(c,app))return;
     native_character_regions(c,app);
+    trial_course_hint(c,app);
     if(!native_selection || !room_reply.has("room"))return;
     const uint32_t scene=mem_r32(app+0xc);if(!valid(scene,0x10))return;
     const CPU saved=*c;c->r[3]=mem_r32(scene+4);call_indirect(c,mem_r32(mem_r32(c->r[3])+0x14));
@@ -986,6 +1013,7 @@ extern "C" bool mkdd_online_menu_race_selected(CPU* c) {return native_race_selec
 
 namespace {bool pause_open=false,pause_confirm=false;unsigned pause_choice=0,pause_row=0;bool pause_returning=false;}
 extern "C" bool mkdd_online_pause_open(){return pause_open;}
+extern "C" bool mkdd_trial_result_open(){return trial.active && trial.result_open;}
 extern "C" bool mkdd_online_pause_capture(uint64_t tick) {
     static uint64_t last=0;static uint16_t previous=0;
     if(tick<=last)return pause_open;
@@ -1044,6 +1072,23 @@ extern "C" void hle_draw__7RaceAppFv(CPU* c) {
     desktop_pointer::publish(pause_confirm?"pause-return-confirm":"pause-online",clickable);*c=saved;
 }
 
+extern "C" void orig_fn_801399BC(CPU* c);
+extern "C" void hle_fn_801399BC(CPU* c){
+    orig_fn_801399BC(c);
+    trial_result_draw(c);
+}
+
+extern "C" void mkdd_trial_pause_exec(CPU* c){
+    if(!trial.active || !trials::native_session().result()){orig_fn_80126804(c);return;}
+    const CPU saved=*c;
+    TrialPadRestore restore;
+    if(trial.active)desktop_online(c,true);
+    *c=saved;
+    trial_result_update(c);
+    *c=saved;
+    orig_fn_80126804(c);
+}
+
 extern "C" void hle_fn_80162AE4(CPU* c) {
     const uint32_t scene=c->r[3],pad=c->r[4];
     if(native_character_confirm(c,scene,pad))return;
@@ -1059,4 +1104,10 @@ extern "C" void hle_fn_80162AE4(CPU* c) {
 extern "C" void hle_fn_80162CC0(CPU* c) {
     if(native_selection && native_ui.state=="characters" && !c->r[4]) {native_character_cancel(c->r[3]);return;}
     orig_fn_80162CC0(c);
+}
+
+extern "C" void orig_fn_80030F4C(CPU* c);
+extern "C" void hle_fn_80030F4C(CPU* c){
+    if(!trial.active || !trial.result_open){orig_fn_80030F4C(c);return;}
+    TrialResultLabels labels(c);orig_fn_80030F4C(c);
 }

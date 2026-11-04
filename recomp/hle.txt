@@ -34,3 +34,9 @@ fn_80126804
 fn_80015F40
 fn_80162CC0
 __ct__7GameAppFUlPCcPv
+available__9GhostFileF9ECourseID
+fn_801DC794
+updateKartPadRecord__9GhostFileFRC13KartPadRecord
+ctrlRace__7RaceAppFv
+fn_801399BC
+fn_80030F4C

@@ -50,6 +50,8 @@ function Health([int]$port) {
 }
 $session=Join-Path $data ('sessions\'+(Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 New-Item -ItemType Directory -Force -Path $session | Out-Null
+. (Join-Path $root 'Trials-Core.ps1')
+$env:TANDEM_TRIAL_CONFIG=Initialize-TandemTrialIdentity $data
 $online=$false;$helper=$null;$upstream=$null
 if(-not $Offline) {
     # One player-facing launcher and menu. The helper combines LAN and Internet

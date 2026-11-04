@@ -20,7 +20,7 @@ file(GLOB_RECURSE MKDD_ID_INPUTS CONFIGURE_DEPENDS
   gcn-recomp/third_party/libco/*.c gcn-recomp/third_party/libco/*.h
   gcn-recomp/recomp/*.py gcn-recomp/openxr/*.cpp gcn-recomp/openxr/*.h)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-  ${MKDD_ID_INPUTS} tools/build_identity.py gcn-recomp/CMakeLists.txt)
+  ${MKDD_ID_INPUTS} tools/build_identity.py tools/prepare_trial_menu_art.py tools/disc_files.py tools/course_archive.py gcn-recomp/CMakeLists.txt)
 string(TOUPPER "${CMAKE_BUILD_TYPE}" MKDD_BUILD_TYPE_UPPER)
 set(MKDD_POLICY "${CMAKE_BINARY_DIR}/compatibility-policy.json")
 # Escape flags as JSON, including user-supplied backslashes and quotes.
@@ -52,6 +52,8 @@ gcn_add_game(
   # sticks respond, for controls.txt (docs/dev/controls.md).
   SOURCES ${CMAKE_SOURCE_DIR}/src/race.cpp ${CMAKE_SOURCE_DIR}/src/vr_mkdd.cpp ${CMAKE_SOURCE_DIR}/src/motion.cpp
           ${CMAKE_SOURCE_DIR}/src/controls.cpp ${CMAKE_SOURCE_DIR}/src/widescreen.cpp
+          ${CMAKE_SOURCE_DIR}/src/time_trials_runtime.cpp
+          ${CMAKE_SOURCE_DIR}/src/time_trial_client.cpp
           ${CMAKE_SOURCE_DIR}/src/online_sync.cpp
           ${CMAKE_SOURCE_DIR}/src/rollback_probe.cpp
           ${CMAKE_SOURCE_DIR}/src/full_frame_probe.cpp
@@ -61,6 +63,23 @@ gcn_add_game(
           ${CMAKE_SOURCE_DIR}/src/online_room.cpp
   # The headset app and its harness, on an Android build.
   ANDROID_PACKAGE com.ethannicholas.mkdd)
+
+# Menu artwork is generated from the local owned image, like game code. Never
+# include the generated directory in source packages or release manifests.
+if(GAME_ISO)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tools/prepare_trial_menu_art.py)
+  execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_SOURCE_DIR}/tools/prepare_trial_menu_art.py"
+    --image "${GAME_ISO}" --output "${CMAKE_BINARY_DIR}/trial-art/trial_menu_art.h"
+    RESULT_VARIABLE TRIAL_ART_RESULT)
+  if(NOT TRIAL_ART_RESULT EQUAL 0)
+    message(FATAL_ERROR "Could not prepare original menu artwork from the local disc")
+  endif()
+  foreach(TRIAL_ART_TARGET mkdd mkdd_bench)
+    if(TARGET ${TRIAL_ART_TARGET})
+      target_include_directories(${TRIAL_ART_TARGET} PRIVATE "${CMAKE_BINARY_DIR}/trial-art")
+    endif()
+  endforeach()
+endif()
 
 if(TARGET mkdd)
   target_include_directories(mkdd PRIVATE "${CMAKE_BINARY_DIR}/identity")
@@ -80,13 +99,40 @@ if(WIN32)
   target_compile_features(mkdd_lan PRIVATE cxx_std_17)
   target_link_libraries(mkdd_lan PRIVATE ws2_32 winhttp bcrypt)
   if(TARGET mkdd)
-    target_link_libraries(mkdd PRIVATE winhttp)
+    target_link_libraries(mkdd PRIVATE winhttp bcrypt)
   endif()
   if(TARGET mkdd_bench)
-    target_link_libraries(mkdd_bench PRIVATE winhttp)
+    target_link_libraries(mkdd_bench PRIVATE winhttp bcrypt)
   endif()
   option(MKDD_ONLINE_TESTS "Build native room-protocol fixture" OFF)
   if(MKDD_ONLINE_TESTS)
+    add_executable(time_trial_live tests/time_trial_live.cpp src/time_trial_client.cpp)
+    target_include_directories(time_trial_live PRIVATE src)
+    target_compile_features(time_trial_live PRIVATE cxx_std_20)
+    target_link_libraries(time_trial_live PRIVATE winhttp bcrypt)
+    add_executable(time_trial_client_test tests/time_trial_client.cpp src/time_trial_client.cpp)
+    target_include_directories(time_trial_client_test PRIVATE src)
+    target_compile_features(time_trial_client_test PRIVATE cxx_std_20)
+    target_link_libraries(time_trial_client_test PRIVATE winhttp bcrypt)
+    add_executable(time_trial_navigation_test tests/time_trial_navigation.cpp)
+    target_include_directories(time_trial_navigation_test PRIVATE src)
+    target_compile_features(time_trial_navigation_test PRIVATE cxx_std_20)
+    add_executable(time_trial_menu_input_test tests/time_trial_menu_input.cpp)
+    target_include_directories(time_trial_menu_input_test PRIVATE src gcn-recomp/runtime)
+    target_compile_features(time_trial_menu_input_test PRIVATE cxx_std_20)
+    if(TARGET SDL2::SDL2-static)
+      add_executable(time_trial_menu_sdl_input_test tests/time_trial_menu_input.cpp gcn-recomp/runtime/desktop_pointer.cpp)
+      target_include_directories(time_trial_menu_sdl_input_test PRIVATE src gcn-recomp/runtime)
+      target_compile_features(time_trial_menu_sdl_input_test PRIVATE cxx_std_20)
+      target_compile_definitions(time_trial_menu_sdl_input_test PRIVATE TANDEM_MENU_SDL_INPUT_TEST SDL_MAIN_HANDLED)
+      target_link_libraries(time_trial_menu_sdl_input_test PRIVATE SDL2::SDL2-static windowscodecs ole32)
+    endif()
+    add_executable(time_trial_record_test tests/time_trial_record.cpp)
+    target_include_directories(time_trial_record_test PRIVATE src)
+    target_compile_features(time_trial_record_test PRIVATE cxx_std_20)
+    add_executable(time_trials_runtime_test tests/time_trials_runtime.cpp src/time_trials_runtime.cpp)
+    target_include_directories(time_trials_runtime_test PRIVATE src gcn-recomp/runtime)
+    target_compile_features(time_trials_runtime_test PRIVATE cxx_std_20)
     add_executable(peer_pings_test tests/peer_pings.cpp)
     target_include_directories(peer_pings_test PRIVATE src)
     target_compile_features(peer_pings_test PRIVATE cxx_std_17)
@@ -105,6 +151,6 @@ if(WIN32)
     add_executable(online_room_test tests/online_room.cpp src/online_room.cpp)
     target_include_directories(online_room_test PRIVATE src gcn-recomp/runtime)
     target_compile_features(online_room_test PRIVATE cxx_std_17)
-    target_link_libraries(online_room_test PRIVATE winhttp)
+    target_link_libraries(online_room_test PRIVATE winhttp bcrypt)
   endif()
 endif()

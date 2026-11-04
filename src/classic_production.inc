@@ -5,6 +5,7 @@ std::string classic_path(const char* name) {
     return std::string(root?root:"assets/classic")+"/"+name;
 }
 std::vector<uint32_t> classic_allocations;
+uint64_t classic_generation=0;
 uint32_t classic_backdrop=0,classic_driver=0;
 std::string classic_loaded;
 uint32_t classic_allocate(CPU* c,unsigned bytes) {
@@ -48,6 +49,7 @@ uint32_t classic_texture(CPU* c,const char* name,bool background=false) {
 }
 struct ClassicFont {uint32_t glyph[95]{};float advance[95]{};bool attempted=false;} classic_font;
 void classic_release(CPU* c) {
+    ++classic_generation;
     display_set_ui_render_width(0);
     // Menu artwork must leave the guest scene heap before the retail selection
     // and race scenes reserve their own memory. Keep no guest pointers across it.

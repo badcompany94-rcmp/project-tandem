@@ -1,15 +1,15 @@
 <p align="center">
   <img src="distribution/assets/project-tandem.png" width="360" alt="Project Tandem community artwork by POOTERMAN">
-  <br><sub>Artwork by <a href="https://www.deviantart.com/pooterman">POOTERMAN</a> · <a href="https://github.com/badcompany94-rcmp/project-tandem/issues/11">Original contribution</a>. Thank you for this awesome artwork!</sub>
+  <br><sub>Artwork by <a href="https://www.deviantart.com/pooterman">POOTERMAN</a> Â· <a href="https://github.com/badcompany94-rcmp/project-tandem/issues/11">Original contribution</a>. Thank you for this awesome artwork!</sub>
 </p>
 
-# Project Tandem — Mario Kart: Double Dash!! Online on PC
+# Project Tandem â€” Mario Kart: Double Dash!! Online on PC
 
-Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2–16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
+Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2â€“16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**Downloads:** [Windows — official Public Beta 13 (experimental)](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.13) · **[Linux — community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
+**Downloads:** [Windows â€” official Public Beta 14](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.14) Â· **[Linux â€” community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
 
-[Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md)
+[Installation and updates](docs/INSTALLATION.md) Â· [Controls](docs/CONTROLS.md) Â· [Online play](docs/ONLINE.md)
 
 The Linux adaptation is maintained separately by slex2jf. Windows/Linux online compatibility has not yet been verified.
 
@@ -17,13 +17,13 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 13 adds experimental Direct3D 11.** Choose OpenGL (default) or Direct3D 11 in F1 > Display, save and restart. The Very Low preset selects 1x internal resolution with interpolation off. Both renderers use the same online build identity. Performance on older hardware still needs feedback. [Changes and limitations](docs/releases/public-beta-13.md)
+**Beta 14 adds Online Time Trials and improves Windows frame pacing.** Race uploaded ghosts, share your runs, and browse course leaderboards through the original-style one-player menu. Grand Prix keeps its flag-to-CC selection flow. OpenGL remains the default; Direct3D 11 remains experimental. [Full update notes](docs/releases/public-beta-14.md) · [Time Trials guide](docs/TIME-TRIALS.md)
 
 ## Features
 
 - **Mouse and keyboard menus, separate racing controls.** Click through the offline and online menus, type names and room codes, then enter a race with a dedicated driving layout. The controls switch automatically. Race bindings stay active through race results and the award ceremony, and can be rebound in F1.
 - **Switch between mouse/keyboard and controller.** Player one accepts both by default: use a mouse in the lobby and pick up a controller to drive. F1 also supports explicit device assignments.
-- **Online play for 2–16 people.** Host a private room with an eight-character code, or make it public in the searchable lobby browser. Nearby LAN rooms appear first. Up to eight drivers and eight passengers share eight karts; solo and shared karts can race together.
+- **Online play for 2â€“16 people.** Host a private room with an eight-character code, or make it public in the searchable lobby browser. Nearby LAN rooms appear first. Up to eight drivers and eight passengers share eight karts; solo and shared karts can race together.
 - **Grand Prix and Battle.** Play a cup with CPUs filling Grand Prix slots, or compete in Balloon Battle, Shine Thief, and Bob-omb Blast. Battle requires at least two opposing karts.
 - **Shared character selection.** Everyone sees live player markers and named, locked choices on the original character grid, with their own kart preview below. Solo players choose two characters; shared teammates choose one each.
 - **Stay together between events.** Return to the same lobby, change seats and modes, edit your name, and keep session medal stars.
@@ -51,7 +51,7 @@ Requirements: 64-bit Windows 10 or 11, graphics supporting desktop OpenGL 3.3 (d
 
 The supported disc is **USA `GM4E01`**, with `main.dol` SHA-1 `e389e50357d4a5076ab3d38672204658f411123d`. Setup rejects an incompatible revision. Other regions and RVZ/GCZ input are not supported by this installer.
 
-[Installation and updates](docs/INSTALLATION.md) · [Controls](docs/CONTROLS.md) · [Online play](docs/ONLINE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+[Installation and updates](docs/INSTALLATION.md) Â· [Controls](docs/CONTROLS.md) Â· [Online play](docs/ONLINE.md) Â· [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 ## Mouse and keyboard controls
 
@@ -74,14 +74,14 @@ Mouse clicks also advance the introductions and the initial save prompt. Menu co
 
 | Input | GameCube action |
 | --- | --- |
-| Left click | A — accelerate |
-| Right click | B — brake/reverse |
-| A / D | Main stick left/right — steer |
+| Left click | A â€” accelerate |
+| Right click | B â€” brake/reverse |
+| A / D | Main stick left/right â€” steer |
 | W / S | Main stick up/down |
-| Space | X — use item |
-| Q | Y — use/pass item |
-| E | Z — switch riders |
-| Left Shift | R trigger — drift |
+| Space | X â€” use item |
+| Q | Y â€” use/pass item |
+| E | Z â€” switch riders |
+| Left Shift | R trigger â€” drift |
 | Ctrl | L trigger |
 | Arrow keys | D-pad |
 | Enter or Escape | Pause offline / open the online menu |
@@ -92,15 +92,15 @@ Player one can use a controller at any time alongside mouse/keyboard unless you 
 
 ## Play with friends
 
-Choose **Online Play → Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 → Online → Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
+Choose **Online Play â†’ Host Room** and share the private room code, or switch the room to Public for discovery. Join using the code keypad, **Browse Public Lobbies**, or **F1 â†’ Online â†’ Quick join**. Use the same launcher for LAN and Internet rooms. Pick seats, ready up, and let the host choose the mode. All players need the same version and build ID, shown in the lobby and settings.
 
 Current compatibility: **Public Beta 13 - `8434831f693c998f`**. Everyone needs the same build; OpenGL and Direct3D 11 players can play together. Display option choices may differ between players.
 
-Use **F1 → Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
+Use **F1 â†’ Exit to desktop**, the window close button, or Alt+F4 to exit. Online services close automatically with the game.
 
 ## Updates and support
 
-From Beta 8 onward, use **Check for updates → Install update** in the Windows launcher. Beta 7 and earlier need one manual update to receive it: close Tandem, copy **all** cumulative ZIP files into the folder containing `Launch-Tandem.cmd`, accept replacement and keep `local-data`. Run Launch-Tandem.cmd once to finish setup. Manual ZIP updates remain available for Alpha12 and later portable installs.
+From Beta 8 onward, use **Check for updates â†’ Install update** in the Windows launcher. Beta 7 and earlier need one manual update to receive it: close Tandem, copy **all** cumulative ZIP files into the folder containing `Launch-Tandem.cmd`, accept replacement and keep `local-data`. Run Launch-Tandem.cmd once to finish setup. Manual ZIP updates remain available for Alpha12 and later portable installs.
 
 Report problems through this repository's Issues, using the bug-report form. Include the version/build ID, Windows version, player count, mode, and steps to reproduce. For network problems, include each player's FPS/RTT/BUF readings. Share only reviewed diagnostic excerpts; [the troubleshooting guide](docs/TROUBLESHOOTING.md) explains which files to keep private.
 

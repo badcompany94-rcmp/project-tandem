@@ -15,6 +15,9 @@ def inputs(root):
     selected = {root / 'CMakeLists.txt', root / 'tools/build_identity.py',
                 root / 'gcn-recomp/CMakeLists.txt',root / 'analysis/symbols.txt',
                 root / 'analysis/splits.txt',root / 'analysis/config.yml'}
+    for name in ('prepare_trial_menu_art.py','disc_files.py','course_archive.py'):
+        if (root/'tools'/name).is_file():
+            selected.add(root/'tools'/name)
     for directory, extensions in (
         ('src', {'.cpp', '.h', '.inc'}),
         ('services', {'.py'}),
