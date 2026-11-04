@@ -421,6 +421,7 @@ bool trial_menu_draw(CPU* c,uint32_t app){
         scene=mem_r32(app+0xc);
         if(!valid(scene,0x2200))return false;
         const auto phase=mem_r32(scene+0x20e0);
+        if(phase==6 && !native_pane_visible(mem_r32(scene+0xd9c)))return false;
         // Cover the retail entrance and exit animations too, while keeping
         // input owned by retail until the fully open phase (7).
         if(phase!=6 && !((trial.online_launch || trial.native_flow) && phase>=7 && phase<13))return false;

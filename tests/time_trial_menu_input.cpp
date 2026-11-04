@@ -158,6 +158,9 @@ int main(){
 #endif
     _putenv_s("TANDEM_TRIAL_CONFIG","fixture-only-no-file");
     _putenv_s("MKDD_ROOM_TOKEN","");_putenv_s("TANDEM_COURSE_INDEX","");_putenv_s("GCN_COURSE_OVERLAY","");
+    // Only the one-player mode pane is replaced during its entrance animation.
+    reset();mem_w32(scene+0x20e0,6);CHECK(trial_menu_draw(&cpu,app));
+    mem_w32(scene+0xd9c,0);CHECK(!trial_menu_draw(&cpu,app));
     // All three mode rows, stick/D-pad, A/Start, Back, mouse and stationary hover.
     reset();frame();point(2000,false);frame(0,4);CHECK(trial.mode_row==1);
     frame();CHECK(trial.mode_row==1);frame(0,0x04000000);CHECK(trial.mode_row==2);
