@@ -7,6 +7,7 @@
 #include "replay_audit.h"
 #include "device_checkpoint.h"
 #include "memory_checkpoint.h"
+#include "presentation_wait.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -569,7 +570,12 @@ void clock_pace() {
         if (ahead > 50000000) ahead = 50000000;
         static const bool profile=getenv("GCN_PRESENT_TRACE")!=nullptr || getenv("GCN_FRAME_STATS")!=nullptr;
         const uint64_t began=profile?host_ns():0;
-        std::this_thread::sleep_for(std::chrono::nanoseconds(ahead));
+        // Use a per-thread high-resolution wait on Windows. Repeated rounded
+        // millisecond sleeps can exhaust the frame budget before any game work
+        // runs. This does not spin, change the system timer period, or alter
+        // virtual deadlines; older platforms retain the existing fallback.
+        static thread_local PresentationWait pace_wait;
+        pace_wait.sleep(uint64_t(ahead));
         if(profile) {
             g_pace_requested_ns.fetch_add(uint64_t(ahead),std::memory_order_relaxed);
             g_pace_elapsed_ns.fetch_add(host_ns()-began,std::memory_order_relaxed);

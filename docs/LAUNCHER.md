@@ -90,6 +90,11 @@ build backups and must not be uploaded as a whole.
 
 **Launch-Tandem.cmd** remains the direct game-launch fallback. Full and
 cumulative ZIP updates remain available on GitHub for manual installation.
+Detailed frame-pacing and render-queue logging is off during normal play. For a
+requested diagnostic session, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Launch-Tandem.ps1 -Diagnostics` from the installation folder. This
+logging can itself affect frame pacing, so use it only while diagnosing a
+problem. Ordinary startup/error logs and the optional F1/F10 FPS overlay remain
+available without it.
 Beta 7 and earlier launchers need one manual update/setup to receive this updater;
 subsequent supported Windows releases can be installed inside the launcher.
 

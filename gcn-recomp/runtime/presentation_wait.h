@@ -13,7 +13,7 @@
 #include <windows.h>
 #endif
 
-// A render-thread timer, created lazily only for high-refresh output. Ordinary
+// A thread-owned timer, created lazily for simulation or high-refresh pacing. Ordinary
 // Windows millisecond waits can round to a scheduler tick in hidden/background
 // windows. This avoids a process-wide timer-period change or a busy-spin loop.
 class PresentationWait {

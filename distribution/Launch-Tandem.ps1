@@ -1,4 +1,4 @@
-param([switch]$Offline,
+param([switch]$Offline,[switch]$Diagnostics,
       [ValidateSet('Stable','Responsive')][string]$NetworkProfile='Stable',[uint32]$Frames=0)
 $ErrorActionPreference='Stop'
 $root=$PSScriptRoot
@@ -114,9 +114,11 @@ if(-not $Offline) {
     $env:MKDD_ONLINE_MENU='1';$env:MKDD_ROOM_BACKEND='eos';$env:MKDD_ROOM_PORT=[string]$port
     $env:MKDD_ONLINE_NAME=if($settings.player_name){$settings.player_name}else{'Player'}
     $env:GCN_NET_STATS=$ready+'.stats.json'
-    $env:GCN_FRAME_STATS='1'
-    $env:GCN_PIPELINE_TRACE='1'
 }
+# Detailed pacing/queue logs synchronously write to the launcher's redirected
+# pipe. Keep that diagnostic work out of ordinary gameplay on both renderers.
+# The optional F1 FPS overlay and normal startup/error logs remain independent.
+if($Diagnostics){$env:GCN_FRAME_STATS='1';$env:GCN_PIPELINE_TRACE='1'}
 $run=Join-Path $data 'game';New-Item -ItemType Directory -Force -Path $run | Out-Null
 $env:GCN_CURSOR_ASSET=Join-Path $root 'assets\menu-cursor.png'
 $env:MKDD_MENU_KART_ASSET=Join-Path $root 'assets\menu-kart.gctex'
