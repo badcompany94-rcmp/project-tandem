@@ -7,7 +7,7 @@
 
 Play *Mario Kart: Double Dash!!* online with friends on Windows. Project Tandem is a native PC port and static recompilation project for the GameCube game, with 2â€“16 player online multiplayer, solo or shared karts, natural widescreen, modern controllers, and automatic menu/racing mouse and keyboard controls.
 
-**Downloads:** [Windows â€” official Public Beta 14](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.14) Â· **[Linux â€” community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
+**Downloads:** [Windows â€” official Public Beta 15](https://github.com/badcompany94-rcmp/project-tandem/releases/tag/v0.1.0-beta.15) Â· **[Linux â€” community build by slex2jf](https://github.com/slex2jf/Project-Tandem-Linux)**
 
 [Installation and updates](docs/INSTALLATION.md) Â· [Controls](docs/CONTROLS.md) Â· [Online play](docs/ONLINE.md)
 
@@ -17,7 +17,7 @@ The Linux adaptation is maintained separately by slex2jf. Windows/Linux online c
 
 **Online requires matching builds.** Everyone joining a room must use the same build ID. Update every player's installation before hosting or joining after an update; different builds cannot play together. Controller settings, trigger click points, and display options may differ. See [online play](docs/ONLINE.md).
 
-**Beta 14 adds Online Time Trials and improves Windows frame pacing.** Race uploaded ghosts, share your runs, and browse course leaderboards through the original-style one-player menu. Grand Prix keeps its flag-to-CC selection flow. OpenGL remains the default; Direct3D 11 remains experimental. [Full update notes](docs/releases/public-beta-14.md) · [Time Trials guide](docs/TIME-TRIALS.md)
+**Beta 15 adds Ghost Lineup with clear Race Ghost buttons, smoother menu navigation, and an optional close-on-play launcher setting.** It also fixes controller stick input when keyboard and mouse are enabled. [Full update notes](docs/releases/public-beta-15.md) · [Time Trials guide](docs/TIME-TRIALS.md)
 
 ## Features
 
