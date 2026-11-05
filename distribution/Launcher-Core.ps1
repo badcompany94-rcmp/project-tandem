@@ -1,6 +1,29 @@
 . (Join-Path $PSScriptRoot 'Tandem-Paths.ps1')
 # Shared launcher state and child-process arguments. Windows PowerShell 5.1.
 $script:TandemManifestCache=@{}
+function Get-TandemLauncherPreferences([string]$Path) {
+    $values=@{check_at_startup=$true;close_on_play=$false}
+    try {
+        if(Test-Path -LiteralPath $Path){
+            $saved=Get-Content -LiteralPath $Path -Raw|ConvertFrom-Json
+            foreach($key in @('check_at_startup','close_on_play')){
+                if($saved.$key -is [bool]){$values[$key]=$saved.$key}
+            }
+        }
+    }catch{}
+    return $values
+}
+function Save-TandemLauncherPreferences([string]$Path,[bool]$Check,[bool]$CloseOnPlay) {
+    $values=@{}
+    if(Test-Path -LiteralPath $Path){
+        try{(Get-Content -LiteralPath $Path -Raw|ConvertFrom-Json).PSObject.Properties|ForEach-Object{$values[$_.Name]=$_.Value}}catch{}
+    }
+    $values.check_at_startup=$Check;$values.close_on_play=$CloseOnPlay
+    Write-TandemJson $Path $values
+}
+function Test-TandemCloseAfterPlay([bool]$Enabled,[string]$Action,[bool]$Succeeded) {
+    return $Enabled -and $Succeeded -and $Action -eq 'Play'
+}
 function Join-TandemArguments([string[]]$Values) {
     # CommandLineToArgvW quoting, including embedded quotes and trailing slashes.
     return (($Values | ForEach-Object {

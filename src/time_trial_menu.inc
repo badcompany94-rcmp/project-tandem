@@ -21,6 +21,8 @@ struct TrialMenu {
 } trial;
 constexpr int trial_back=2500,trial_previous=2501,trial_next=2502;
 constexpr int trial_edit_name=2503;
+constexpr unsigned trial_page_size=5;
+constexpr int trial_race_ghost=2700;
 int trial_hover(unsigned pressed,unsigned repeat,const std::optional<int>& click){
     const auto p=desktop_pointer::read();
     return trial.pointer.hover(p.hover,p.x,p.y,(pressed|repeat)!=0,click.has_value());
@@ -106,7 +108,7 @@ void trial_poll(){
         // A refreshed table may reorder players. Discard a queued click on the
         // previous table rather than downloading a different player's ghost.
         desktop_pointer::publish("trial-board-updated",{});
-        trial.status=trial.entries.empty()?"NO TIMES YET. BE THE FIRST TO UPLOAD!":"SELECT A PLAYER TO RACE THEIR GHOST";
+        trial.status=trial.entries.empty()?"NO TIMES YET. BE THE FIRST TO UPLOAD!":"";
     }
     else if(response->action==trials::TrialAction::Download){
         std::string error;auto& session=trials::native_session();
@@ -345,7 +347,8 @@ bool trial_menu_update(CPU* c,uint32_t app){
     }
     const unsigned count=trial.page==TrialPage::Hub?2:unsigned(trial.entries.size());
     if(trial.page==TrialPage::Board && hover==2201)trial.course_focus=true;
-    if(hover>=2100 && unsigned(hover-2100)<count){trial.row=unsigned(hover-2100);trial.course_focus=false;}
+    const int row_hover=hover>=trial_race_ghost?hover-trial_race_ghost:hover-2100;
+    if(row_hover>=0 && unsigned(row_hover)<count){trial.row=unsigned(row_hover);trial.course_focus=false;}
     if(count && (up || down)){
         if(trial.page==TrialPage::Board && trial.course_focus){trial.course_focus=false;trial.row=up?count-1:0;}
         else if(trial.page==TrialPage::Board && ((up && !trial.row) || (down && trial.row==count-1)))trial.course_focus=true;
@@ -354,9 +357,10 @@ bool trial_menu_update(CPU* c,uint32_t app){
     }
     const bool previous=left || (click && *click==trial_previous),next=right || (click && *click==trial_next);
     if(trial.page==TrialPage::Board && (previous || next) && count){
-        trial.row=std::min(count-1,unsigned(std::max(0,int(trial.row)+(previous?-6:6))));trial.course_focus=false;
+        trial.row=std::min(count-1,unsigned(std::max(0,int(trial.row)+(previous?-int(trial_page_size):int(trial_page_size)))));trial.course_focus=false;
     }
     if(click && *click>=2100 && unsigned(*click-2100)<count){trial.row=unsigned(*click-2100);trial.course_focus=false;pressed|=0x100;}
+    if(click && *click>=trial_race_ghost && unsigned(*click-trial_race_ghost)<count){trial.row=unsigned(*click-trial_race_ghost);trial.course_focus=false;pressed|=0x100;}
     if(click && *click==2200)pressed|=0x400;
     if(trial.page==TrialPage::Board && trial.course_focus && (pressed&0x1100)){
         trial.course_open=true;trial.course_row=trials::course_slot(trial.course).value_or(0);return true;
@@ -428,7 +432,7 @@ bool trial_menu_draw(CPU* c,uint32_t app){
     }else if(!modes)return false;
     if(!backgrounds(c))return false;
     const CPU saved=*c;clickable.clear();
-    trial_background(c,scene,trial.page==TrialPage::None?"SELECT MODE":trial.page==TrialPage::Board?"LEADERBOARDS":"ONLINE TIME TRIALS");
+    trial_background(c,scene,trial.page==TrialPage::None?"SELECT MODE":trial.page==TrialPage::Board?"RACE A GHOST":"ONLINE TIME TRIALS");
     if(trial.name_open){trial_name_draw(c);*c=saved;return true;}
     if(trial.page==TrialPage::None){
         trial_native_decoration(c,scene,0x00004e5f53746f6bull,1,0,0); // N_Stok
@@ -483,22 +487,29 @@ bool trial_menu_draw(CPU* c,uint32_t app){
         text(c,"COURSE",40,94,12,0xace7ffff);
         text(c,trial_course_name(trial.course),127,91,17,0xffed83ff);
         text(c,"v",551,91,17,0xffed83ff);hit(30,83,548,36,2201);
-        text(c,"RANK",41,130,12,0xace7ffff);text(c,"ONLINE PLAYER",101,130,12,0xace7ffff);
-        text(c,"COURSE TIME",424,130,12,0xace7ffff);
-        box(c,30,150,548,1,0x3183baff);
-        const unsigned start=trial.row/6*6;
-        for(unsigned i=start;i<trial.entries.size() && i<start+6;++i){
-            const auto& entry=trial.entries[i];const float y=162+(i-start)*31;
-            if(i==trial.row && !trial.course_focus)box(c,30,y-4,548,29,0x1e82bdcc);
-            text(c,(std::to_string(i+1)+".").c_str(),41,y,17,0xffed83ff);
-            const float name_size=std::min(17.f,300.f/std::max(1.f,float(entry.name.size())*.65f));
-            text(c,entry.name.c_str(),101,y,name_size,i==trial.row && !trial.course_focus?0xffff83ff:0xffffffff);
-            text(c,trial_time(entry.time_ms).c_str(),424,y,17,0xffed83ff);hit(30,y-4,548,29,2100+i);
+        label(c,"CHOOSE A PLAYER AND RACE THEIR RECORDED RUN",126,11,0xace7ffff);
+        const unsigned start=trial.row/trial_page_size*trial_page_size;
+        for(unsigned i=start;i<trial.entries.size() && i<start+trial_page_size;++i){
+            const auto& entry=trial.entries[i];const float y=147+(i-start)*42;
+            const bool selected=i==trial.row && !trial.course_focus;
+            const bool busy=trial.client.busy() || trial.list_pending;
+            box(c,30,y,548,38,selected?0x176caeff:0x062e60ee);
+            box(c,30,y,4,38,selected?0xffffffff:0x3183baff);
+            text(c,(std::to_string(i+1)+".").c_str(),42,y+9,17,0xffed83ff);
+            const float name_size=std::min(18.f,218.f/std::max(1.f,float(entry.name.size())*.65f));
+            text(c,entry.name.c_str(),78,y+3,name_size,selected?0xffff83ff:0xffffffff);
+            text(c,"GHOST READY TO RACE",78,y+24,9,0xace7ffff);
+            text(c,trial_time(entry.time_ms).c_str(),308,y+10,16,0xffed83ff);
+            hit(30,y,548,38,2100+i);
+            box(c,432,y+5,136,28,busy?0x677580ff:selected?0xffee8aff:0xefc54eff);
+            if(!trial_art_word(c,"RACE GHOST",500,y+8,21,2,true))
+                text(c,"RACE GHOST",444,y+12,13,0x062550ff);
+            hit(432,y+5,136,28,trial_race_ghost+i);
         }
-        if(start){text(c,"< PREV",40,360,12,0xffed83ff);hit(30,350,110,32,trial_previous);}
-        if(start+6<trial.entries.size()){text(c,"NEXT >",477,360,12,0xffed83ff);hit(465,350,113,32,trial_next);}
-        const auto pages=std::max(1u,(unsigned(trial.entries.size())+5)/6);
-        label(c,"PAGE "+std::to_string(start/6+1)+" / "+std::to_string(pages),360,12);
+        if(start){text(c,"< PREV",40,360,12,0xffed83ff);hit(30,356,110,26,trial_previous);}
+        if(start+trial_page_size<trial.entries.size()){text(c,"NEXT >",477,360,12,0xffed83ff);hit(465,356,113,26,trial_next);}
+        const auto pages=std::max(1u,(unsigned(trial.entries.size())+trial_page_size-1)/trial_page_size);
+        label(c,"PAGE "+std::to_string(start/trial_page_size+1)+" / "+std::to_string(pages),360,12);
         label(c,"COMMUNITY TIMES - NOT COMPETITION VERIFIED",387,9,0xace7ffff);
         if(trial.course_open){
             clickable.clear();hit(30,83,548,36,2201);box(c,30,120,548,264,0x042950ff);
@@ -518,14 +529,14 @@ bool trial_menu_draw(CPU* c,uint32_t app){
     if(!trial.status.empty())label(c,trial.status,401,10,0xffed83ff);
     text(c,trial.course_open?"B: CANCEL":"B: BACK",35,426,12,0xffed83ff);hit(25,416,120,30,trial_back);
     if(!trial.online_launch){
-        label(c,trial.page==TrialPage::Board?"Y: COURSE   A: SELECT":"A: SELECT",426,11,0xace7ffff);
+        label(c,trial.page==TrialPage::Board?(trial.course_open || trial.course_focus?"Y: COURSE   A: SELECT":"Y: COURSE   A: RACE GHOST"):"A: SELECT",426,11,0xace7ffff);
         if(trial.page==TrialPage::Board && !trial.course_open){
             text(c,"X: REFRESH",465,426,12,0xffed83ff);hit(455,416,130,30,2200);
         }
     }
     std::string key="trial-"+std::to_string(unsigned(trial.page));
     if(trial.page==TrialPage::Board)key+="-"+std::to_string(trial.course)+
-        (trial.course_open?"-courses-"+std::to_string(trial.course_row/8):"-rows-"+std::to_string(trial.row/6));
+        (trial.course_open?"-courses-"+std::to_string(trial.course_row/8):"-rows-"+std::to_string(trial.row/trial_page_size));
     if(trial.online_launch)key+="-launching";
     desktop_pointer::publish(key,clickable);
     *c=saved;return true;

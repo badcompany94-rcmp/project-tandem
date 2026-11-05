@@ -204,7 +204,7 @@ int main(){
     click(2201);click(2201);CHECK(!trial.course_open);
 
     // Full/partial pages, header-to-rows wrap, empty board and repeated refresh.
-    for(unsigned count:{0u,1u,6u,7u,50u}){
+    for(unsigned count:{0u,1u,5u,6u,10u,50u}){
         board(count);CHECK(trial.course_focus);
         if(count){
             frame(0,8);CHECK(!trial.course_focus && trial.row==count-1);
@@ -212,8 +212,8 @@ int main(){
             frame(0,4);CHECK(!trial.course_focus && trial.row==0);
             frame(0,8);CHECK(trial.course_focus);
             while(has(trial_next))click(trial_next);
-            CHECK(trial.row/6==(count-1)/6);
-            if(count>6){click(trial_previous);CHECK(trial.row/6==(count-1)/6-1);}
+            CHECK(trial.row/trial_page_size==(count-1)/trial_page_size);
+            if(count>trial_page_size){click(trial_previous);CHECK(trial.row/trial_page_size==(count-1)/trial_page_size-1);}
         }else{
             frame(0,4);frame(0x100);CHECK(trial.course_open);click(trial_back);
         }
@@ -223,13 +223,24 @@ int main(){
     }
     // Clicking a row downloads that run without a Ready page. Back stays usable
     // while busy; a cancelled worker's reply is discarded by the client contract.
-    board(50);click(trial_next);click(2107);
+    board(50);click(trial_next);click(trial_race_ghost+7);
     CHECK(trials::transfer.request->action==trials::TrialAction::Download && trials::transfer.request->entry.id=="7");
     const auto requests=trials::transfer.submitted;frame(0x100);CHECK(trials::transfer.submitted==requests);
     trials::TrialResponse reply;reply.action=trials::TrialAction::Download;reply.course=36;reply.record=ghost(36);
     trials::transfer.response=reply;trials::transfer.busy=false;frame();
     CHECK(trial.online_launch && trial.route.active());
     click(trial_back);CHECK(!trial.online_launch && !trial.launch_ticks);
+    // Every visible Race Ghost button targets its own entry, on every page.
+    for(unsigned target=0;target<50;++target){
+        board(50);while(trial.row/trial_page_size<target/trial_page_size)click(trial_next);
+        CHECK(has(trial_race_ghost+target));
+        point(trial_race_ghost+target,false);frame();
+        CHECK(trial.row==target && !trial.course_focus);
+        click(trial_race_ghost+target);
+        CHECK(trials::transfer.request->entry.id==std::to_string(target));
+    }
+    board(6);frame(0,4);frame(0x100);
+    CHECK(trials::transfer.request->action==trials::TrialAction::Download && trials::transfer.request->entry.id=="0");
     board(10);click(2100);click(trial_back);CHECK(trial.page==TrialPage::Hub && !trial.online_launch);
     click(2100);CHECK(trial.online_launch); // cancelled HTTP cannot block Choose Course
     // A refresh cannot reinterpret an old mouse click as another player's run.
@@ -299,5 +310,5 @@ int main(){
     desktop_pointer::shutdown();SDL_DestroyWindow(window);SDL_Quit();
     std::puts("PASS: real SDL events under dummy video, controller buttons/stick threshold, mouse viewport mapping, letterbox and blocked click-through");
 #endif
-    std::puts("PASS: production menu input + hit regions, all16 courses, 0/1/6/7/50 rows, mouse/controller switching, modal cancel, busy requests, ghost launch and upload/continue");
+    std::puts("PASS: production menu input + hit regions, all16 courses, 0/1/5/6/10/50 rows, mouse/controller switching, modal cancel, busy requests, ghost launch and upload/continue");
 }

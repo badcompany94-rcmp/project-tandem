@@ -2,10 +2,30 @@ param([Parameter(Mandatory=$true)][string]$Evidence)
 $ErrorActionPreference='Stop'
 $source=Split-Path -Parent $PSScriptRoot
 . (Join-Path $source 'distribution/Launcher-Core.ps1')
+. (Join-Path $source 'distribution/Updater-Core.ps1')
 $checks=0
 function Require([bool]$Value,[string]$Message){$script:checks++;if(-not $Value){throw $Message}}
 $root=Join-Path $Evidence "Tandem spaces % and ' quote.pc"
 New-Item -ItemType Directory -Path $root -Force|Out-Null
+$preferences=Join-Path $root 'launcher-settings.json'
+$prefs=Get-TandemLauncherPreferences $preferences
+Require ($prefs.check_at_startup -and -not $prefs.close_on_play) 'new launcher keeps startup checks and stays open'
+'{"check_at_startup":false,"future_preference":17}'|Set-Content -LiteralPath $preferences
+$prefs=Get-TandemLauncherPreferences $preferences
+Require (-not $prefs.check_at_startup -and -not $prefs.close_on_play) 'older settings retain their value and default new option off'
+Save-TandemLauncherPreferences $preferences $false $true
+$prefs=Get-TandemLauncherPreferences $preferences
+Require (-not $prefs.check_at_startup -and $prefs.close_on_play) 'close option persists independently of update checking'
+Require ((Get-Content -LiteralPath $preferences -Raw|ConvertFrom-Json).future_preference -eq 17) 'unknown preferences preserved'
+Save-TandemLauncherPreferences $preferences $true $false
+Require (-not (Get-TandemLauncherPreferences $preferences).close_on_play) 'option can be disabled again'
+'{"close_on_play":"false"}'|Set-Content -LiteralPath $preferences
+Require (-not (Get-TandemLauncherPreferences $preferences).close_on_play) 'malformed string is not interpreted as true'
+'broken'|Set-Content -LiteralPath $preferences
+Require (-not (Get-TandemLauncherPreferences $preferences).close_on_play) 'corrupt preferences fail open'
+foreach($enabled in @($false,$true)){foreach($success in @($false,$true)){foreach($action in @('Play','Setup','Repair','CheckUpdate')){
+    Require ((Test-TandemCloseAfterPlay $enabled $action $success) -eq ($enabled -and $success -and $action -eq 'Play')) 'only successful Play with option on may close'
+}}}
 Require (-not (Get-TandemLauncherState $root).PackageValid) 'missing package must be explained'
 $manifest=Join-Path $root 'package-manifest.json'
 'broken json'|Set-Content -LiteralPath $manifest

@@ -68,9 +68,13 @@ $releaseNotes=New-Object Windows.Forms.LinkLabel;$releaseNotes.Text="What's new"
 $releaseNotes.SetBounds(300,368,150,28);$releaseNotes.Visible=$false;$form.Controls.Add($releaseNotes)
 $auto=New-Object Windows.Forms.CheckBox;$auto.Text='Check automatically at startup and while open';$auto.SetBounds(300,402,620,30);$auto.Checked=$true;$form.Controls.Add($auto)
 $preferences=Join-Path (Get-TandemDataRoot $Root) 'launcher-settings.json'
-try {if(Test-Path -LiteralPath $preferences){$auto.Checked=[bool](Get-Content -LiteralPath $preferences -Raw|ConvertFrom-Json).check_at_startup}}catch{}
-$auto.add_CheckedChanged({if(-not $SelfTest){try{Write-TandemJson $preferences @{check_at_startup=$auto.Checked}}catch{$output.Text='Could not save launcher preferences: '+$_.Exception.Message}}})
-$matching=Label 'Online players need the same build. Game settings are in F1.' 297 440 630 28 10
+$savedPreferences=Get-TandemLauncherPreferences $preferences
+$auto.Checked=$savedPreferences.check_at_startup
+$closeOnPlay=New-Object Windows.Forms.CheckBox;$closeOnPlay.Text='Close launcher when the game starts';$closeOnPlay.SetBounds(300,434,620,30)
+$closeOnPlay.Checked=$savedPreferences.close_on_play;$form.Controls.Add($closeOnPlay)
+$savePreferences={if(-not $SelfTest){try{Save-TandemLauncherPreferences $preferences $auto.Checked $closeOnPlay.Checked}catch{$output.Text='Could not save launcher preferences: '+$_.Exception.Message}}}
+$auto.add_CheckedChanged($savePreferences);$closeOnPlay.add_CheckedChanged($savePreferences)
+$matching=Label 'Online players need the same build. Game settings are in F1.' 297 644 630 26 10
 $progress=New-Object Windows.Forms.ProgressBar;$progress.Location=New-Object Drawing.Point(300,474);$progress.Size=New-Object Drawing.Size(626,8);$progress.Style='Marquee';$progress.Visible=$false;$form.Controls.Add($progress)
 $output=New-Object Windows.Forms.TextBox;$output.Multiline=$true;$output.ReadOnly=$true;$output.ScrollBars='Vertical'
 $output.Location=New-Object Drawing.Point(300,499);$output.Size=New-Object Drawing.Size(626,142)
@@ -171,6 +175,9 @@ $timer.add_Tick({
         if(Test-Path -LiteralPath $script:job.Result){$result=Get-Content -LiteralPath $script:job.Result -Raw|ConvertFrom-Json;$succeeded=$result.succeeded;$message=$result.message}
         $script:job.Process.Dispose();$script:job=$null;$progress.Visible=$false
         Refresh-State;$status.Text=$message
+        # Play's worker confirms the game process and independent online watcher
+        # are running. Never disappear during setup, repair or a failed startup.
+        if(Test-TandemCloseAfterPlay $closeOnPlay.Checked $action $succeeded){$form.Close();return}
         if($succeeded -and $action -eq 'Setup' -and $script:playAfterSetup){$script:playAfterSetup=$false;Start-Action 'Play' ''}
     }catch {$output.Text=$_.Exception.Message}
 })
@@ -191,6 +198,6 @@ if($SelfTest) {
     if($taskbar['window_app_id'] -ne [TandemTaskbarIdentity]::AppId -or $taskbar['process_app_id'] -ne [TandemTaskbarIdentity]::AppId -or $taskbar['icon_resource'] -ne ($icon+',0') -or $taskbar['large_icon_handle'] -ne $form.Icon.Handle.ToInt64().ToString() -or $taskbar['small_icon_handle'] -eq '0'){throw 'Launcher taskbar identity or artwork was not applied.'}
     $bitmap=New-Object Drawing.Bitmap($form.Width,$form.Height)
     try {$form.DrawToBitmap($bitmap,(New-Object Drawing.Rectangle(0,0,$bitmap.Width,$bitmap.Height)));$bitmap.Save((Join-Path $Evidence 'launcher.png'),[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
-    @{passed=$true;taskbar_identity=$taskbar;buttons=@($buttons|ForEach-Object {$_.Text});state=(Get-TandemLauncherState $Root);no_game_launched=$true;view=$TestView;update_enabled=$updates.Enabled;play_enabled=$play.Enabled;startup_check=$auto.Checked;update_text=$updateStatus.Text}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $Evidence 'result.json') -Encoding UTF8
+    @{passed=$true;taskbar_identity=$taskbar;buttons=@($buttons|ForEach-Object {$_.Text});state=(Get-TandemLauncherState $Root);no_game_launched=$true;view=$TestView;update_enabled=$updates.Enabled;play_enabled=$play.Enabled;startup_check=$auto.Checked;close_on_play=$closeOnPlay.Checked;update_text=$updateStatus.Text}|ConvertTo-Json -Depth 6|Set-Content -LiteralPath (Join-Path $Evidence 'result.json') -Encoding UTF8
 }else {$form.add_Shown({if($auto.Checked){Start-UpdateCheck}});$timer.Start();[void]$form.ShowDialog()}
 $timer.Stop();$timer.Dispose();if($picture.Image){$picture.Image.Dispose()};$form.Dispose()
