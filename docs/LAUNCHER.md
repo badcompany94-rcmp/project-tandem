@@ -31,6 +31,11 @@ still needs replacement when an actual code update or Repair requires a build.
 
 On Windows, open **Project Tandem.lnk** or **ProjectTandem.exe** after setup.
 Play starts the same unified LAN/Internet game; game settings remain in F1.
+**Close launcher when the game starts** is optional and off by default. When
+checked, the launcher closes after Play successfully starts the game and its
+networking helpers. It stays open during setup and repair, and shows startup
+errors instead of closing. The checkbox is saved independently of automatic
+update checks. Closing the launcher does not close the game or its networking.
 The launcher shows the installed release and online build ID and credits
 POOTERMAN's artwork. Beta 9 assigns the launcher window its own Windows taskbar
 identity and the fan-art icon, so it is represented as Tandem rather than its

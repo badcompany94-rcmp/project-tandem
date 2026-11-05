@@ -1,6 +1,6 @@
 # Online Time Trials
 
-Choose **Start Game > 1 Player > Online Time Trials**. Use Choose Course for a new run or Leaderboards to select a course and race a downloaded ghost. Mouse and controller navigation are supported. Selecting a leaderboard row goes through character/kart selection and straight to that ghost's course.
+Choose **Start Game > 1 Player > Online Time Trials**. Use Choose Course for a new run or Leaderboards to select a course and race a downloaded ghost. Each Ghost Lineup row shows rank, player, time and a **Race Ghost** button. Click the button, or select a row with the stick/D-pad and press **A**. This goes through character/kart selection and straight to that ghost's course. Use **Y** for the course dropdown, **X** to refresh and left/right to change pages. Mouse and controller navigation are supported.
 
 Keep Ghost enabled in the game's original Options menu. Only original courses and stock Time Trial rules are supported. Public boards and ghosts are separated by exact build ID, including when using different renderers.
 
