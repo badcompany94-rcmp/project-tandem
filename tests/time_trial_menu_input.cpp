@@ -5,6 +5,7 @@
 #include "time_trial_navigation.h"
 #include "time_trials_runtime.h"
 #include "desktop_pointer.h"
+#include "hw/pad.h"
 #include <cstdio>
 #include <cstdlib>
 #include <unordered_map>
@@ -86,6 +87,10 @@ void hit(float x,float y,float w,float h,int a){clickable.push_back({x/608,y/448
 void native_hit_pane(uint32_t pane,int action,float){
     if(action>=2300 && action<2306)hit(60,60+(action-2300)*50,488,46,action);
 }
+std::array<PadState,4> test_pads{};
+uint64_t test_ms=0;
+std::array<PadState,4> pad_capture_states(){return test_pads;}
+uint64_t trial_menu_milliseconds(){return test_ms;}
 #include "time_trial_menu.inc"
 
 CPU cpu;
@@ -93,7 +98,7 @@ constexpr uint32_t app=0x80100000,scene=0x80200000;
 void reset(){
     trial.~TrialMenu();new (&trial) TrialMenu;
     trials::transfer={};trials::session={};memory.clear();
-    initials="P1";
+    initials="P1";test_pads={};test_ms=0;
     cpu={};cpu.r[13]=0x80300000;cpu.r[2]=0x80310000;
     mem_w32(app+12,scene);mem_w32(cpu.r[13]-30528,1);
     mem_w32(scene+0x20e0,7);mem_w32(scene+0xd9c,0x80400000);
@@ -102,6 +107,13 @@ void reset(){
     desktop_pointer::state={true,-1,0,0};
 }
 void frame(unsigned pressed=0,unsigned repeat=0){
+    // Ordinary fixture calls are separate deliberate nudges, not a held stick.
+    test_ms+=150;test_pads={};
+    trial.vertical.step(0,false,false,test_ms-100);
+    trial.horizontal.step(0,false,false,test_ms-100);
+    test_pads[0].buttons=repeat&15;
+    if(repeat&0x08000000)test_pads[0].stick_y=228;
+    if(repeat&0x04000000)test_pads[0].stick_y=28;
     mem_w32(0x803b442c,pressed);mem_w32(0x803b4440,repeat);
     CHECK(trial_menu_update(&cpu,app));
     drawn_boxes.clear();
@@ -232,7 +244,10 @@ int main(){
     trials::TrialResponse reply;reply.action=trials::TrialAction::Download;reply.course=36;reply.record=ghost(36);
     trials::transfer.response=reply;trials::transfer.busy=false;frame();
     CHECK(trial.online_launch && trial.route.active());
-    click(trial_back);CHECK(!trial.online_launch && !trial.launch_ticks);
+    click(trial_back);CHECK(!trial.online_launch && !trial.launch_ticks && trial.pressed_ghost==-1);
+    board(1);click(trial_race_ghost);trials::transfer.response=reply;trials::transfer.busy=false;frame();
+    CHECK(trial.online_launch);trial.launch_ticks=1;frame();
+    CHECK(!trial.online_launch && trial.pressed_ghost==-1 && !trial.status.empty());
     // Name/time areas are inert; only the button responds and gets highlighted.
     board(5);CHECK(!has(2100) && !has(2104));
     const auto previous_requests=trials::transfer.submitted;
@@ -246,6 +261,27 @@ int main(){
     frame(0,4);CHECK(highlighted()==1 && trial.row==2);
     frame();CHECK(highlighted()==1 && trial.row==2); // idle mouse cannot steal focus
     point(trial_race_ghost+4,false);frame();CHECK(highlighted()==1 && trial.row==4);
+    // A held raw stick moves once initially even if retail repeat pulses flood.
+    board(5);test_pads[0].stick_y=28;const auto held_at=test_ms;
+    for(unsigned t=0;t<350;t+=5){
+        test_ms=held_at+t;mem_w32(0x803b4440,0x04000004);
+        CHECK(trial_menu_update(&cpu,app));CHECK(trial.row==1);
+    }
+    test_ms=held_at+400;CHECK(trial_menu_update(&cpu,app));CHECK(trial.row==2);
+    // Press feedback changes only the activated button, with no column flash.
+    board(5);point(trial_race_ghost+2,false);frame();const auto idle_boxes=drawn_boxes;
+    click(trial_race_ghost+2);CHECK(trial.pressed_ghost==2);
+    CHECK(drawn_boxes.size()==idle_boxes.size());unsigned changed_boxes=0;
+    for(unsigned i=0;i<drawn_boxes.size();++i){
+        const auto& a=idle_boxes[i];const auto& b=drawn_boxes[i];
+        if(a.x!=b.x || a.y!=b.y || a.w!=b.w || a.h!=b.h || a.color!=b.color){
+            CHECK(a.x>=430 && a.y>=208 && a.y<246);++changed_boxes;
+        }
+    }
+    CHECK(changed_boxes==2);
+    point(trial_race_ghost+4,true);frame(0,4);CHECK(trial.row==2 && trial.pressed_ghost==2);
+    trials::TrialResponse failure;failure.action=trials::TrialAction::Download;failure.course=36;failure.error="Fixture download failure";
+    trials::transfer.response=failure;trials::transfer.busy=false;frame();CHECK(trial.pressed_ghost==-1);
     // Every visible Race Ghost button targets its own entry, on every page.
     for(unsigned target=0;target<50;++target){
         board(50);while(trial.row/trial_page_size<target/trial_page_size)click(trial_next);
@@ -289,6 +325,13 @@ int main(){
     mem_w8(cpu.r[13]-23800,1);mem_w32(cpu.r[13]-23792,2);mem_w32(result+0x198c,30);
     CHECK(trial_result_update(&cpu));CHECK(trial_result_draw(&cpu));
     for(unsigned n=0;n<1200;++n){CHECK(trial_result_update(&cpu));CHECK(trial.result_open);}
+    test_pads[0].stick_y=28;const auto result_held_at=test_ms;
+    for(unsigned t=0;t<350;t+=5){
+        test_ms=result_held_at+t;mem_w32(0x803b4440,0x04000004);
+        CHECK(trial_result_update(&cpu));CHECK(trial.row==1);
+    }
+    test_ms=result_held_at+400;CHECK(trial_result_update(&cpu));CHECK(trial.row==2);
+    test_pads={};test_ms+=150;CHECK(trial_result_update(&cpu));
     point(2301,true);CHECK(trial_result_update(&cpu));CHECK(trial.name_open);CHECK(trial_result_draw(&cpu));
     desktop_pointer::typed="\b\bmyname\r";CHECK(trial_result_update(&cpu));CHECK(!trial.name_open && initials=="MYNAME");
     CHECK(trial_result_draw(&cpu));

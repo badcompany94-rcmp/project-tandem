@@ -14,6 +14,8 @@ struct TrialMenu {
     unsigned course_row=0;
     trials::GhostCourseRoute route;
     trials::MenuPointerFocus pointer;
+    trials::MenuAxisRepeat vertical,horizontal;
+    int pressed_ghost=-1;
     uint64_t shown_result=0;
     std::string status,rival,build,config;
     std::string name_draft,name_error,upload_name;
@@ -48,7 +50,8 @@ bool trial_mode_scene(CPU* c,uint32_t app,uint32_t& scene){
     return valid(scene,0x2200) && mem_r32(scene+0x20e0)==7 && native_pane_visible(mem_r32(scene+0xd9c));
 }
 void trial_change(CPU* c,TrialPage next,unsigned row=0){
-    trial.page=next;trial.row=row;trial.status.clear();sound(c,0x20002);
+    trial.page=next;trial.row=row;trial.status.clear();trial.pressed_ghost=-1;
+    trial.vertical={};trial.horizontal={};sound(c,0x20002);
     desktop_pointer::publish("trial-changing",{});
 }
 void trial_leave(){
@@ -57,6 +60,7 @@ void trial_leave(){
     trial.route.clear();trial.online_launch=false;trial.list_pending=false;trial.course_open=false;
     trial.launch_ticks=0;trial.return_board=false;trial.result_exiting=false;trial.result_object=0;
     trial.name_open=false;desktop_pointer::text_enabled=false;
+    trial.pressed_ghost=-1;trial.vertical={};trial.horizontal={};
 }
 void trial_launch(){
     trial.launch_target=2;trial.launch_ticks=180;trial.online_launch=true;
@@ -66,6 +70,7 @@ void trial_launch(){
 void trial_load_board(unsigned course){
     trial.client.cancel();trial.course=course;trial.row=0;trial.entries.clear();
     trial.course_open=false;trial.list_pending=true;trial.status="GETTING LATEST TIMES...";
+    trial.pressed_ghost=-1;
     desktop_pointer::publish("trial-board-changing",{});
 }
 bool trial_enter(){
@@ -88,8 +93,10 @@ void trial_request(trials::TrialAction action){
         request.record=*record;request.course=(*record)[3];
         request.display_name=initials;trial.upload_name=initials;
     }
-    if(trial.client.submit(std::move(request),trial.config,trial.build))
+    if(trial.client.submit(std::move(request),trial.config,trial.build)){
+        if(action==trials::TrialAction::Download)trial.pressed_ghost=int(trial.row);
         trial.status=action==trials::TrialAction::List?"GETTING LATEST TIMES...":action==trials::TrialAction::Download?"DOWNLOADING GHOST...":"UPLOADING YOUR GHOST...";
+    }
     else trial.status="FINISHING THE PREVIOUS REQUEST. PLEASE TRY AGAIN";
 }
 void trial_poll(){
@@ -102,7 +109,7 @@ void trial_poll(){
     if(response->action!=trials::TrialAction::Upload &&
        (trial.page!=TrialPage::Board || response->course!=trial.course))return;
     if(getenv("MKDD_NATIVE_MENU_TRACE"))fprintf(stderr,"[trial-service] action=%u success=%u entries=%zu\n",unsigned(response->action),response->error.empty(),response->entries.size());
-    if(!response->error.empty()){trial.status=response->error;return;}
+    if(!response->error.empty()){trial.pressed_ghost=-1;trial.status=response->error;return;}
     if(response->action==trials::TrialAction::List){
         trial.entries=response->entries;trial.row=0;trial.course_focus=trial.entries.empty();
         // A refreshed table may reorder players. Discard a queued click on the
@@ -116,6 +123,7 @@ void trial_poll(){
             if(trial.route.begin(response->course))trial_launch();
             else trial.status="THIS GHOST HAS AN UNSUPPORTED COURSE";
         }else trial.status=error;
+        if(!trial.online_launch)trial.pressed_ghost=-1;
     }else{trial.result_sent=true;trial.status="UPLOADED AS "+trial.upload_name+"! YOUR FRIEND CAN REFRESH";}
 }
 void trial_clear_buttons();
@@ -285,7 +293,7 @@ bool trial_menu_update(CPU* c,uint32_t app){
     if(trial.launch_ticks){
         const auto click=desktop_pointer::take();
         if((mem_r32(0x803b442c)&0x200) || trial_clicked_back(click)){
-            trial.launch_ticks=0;trial.online_launch=false;trial.route.clear();
+            trial.launch_ticks=0;trial.online_launch=false;trial.route.clear();trial.pressed_ghost=-1;
             trial.status.clear();trial_clear_buttons();return true;
         }
         if(getenv("MKDD_NATIVE_MENU_TRACE") && (trial.launch_ticks==60 || trial.launch_ticks==30 || trial.launch_ticks==1))fprintf(stderr,"[trial-launch] ticks=%u selected=%u target=%u pad=%08x scene=%08x r3=%08x edit=%08x counters=%u/%u/%u dialog=%u\n",trial.launch_ticks,mem_r32(scene+0x2100),trial.launch_target,mem_r32(0x803527f8),scene,c->r[3],mem_r32(scene+0x2108),mem_r32(scene+0x210c),mem_r32(scene+0x2110),mem_r32(scene+0x2114),mem_r32(mem_r32(scene+0x22b4)+0x14));
@@ -295,12 +303,12 @@ bool trial_menu_update(CPU* c,uint32_t app){
         if(mem_r32(scene+0x2100)==trial.launch_target){
             trial_clear_buttons();trial_native_button(0x100);
             if(trial.online_launch){
-                if(!--trial.launch_ticks){trial.online_launch=false;trial.route.clear();trial.status="COULD NOT OPEN CHARACTER SELECT. PLEASE TRY AGAIN";}
+                if(!--trial.launch_ticks){trial.online_launch=false;trial.route.clear();trial.pressed_ghost=-1;trial.status="COULD NOT OPEN CHARACTER SELECT. PLEASE TRY AGAIN";}
             }else{trial.launch_ticks=0;trial.native_flow=true;}
         }
         else {
             trial_clear_buttons();trial_native_button(0,trial.launch_target?0x04000000u:0x08000000u);
-            if(!--trial.launch_ticks){trial.online_launch=false;trial.route.clear();trial.status="COULD NOT OPEN CHARACTER SELECT. PLEASE TRY AGAIN";}
+            if(!--trial.launch_ticks){trial.online_launch=false;trial.route.clear();trial.pressed_ghost=-1;trial.status="COULD NOT OPEN CHARACTER SELECT. PLEASE TRY AGAIN";}
         }
         return true;
     }
@@ -308,8 +316,14 @@ bool trial_menu_update(CPU* c,uint32_t app){
     unsigned pressed=mem_r32(0x803b442c),repeat=mem_r32(0x803b4440);
     if(getenv("MKDD_NATIVE_MENU_TRACE") && (pressed || repeat))fprintf(stderr,"[trial-input] page=%u row=%u pressed=%x repeat=%x\n",unsigned(trial.page),trial.mode_row,pressed,repeat);
     const auto click=desktop_pointer::take();const auto hover=trial_hover(pressed,repeat,click);
-    const bool up=(repeat&(8|0x08000000u))!=0,down=(repeat&(4|0x04000000u))!=0;
-    const bool left=(repeat&(1|0x01000000u))!=0,right=(repeat&(2|0x02000000u))!=0;
+    bool up=(repeat&(8|0x08000000u))!=0,down=(repeat&(4|0x04000000u))!=0;
+    bool left=(repeat&(1|0x01000000u))!=0,right=(repeat&(2|0x02000000u))!=0;
+    if(trial.page==TrialPage::Board){
+        const auto pad=pad_capture_states()[0];const auto now=trial_menu_milliseconds();
+        const int v=trial.vertical.step(128-int(pad.stick_y),pad.buttons&PAD_UP,pad.buttons&PAD_DOWN,now);
+        const int h=trial.horizontal.step(int(pad.stick_x)-128,pad.buttons&PAD_LEFT,pad.buttons&PAD_RIGHT,now);
+        up=v<0;down=v>0;left=h<0;right=h>0;
+    }
     if(trial_clicked_back(click))pressed|=0x200;
     if(trial.page==TrialPage::None){
         if(hover>=2000 && hover<2003)trial.mode_row=unsigned(hover-2000);
@@ -337,11 +351,14 @@ bool trial_menu_update(CPU* c,uint32_t app){
         return true;
     }
     if(pressed&0x200){
-        trial.client.cancel();trial.list_pending=false;
+        trial.client.cancel();trial.list_pending=false;trial.pressed_ghost=-1;
         if(trial.page==TrialPage::Hub){trial_leave();trial.mode_row=2;}
         else trial_change(c,TrialPage::Hub);
         return true;
     }
+    // Keep the pressed button/page stable while its one download is in flight.
+    // Back still cancels; no unrelated button changes its appearance.
+    if(trial.page==TrialPage::Board && trial.pressed_ghost>=0)return true;
     if(trial.page==TrialPage::Board && ((pressed&0x800) || (click && *click==2201))){
         trial.course_open=true;trial.course_focus=true;trial.course_row=trials::course_slot(trial.course).value_or(0);return true;
     }
@@ -492,7 +509,7 @@ bool trial_menu_draw(CPU* c,uint32_t app){
             const auto& entry=trial.entries[i];const float y=147+(i-start)*42;
             const bool selected=i==trial.row && !trial.course_focus &&
                 (trial.pointer.controller_active() || desktop_pointer::read().hover==trial_race_ghost+int(i));
-            const bool busy=trial.client.busy() || trial.list_pending;
+            const bool depressed=trial.pressed_ghost==int(i);
             box(c,30,y,548,38,0x062e60ee);
             box(c,30,y,4,38,0x3183baff);
             text(c,(std::to_string(i+1)+".").c_str(),42,y+9,17,0xffed83ff);
@@ -501,11 +518,12 @@ bool trial_menu_draw(CPU* c,uint32_t app){
             text(c,"GHOST READY TO RACE",78,y+24,9,0xace7ffff);
             text(c,trial_time(entry.time_ms).c_str(),308,y+10,16,0xffed83ff);
             // Only the raised button is interactive; rank/name/time are labels.
+            const float press=depressed?2.f:0.f;
             box(c,432,y+7,138,29,0x02162fff);
-            box(c,430,y+3,140,32,selected && !busy?0xffffffff:0x9e722aff);
-            box(c,432,y+5,136,28,busy?0x677580ff:selected?0xffee8aff:0xefc54eff);
-            if(!trial_art_word(c,"RACE GHOST",500,y+8,21,2,true))
-                text(c,"RACE GHOST",444,y+12,13,0x062550ff);
+            box(c,430,y+3+press,140,32-press,selected || depressed?0xffffffff:0x9e722aff);
+            box(c,432,y+5+press,136,28-press,depressed?0xd8ad3fff:selected?0xffee8aff:0xefc54eff);
+            if(!trial_art_word(c,"RACE GHOST",500,y+8+press,21,2,true))
+                text(c,"RACE GHOST",444,y+12+press,13,0x062550ff);
             hit(432,y+5,136,28,trial_race_ghost+i);
         }
         if(start){text(c,"< PREV",40,360,12,0xffed83ff);hit(30,356,110,26,trial_previous);}
@@ -569,6 +587,7 @@ bool trial_result_update(CPU* c){
     if(session.result_serial()!=trial.shown_result){
         trial.shown_result=session.result_serial();trial.result_sent=false;trial.result_exiting=false;
         trial.status.clear();trial.row=0;trial.route.clear();
+        trial.vertical={};
         desktop_pointer::context(true);desktop_pointer::publish("trial-result",{});
     }
     if(trial.result_exiting)return false;
@@ -578,7 +597,9 @@ bool trial_result_update(CPU* c){
     unsigned pressed=mem_r32(0x803b442c),repeat=mem_r32(0x803b4440);
     const auto click=desktop_pointer::take();const auto hover=trial_hover(pressed,repeat,click);
     if(hover>=2300 && hover<2306)trial.row=hover-2300;
-    if(repeat&(8|4|0x0c000000u))trial.row=(trial.row+((repeat&(8|0x08000000u))?5:1))%6;
+    const auto pad=pad_capture_states()[0];
+    const int move=trial.vertical.step(128-int(pad.stick_y),pad.buttons&PAD_UP,pad.buttons&PAD_DOWN,trial_menu_milliseconds());
+    if(move)trial.row=(trial.row+(move<0?5:1))%6;
     if(click && *click>=2300 && *click<2306){trial.row=*click-2300;pressed|=0x100;}
     // No timeout, and B/Start do not silently discard the completed run.
     trial_clear_buttons();mem_w32(c->r[13]-23796,trial_result_choices[trial.row]);

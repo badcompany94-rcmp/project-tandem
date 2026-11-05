@@ -554,6 +554,9 @@ void native_follow_course(CPU*,uint32_t);
 #include "online_native_selection.inc"
 #include "native_pointer.inc"
 #include "time_trial_art.inc"
+uint64_t trial_menu_milliseconds(){
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 #include "time_trial_menu.inc"
 bool native_dialog_regions(CPU* c) {
     const auto state=mem_r32(c->r[13]-0x5644);
