@@ -318,7 +318,7 @@ bool trial_menu_update(CPU* c,uint32_t app){
     const auto click=desktop_pointer::take();const auto hover=trial_hover(pressed,repeat,click);
     bool up=(repeat&(8|0x08000000u))!=0,down=(repeat&(4|0x04000000u))!=0;
     bool left=(repeat&(1|0x01000000u))!=0,right=(repeat&(2|0x02000000u))!=0;
-    if(trial.page==TrialPage::Board){
+    if(trial.page==TrialPage::None || trial.page==TrialPage::Board){
         const auto pad=pad_capture_states()[0];const auto now=trial_menu_milliseconds();
         const int v=trial.vertical.step(128-int(pad.stick_y),pad.buttons&PAD_UP,pad.buttons&PAD_DOWN,now);
         const int h=trial.horizontal.step(int(pad.stick_x)-128,pad.buttons&PAD_LEFT,pad.buttons&PAD_RIGHT,now);

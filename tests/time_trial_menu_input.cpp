@@ -176,6 +176,23 @@ int main(){
     // Only the one-player mode pane is replaced during its entrance animation.
     reset();mem_w32(scene+0x20e0,6);CHECK(trial_menu_draw(&cpu,app));
     mem_w32(scene+0xd9c,0);CHECK(!trial_menu_draw(&cpu,app));
+    // Select Mode uses the same deliberate repeat as the board and retry menu.
+    // Flooded retail pulses must not turn a short nudge into two selections.
+    for(bool digital:{false,true}){
+        reset();frame();const auto start=test_ms;
+        test_pads[0].stick_y=digital?128:28;
+        test_pads[0].buttons=digital?PAD_DOWN:0;
+        for(unsigned t=0;t<400;t+=5){
+            test_ms=start+t;mem_w32(0x803b4440,0x04000004);
+            CHECK(trial_menu_update(&cpu,app));CHECK(trial.mode_row==1);
+        }
+        test_ms=start+400;CHECK(trial_menu_update(&cpu,app));CHECK(trial.mode_row==2);
+        test_pads={};test_ms+=20;CHECK(trial_menu_update(&cpu,app));
+        test_ms+=150;test_pads[0].stick_y=digital?128:228;test_pads[0].buttons=digital?PAD_UP:0;
+        mem_w32(0x803b4440,0x08000008);
+        CHECK(trial_menu_update(&cpu,app));CHECK(trial.mode_row==1);
+        CHECK(trial_menu_update(&cpu,app));CHECK(trial.mode_row==1);
+    }
     // All three mode rows, stick/D-pad, A/Start, Back, mouse and stationary hover.
     reset();frame();point(2000,false);frame(0,4);CHECK(trial.mode_row==1);
     frame();CHECK(trial.mode_row==1);frame(0,0x04000000);CHECK(trial.mode_row==2);
