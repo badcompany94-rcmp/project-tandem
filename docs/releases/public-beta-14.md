@@ -1,6 +1,6 @@
 Online Time Trials, original-style menus, and Windows frame-pacing improvements.
 
-**November 4 service update:** Public times and ghosts now carry over between compatible releases, including Beta 14 and Beta 15. Existing records are preserved and available in both. Refresh the leaderboard; no additional download is needed. This supersedes the original build-specific leaderboard limitation below.
+**November 4 service update:** Public times and ghosts now carry over between compatible releases, including Beta 14 and Beta 15. Existing records are preserved and available in both. Refresh the leaderboard; no additional download is needed.
 
 ### New: Online Time Trials (beta)
 
@@ -31,4 +31,4 @@ Local validation includes native menu/gameplay checks, ghost upload/list/downloa
 
 **Existing players:** use Check for Updates in the launcher, then install the update. **New players:** download **ProjectTandem.exe**, choose an installation folder, and select your own compatible USA Double Dash disc image when asked. Saves and settings are retained by the updater.
 
-All players in a multiplayer lobby must update to the same build. Time Trial ghosts and boards are also build-specific. Texture packs, custom courses and Extra CC development are not included in this release.
+All players in a multiplayer lobby must update to the same build. Public Time Trial times and ghosts carry over across compatible updates; updating does not reset the leaderboard. Private test runs remain separate. Texture packs, custom courses and Extra CC development are not included in this release.

@@ -13,7 +13,7 @@ Ghost Lineup, smoother menu controls, and an optional launcher close setting.
 ### Install or update
 Existing players: **Check for Updates** in the launcher, then install the update. New players: download **ProjectTandem.exe**, choose an installation folder, and select your own supported USA Double Dash disc image when prompted. Saves and settings are retained.
 
-Everyone in a multiplayer lobby must use the same build. **Time Trial leaderboards carry over across compatible updates.** A service patch applied on November 4 brings the existing Beta 14 public times and ghosts into Beta 15, preserving their names, times, IDs and recordings. Refresh the leaderboard; no additional game download or rebuild is needed. Private test runs stay excluded. Future compatible releases will continue using this board.
+Everyone in a multiplayer lobby must use the same build. **Public Time Trial times and ghosts carry over across compatible updates—updating does not reset the leaderboard.** Existing Beta 14 runs are available in Beta 15 with their names, times, timestamps, IDs and ghost recordings preserved. Refresh the leaderboard; no additional game download or rebuild is needed. Private test runs remain separate. If future gameplay changes require a different competitive category, existing records will be retained rather than erased.
 
 OpenGL remains the default; Direct3D 11 remains experimental. This is a menu/input/launcher update, with no new graphics-performance claim. HD packs, Plus/custom courses, and Extra CC development are not included.
 
