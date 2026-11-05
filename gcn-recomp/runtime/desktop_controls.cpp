@@ -401,7 +401,11 @@ void sample(std::array<PadState,4>& pads,uint64_t now) {
             const int menu_keys[]={SDL_SCANCODE_RETURN,SDL_SCANCODE_BACKSPACE,SDL_SCANCODE_X,SDL_SCANCODE_Y,SDL_SCANCODE_R,SDL_SCANCODE_N,
                 SDL_SCANCODE_UP,SDL_SCANCODE_DOWN,SDL_SCANCODE_LEFT,SDL_SCANCODE_RIGHT};
             for(int a=0;a<10;++a)if(keys[menu_keys[a]] && !guarded_keys[menu_keys[a]])values[a]=1;
-            values[StickUp]=values[DUp];values[StickDown]=values[DDown];values[StickLeft]=values[DLeft];values[StickRight]=values[DRight];
+            // Keyboard/D-pad navigation supplements the already sampled analog stick.
+            values[StickUp]=std::max(values[StickUp],values[DUp]);
+            values[StickDown]=std::max(values[StickDown],values[DDown]);
+            values[StickLeft]=std::max(values[StickLeft],values[DLeft]);
+            values[StickRight]=std::max(values[StickRight],values[DRight]);
         }
         if(!menu && keyboard && desktop_pointer::navigation_enabled && !desktop_pointer::text_enabled) {
             const int arrows[]={SDL_SCANCODE_UP,SDL_SCANCODE_DOWN,SDL_SCANCODE_LEFT,SDL_SCANCODE_RIGHT};

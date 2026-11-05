@@ -52,6 +52,25 @@ int main(int argc,char** argv) {
     b.axis(0,32767);c.axis(1,-32768);state=read();
     require(state[1].stick_x==228 && state[2].stick_y==228 && state[0].stick_x==128 && state[3].stick_x==128,"independent sticks");
     b.axis(0,0);c.axis(1,0);
+    // Menu keyboard navigation must supplement, not replace, the controller stick.
+    const bool previous_keyboard=configuration()[0].keyboard;
+    desktop_pointer::context(true);read();
+    configuration()[0].keyboard=false;a.axis(0,22000);
+    const auto controller_only=read()[0].stick_x;
+    require(controller_only>128,"controller stick navigates menu without keyboard");
+    configuration()[0].keyboard=true;
+    require(read()[0].stick_x==controller_only,"enabling keyboard preserves menu controller stick");
+    a.axis(0,-22000);require(read()[0].stick_x<128,"mixed menu left stick preserved");
+    a.axis(0,0);a.axis(1,-22000);require(read()[0].stick_y>128,"mixed menu up stick preserved");
+    a.axis(1,22000);require(read()[0].stick_y<128,"mixed menu down stick preserved");a.axis(1,0);
+    key(SDL_SCANCODE_RIGHT,true);require(read()[0].stick_x==228,"mixed menu keyboard arrows work");key(SDL_SCANCODE_RIGHT,false);
+    a.button(SDL_CONTROLLER_BUTTON_DPAD_LEFT,true);require(read()[0].stick_x==28,"mixed menu controller dpad works");a.button(SDL_CONTROLLER_BUTTON_DPAD_LEFT,false);
+    a.axis(0,22000);key(SDL_SCANCODE_UP,true);state=read();
+    require(state[0].stick_x==controller_only && state[0].stick_y==228,"simultaneous keyboard and controller directions merge");
+    key(SDL_SCANCODE_UP,false);a.axis(0,0);read();
+    desktop_pointer::context(false);read();a.axis(0,22000);
+    require(read()[0].stick_x==controller_only,"mixed input race stick is unchanged");
+    a.axis(0,0);configuration()[0].keyboard=previous_keyboard;read();
     configuration()[1].bindings[A][0]={Source::Button,SDL_CONTROLLER_BUTTON_Y,1};b.button(3,true);
     require((read()[1].buttons&PAD_A)!=0 && !read()[0].buttons,"remapped controller input reaches intended port");b.button(3,false);
     require(assign(0,Device::Controller,list[1].id,list[1].name),"move controller to another port");
