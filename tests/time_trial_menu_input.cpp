@@ -59,7 +59,9 @@ bool backgrounds(CPU*){return true;}
 void text(CPU*,const char*,float,float,float=24,uint32_t=0xffffffff,bool=false){}
 void label(CPU*,const std::string&,float,float=24,uint32_t=0xffffffff){}
 void racing_text(CPU*,const std::string&,float,float,float,uint32_t,bool,bool){}
-void box(CPU*,float,float,float,float,uint32_t){}
+struct DrawBox {float x,y,w,h;uint32_t color;};
+std::vector<DrawBox> drawn_boxes;
+void box(CPU*,float x,float y,float w,float h,uint32_t color){drawn_boxes.push_back({x,y,w,h,color});}
 void flat_polygon(CPU*,const float (*)[2],unsigned,uint32_t){}
 bool native_selection=false;
 std::string initials="P1";
@@ -102,6 +104,7 @@ void reset(){
 void frame(unsigned pressed=0,unsigned repeat=0){
     mem_w32(0x803b442c,pressed);mem_w32(0x803b4440,repeat);
     CHECK(trial_menu_update(&cpu,app));
+    drawn_boxes.clear();
     if(!trial_menu_draw(&cpu,app))CHECK(trial.native_flow || (trial.launch_ticks && !trial.online_launch));
 }
 desktop_pointer::Region region(int action){
@@ -203,14 +206,14 @@ int main(){
     frame(0x800);CHECK(trial.course_open);frame(0x800);CHECK(!trial.course_open);
     click(2201);click(2201);CHECK(!trial.course_open);
 
-    // Full/partial pages, header-to-rows wrap, empty board and repeated refresh.
+    // Full/partial pages, button-only wrap, empty board and repeated refresh.
     for(unsigned count:{0u,1u,5u,6u,10u,50u}){
-        board(count);CHECK(trial.course_focus);
+        board(count);CHECK(trial.course_focus==(count==0));
         if(count){
             frame(0,8);CHECK(!trial.course_focus && trial.row==count-1);
-            frame(0,4);CHECK(trial.course_focus);
             frame(0,4);CHECK(!trial.course_focus && trial.row==0);
-            frame(0,8);CHECK(trial.course_focus);
+            frame(0,4);CHECK(!trial.course_focus && trial.row==(1%count));
+            frame(0,8);CHECK(!trial.course_focus && trial.row==0);
             while(has(trial_next))click(trial_next);
             CHECK(trial.row/trial_page_size==(count-1)/trial_page_size);
             if(count>trial_page_size){click(trial_previous);CHECK(trial.row/trial_page_size==(count-1)/trial_page_size-1);}
@@ -221,7 +224,7 @@ int main(){
         CHECK(trials::transfer.submitted==requests+1);
         click(trial_back);CHECK(trial.page==TrialPage::Hub);
     }
-    // Clicking a row downloads that run without a Ready page. Back stays usable
+    // Clicking a button downloads that run without a Ready page. Back stays usable
     // while busy; a cancelled worker's reply is discarded by the client contract.
     board(50);click(trial_next);click(trial_race_ghost+7);
     CHECK(trials::transfer.request->action==trials::TrialAction::Download && trials::transfer.request->entry.id=="7");
@@ -230,6 +233,19 @@ int main(){
     trials::transfer.response=reply;trials::transfer.busy=false;frame();
     CHECK(trial.online_launch && trial.route.active());
     click(trial_back);CHECK(!trial.online_launch && !trial.launch_ticks);
+    // Name/time areas are inert; only the button responds and gets highlighted.
+    board(5);CHECK(!has(2100) && !has(2104));
+    const auto previous_requests=trials::transfer.submitted;
+    desktop_pointer::clicked=2100;frame();CHECK(trials::transfer.submitted==previous_requests);
+    auto highlighted=[](){unsigned count=0;for(const auto& b:drawn_boxes){
+        if(b.x==30 && b.w==548 && b.h==38)CHECK(b.color==0x062e60ee);
+        if(b.x==430 && b.w==140 && b.color==0xffffffff)++count;
+    }return count;};
+    point(trial_race_ghost+1,false);frame();CHECK(highlighted()==1 && trial.row==1);
+    desktop_pointer::state.hover=-1;desktop_pointer::state.x=.2f;frame();CHECK(highlighted()==0);
+    frame(0,4);CHECK(highlighted()==1 && trial.row==2);
+    frame();CHECK(highlighted()==1 && trial.row==2); // idle mouse cannot steal focus
+    point(trial_race_ghost+4,false);frame();CHECK(highlighted()==1 && trial.row==4);
     // Every visible Race Ghost button targets its own entry, on every page.
     for(unsigned target=0;target<50;++target){
         board(50);while(trial.row/trial_page_size<target/trial_page_size)click(trial_next);
@@ -239,15 +255,15 @@ int main(){
         click(trial_race_ghost+target);
         CHECK(trials::transfer.request->entry.id==std::to_string(target));
     }
-    board(6);frame(0,4);frame(0x100);
+    board(6);frame(0x100);
     CHECK(trials::transfer.request->action==trials::TrialAction::Download && trials::transfer.request->entry.id=="0");
-    board(10);click(2100);click(trial_back);CHECK(trial.page==TrialPage::Hub && !trial.online_launch);
+    board(10);click(trial_race_ghost);click(trial_back);CHECK(trial.page==TrialPage::Hub && !trial.online_launch);
     click(2100);CHECK(trial.online_launch); // cancelled HTTP cannot block Choose Course
     // A refresh cannot reinterpret an old mouse click as another player's run.
-    board(10);click(2200);point(2100,true);
+    board(10);click(2200);point(trial_race_ghost,true);
     trials::TrialResponse changed;changed.course=36;changed.entries.push_back({"new","NEW PLAYER","hash",89000});
     trials::transfer.busy=false;trials::transfer.response=changed;frame();
-    CHECK(!trial.online_launch && trials::transfer.request->action==trials::TrialAction::List && trial.course_focus);
+    CHECK(!trial.online_launch && trials::transfer.request->action==trials::TrialAction::List && !trial.course_focus);
     // Rapid course changes wait for the cancelled worker, then request latest.
     board(10);click(2200);click(2201);click(trial_next);click(2415);
     CHECK(trial.list_pending);click(2201);click(trial_previous);click(2401);

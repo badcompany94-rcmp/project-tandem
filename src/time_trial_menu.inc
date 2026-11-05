@@ -104,7 +104,7 @@ void trial_poll(){
     if(getenv("MKDD_NATIVE_MENU_TRACE"))fprintf(stderr,"[trial-service] action=%u success=%u entries=%zu\n",unsigned(response->action),response->error.empty(),response->entries.size());
     if(!response->error.empty()){trial.status=response->error;return;}
     if(response->action==trials::TrialAction::List){
-        trial.entries=response->entries;trial.row=0;trial.course_focus=true;
+        trial.entries=response->entries;trial.row=0;trial.course_focus=trial.entries.empty();
         // A refreshed table may reorder players. Discard a queued click on the
         // previous table rather than downloading a different player's ghost.
         desktop_pointer::publish("trial-board-updated",{});
@@ -347,11 +347,10 @@ bool trial_menu_update(CPU* c,uint32_t app){
     }
     const unsigned count=trial.page==TrialPage::Hub?2:unsigned(trial.entries.size());
     if(trial.page==TrialPage::Board && hover==2201)trial.course_focus=true;
-    const int row_hover=hover>=trial_race_ghost?hover-trial_race_ghost:hover-2100;
+    const int row_hover=hover-(trial.page==TrialPage::Board?trial_race_ghost:2100);
     if(row_hover>=0 && unsigned(row_hover)<count){trial.row=unsigned(row_hover);trial.course_focus=false;}
     if(count && (up || down)){
         if(trial.page==TrialPage::Board && trial.course_focus){trial.course_focus=false;trial.row=up?count-1:0;}
-        else if(trial.page==TrialPage::Board && ((up && !trial.row) || (down && trial.row==count-1)))trial.course_focus=true;
         else trial.row=(trial.row+(up?count-1:1))%count;
         sound(c,0x20000);
     }
@@ -359,8 +358,8 @@ bool trial_menu_update(CPU* c,uint32_t app){
     if(trial.page==TrialPage::Board && (previous || next) && count){
         trial.row=std::min(count-1,unsigned(std::max(0,int(trial.row)+(previous?-int(trial_page_size):int(trial_page_size)))));trial.course_focus=false;
     }
-    if(click && *click>=2100 && unsigned(*click-2100)<count){trial.row=unsigned(*click-2100);trial.course_focus=false;pressed|=0x100;}
-    if(click && *click>=trial_race_ghost && unsigned(*click-trial_race_ghost)<count){trial.row=unsigned(*click-trial_race_ghost);trial.course_focus=false;pressed|=0x100;}
+    if(trial.page==TrialPage::Hub && click && *click>=2100 && unsigned(*click-2100)<count){trial.row=unsigned(*click-2100);trial.course_focus=false;pressed|=0x100;}
+    if(trial.page==TrialPage::Board && click && *click>=trial_race_ghost && unsigned(*click-trial_race_ghost)<count){trial.row=unsigned(*click-trial_race_ghost);trial.course_focus=false;pressed|=0x100;}
     if(click && *click==2200)pressed|=0x400;
     if(trial.page==TrialPage::Board && trial.course_focus && (pressed&0x1100)){
         trial.course_open=true;trial.course_row=trials::course_slot(trial.course).value_or(0);return true;
@@ -491,16 +490,19 @@ bool trial_menu_draw(CPU* c,uint32_t app){
         const unsigned start=trial.row/trial_page_size*trial_page_size;
         for(unsigned i=start;i<trial.entries.size() && i<start+trial_page_size;++i){
             const auto& entry=trial.entries[i];const float y=147+(i-start)*42;
-            const bool selected=i==trial.row && !trial.course_focus;
+            const bool selected=i==trial.row && !trial.course_focus &&
+                (trial.pointer.controller_active() || desktop_pointer::read().hover==trial_race_ghost+int(i));
             const bool busy=trial.client.busy() || trial.list_pending;
-            box(c,30,y,548,38,selected?0x176caeff:0x062e60ee);
-            box(c,30,y,4,38,selected?0xffffffff:0x3183baff);
+            box(c,30,y,548,38,0x062e60ee);
+            box(c,30,y,4,38,0x3183baff);
             text(c,(std::to_string(i+1)+".").c_str(),42,y+9,17,0xffed83ff);
             const float name_size=std::min(18.f,218.f/std::max(1.f,float(entry.name.size())*.65f));
-            text(c,entry.name.c_str(),78,y+3,name_size,selected?0xffff83ff:0xffffffff);
+            text(c,entry.name.c_str(),78,y+3,name_size,0xffffffff);
             text(c,"GHOST READY TO RACE",78,y+24,9,0xace7ffff);
             text(c,trial_time(entry.time_ms).c_str(),308,y+10,16,0xffed83ff);
-            hit(30,y,548,38,2100+i);
+            // Only the raised button is interactive; rank/name/time are labels.
+            box(c,432,y+7,138,29,0x02162fff);
+            box(c,430,y+3,140,32,selected && !busy?0xffffffff:0x9e722aff);
             box(c,432,y+5,136,28,busy?0x677580ff:selected?0xffee8aff:0xefc54eff);
             if(!trial_art_word(c,"RACE GHOST",500,y+8,21,2,true))
                 text(c,"RACE GHOST",444,y+12,13,0x062550ff);

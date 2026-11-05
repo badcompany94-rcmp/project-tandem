@@ -16,6 +16,7 @@ inline std::optional<unsigned> course_slot(unsigned course) {
 // frame. Actual movement or a click hands focus back to the mouse immediately.
 class MenuPointerFocus {
 public:
+    bool controller_active()const{return controller_;}
     int hover(int hovered,float x,float y,bool controller,bool clicked) {
         if(controller)controller_=true;
         else if(clicked || x!=x_ || y!=y_)controller_=false;
