@@ -2,7 +2,7 @@
 
 Choose **Start Game > 1 Player > Online Time Trials**. Use Choose Course for a new run or Leaderboards to select a course and race a downloaded ghost. Each Ghost Lineup row shows rank, player, time and a **Race Ghost** button. Click the button, or select a button with the stick/D-pad and press **A**. This goes through character/kart selection and straight to that ghost's course. Use **Y** for the course dropdown, **X** to refresh and left/right to change pages. Mouse and controller navigation are supported.
 
-Keep Ghost enabled in the game's original Options menu. Only original courses and stock Time Trial rules are supported. Public boards and ghosts are separated by exact build ID, including when using different renderers.
+Keep Ghost enabled in the game's original Options menu. Only original courses and stock Time Trial rules are supported. Public times and ghosts carry over across compatible updates: Beta 14 and Beta 15 share the same stock Time Trial leaderboard. OpenGL and Direct3D use that same board. Routine menu, launcher and graphics updates do not reset it. A change to course rules, physics or ghost playback must be checked for compatibility; any incompatible category must preserve the earlier records rather than delete them. Multiplayer lobbies still require matching game builds.
 
 After finishing, choose Retry, Change Name, To Leaderboards, Replay, Upload Ghost, or Quit. Upload is optional. The results screen does not expire. Change Name and F1 > Online edit the name used for the next upload, which accepts 1–7 letters or numbers.
 

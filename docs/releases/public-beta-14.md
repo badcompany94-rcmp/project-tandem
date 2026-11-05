@@ -1,5 +1,7 @@
 Online Time Trials, original-style menus, and Windows frame-pacing improvements.
 
+**November 4 service update:** Public times and ghosts now carry over between compatible releases, including Beta 14 and Beta 15. Existing records are preserved and available in both. Refresh the leaderboard; no additional download is needed. This supersedes the original build-specific leaderboard limitation below.
+
 ### New: Online Time Trials (beta)
 
 - Open **Start Game > 1 Player > Online Time Trials**. Choose a course for your own run, or browse the course leaderboard and select a player's ghost to race.
